@@ -8,6 +8,9 @@ set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${C
 find_package(PkgConfig REQUIRED)
 find_package(Fcitx5Core ${REQUIRED_FCITX_VERSION} REQUIRED)
 find_package(Fcitx5Module REQUIRED COMPONENTS TestFrontend)
+# Optional push-to-talk dictation module (github.com/siygle/fcitx5-voxkit).
+find_package(Fcitx5ModuleVoxkit QUIET)
+option(ENABLE_VOXKIT "Integrate with the fcitx5-voxkit dictation module" ${Fcitx5ModuleVoxkit_FOUND})
 find_package(Gettext REQUIRED)
 include(FeatureSummary)
 include(GNUInstallDirs)
