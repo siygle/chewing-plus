@@ -1,0 +1,25 @@
+# Builds libchewing from the local checkout (~/Work/libchewing). No network.
+pkgname=libchewing-plus
+pkgver=0.14.0rc1.r5.g26f3e70f
+pkgrel=1
+pkgdesc="Intelligent Chinese phonetic input method library (0.14 from ~/Work/libchewing)"
+arch=(x86_64)
+url="https://codeberg.org/chewing/libchewing"
+license=(LGPL-2.1-or-later)
+depends=(glibc gcc-libs)
+makedepends=(cmake rust git)
+provides=("libchewing=${pkgver}" libchewing.so)
+conflicts=(libchewing)
+options=(!debug !lto)
+_src=$(realpath "$startdir/../../../libchewing")
+pkgver() {
+  git -C "$_src" describe --tags | sed 's/^v//; s/-rc\./rc/; s/-\([0-9]*\)-g/.r\1.g/; s/-/./g'
+}
+build() {
+  cmake -S "$_src" -B build -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_DOC=OFF -DBUILD_TESTING=OFF
+  cmake --build build
+}
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

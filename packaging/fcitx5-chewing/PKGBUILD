@@ -1,0 +1,29 @@
+# Builds fcitx5-chewing (plus branch) from this checkout against the
+# locally built libchewing-plus package. No network.
+pkgname=fcitx5-chewing-plus
+pkgver=5.1.13.plus.r265.gff804e0
+pkgrel=1
+pkgdesc="Chewing wrapper for Fcitx5 with Plus features (from ~/Work/fcitx5-chewing)"
+arch=(x86_64)
+url="https://github.com/fcitx/fcitx5-chewing"
+license=(LGPL-2.1-or-later)
+depends=(fcitx5 'libchewing-plus>=0.14.0rc1')
+makedepends=(cmake extra-cmake-modules ninja git)
+provides=("fcitx5-chewing=${pkgver}")
+conflicts=(fcitx5-chewing)
+options=(!debug)
+_src=$(realpath "$startdir/../..")
+_lc=$(realpath "$startdir/../libchewing/pkg/libchewing-plus")
+pkgver() {
+  echo "$(git -C "$_src" describe --tags --abbrev=0).plus.r$(git -C "$_src" rev-list --count HEAD).g$(git -C "$_src" rev-parse --short HEAD)"
+}
+build() {
+  [[ -f $_lc/usr/lib/pkgconfig/chewing.pc ]] || { echo "build libchewing-plus first"; return 1; }
+  PKG_CONFIG_PATH="$_lc/usr/lib/pkgconfig" PKG_CONFIG_SYSROOT_DIR="$_lc" \
+    cmake -S "$_src" -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr \
+      -DCMAKE_BUILD_TYPE=Release -DENABLE_TEST=OFF
+  cmake --build build
+}
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}
