@@ -292,11 +292,17 @@ void logger(void * /*context*/, int /*level*/, const char *fmt, ...) {
 
 ChewingContext *getChewingContext() {
     const auto &sp = StandardPaths::global();
-    std::filesystem::path dictData =
-        sp.locate(StandardPathsType::Data, "libchewing/tsi.dat");
-    if (!dictData.empty()) {
-        std::string sysPath = dictData.parent_path().string();
-        return chewing_new2(sysPath.c_str(), nullptr, nullptr, nullptr);
+    // libchewing >= 0.14 ships static_dict.bin instead of tsi.dat. Prefer it,
+    // so a leftover 0.13 tsi.dat elsewhere on XDG_DATA_DIRS is never used
+    // with a 0.14 library (which cannot read it).
+    for (const char *marker :
+         {"libchewing/static_dict.bin", "libchewing/tsi.dat"}) {
+        std::filesystem::path dictData =
+            sp.locate(StandardPathsType::Data, marker);
+        if (!dictData.empty()) {
+            std::string sysPath = dictData.parent_path().string();
+            return chewing_new2(sysPath.c_str(), nullptr, nullptr, nullptr);
+        }
     }
     return chewing_new();
 }
