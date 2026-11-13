@@ -1,8 +1,15 @@
 set(CHEWING_SOURCES
     eim.cpp
+    plus/ChewingPlus.cpp
+    plus/PlusEmoji.cpp
+    plus/PlusEnglish.cpp
+    plus/PlusFeatures.cpp
 )
 add_fcitx5_addon(chewing ${CHEWING_SOURCES})
 target_link_libraries(chewing Fcitx5::Core Fcitx5::Config ${CHEWING_TARGET})
+target_include_directories(chewing PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/plus)
+# Plus sources use C++20 (std::string::starts_with).
+set_target_properties(chewing PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
 target_compile_definitions(chewing PRIVATE FCITX_GETTEXT_DOMAIN=\"fcitx5-chewing\")
 fcitx5_add_i18n_definition(TARGETS chewing)
 install(TARGETS chewing DESTINATION "${CMAKE_INSTALL_LIBDIR}/fcitx5")

@@ -6,7 +6,9 @@
  *
  */
 #include "eim.h"
+#include <algorithm>
 #include <array>
+#include <chrono>
 #include <chewing.h>
 #include <cstdarg>
 #include <cstdio>
@@ -108,7 +110,7 @@ public:
         }
 
         if (chewing_commit_Check(ctx)) {
-            inputContext->commitString(safeChewing_commit_String(ctx));
+            engine_->commit(inputContext, safeChewing_commit_String(ctx));
         }
         engine_->updateUI(inputContext);
     }
@@ -116,6 +118,35 @@ public:
 private:
     ChewingEngine *engine_;
     int index_;
+};
+
+// A Plus panel candidate, or the emoji appended to a Chewing candidate page.
+class PlusCandidateWord : public CandidateWord {
+public:
+    PlusCandidateWord(ChewingEngine *engine, std::string display, int index,
+                      std::string emojiCommit = {})
+        : CandidateWord(Text(std::move(display))), engine_(engine),
+          index_(index), emojiCommit_(std::move(emojiCommit)) {}
+
+    void select(InputContext *ic) const override {
+        auto *ctx = engine_->context();
+        if (!emojiCommit_.empty()) {
+            chewing_cand_close(ctx);
+            chewing_clean_bopomofo_buf(ctx);
+            chewing_clean_preedit_buf(ctx);
+            engine_->commit(ic, emojiCommit_);
+        } else {
+            engine_->plus().select(
+                ctx, index_,
+                [this, ic](const std::string &t) { engine_->commit(ic, t); });
+        }
+        engine_->updateUI(ic);
+    }
+
+private:
+    ChewingEngine *engine_;
+    int index_;
+    std::string emojiCommit_;
 };
 
 class ChewingCandidateList : public CandidateList,
@@ -151,6 +182,20 @@ public:
         labels_.clear();
         cursor_ = 0;
 
+        if (const auto &panel = engine_->plus().panel(); panel.active()) {
+            plusPanel_ = true;
+            const bool english =
+                panel.kind == chewing_plus::Panel::Kind::English;
+            for (size_t i = 0; i < panel.labels.size() && i < 9; i++) {
+                candidateWords_.emplace_back(std::make_unique<PlusCandidateWord>(
+                    engine_, panel.labels[i], static_cast<int>(i)));
+                // Digits are text in these panels: select with Ctrl/Shift+N.
+                labels_.emplace_back(std::string(english ? "^" : "⇧") +
+                                     std::to_string(i + 1) + ". ");
+            }
+            return;
+        }
+
         int index = 0;
         // get candidate word
         int pageSize = chewing_cand_ChoicePerPage(ctx);
@@ -172,7 +217,18 @@ public:
             }
             index++;
         }
+        if (auto extra = engine_->plus().emojiForCandidates(ctx)) {
+            // Third position, like the McBopomofo Plus emoji suggestion.
+            auto pos = std::min<size_t>(2, candidateWords_.size());
+            candidateWords_.insert(
+                candidateWords_.begin() + pos,
+                std::make_unique<PlusCandidateWord>(engine_, extra->first, -1,
+                                                    extra->second));
+            labels_.insert(labels_.begin() + pos, Text("☺ "));
+        }
     }
+
+    bool isPlusPanel() const { return plusPanel_; }
 
     int size() const override { return candidateWords_.size(); }
     int cursorIndex() const override {
@@ -262,7 +318,8 @@ private:
 
     ChewingEngine *engine_;
     InputContext *ic_;
-    std::vector<std::unique_ptr<ChewingCandidateWord>> candidateWords_;
+    std::vector<std::unique_ptr<CandidateWord>> candidateWords_;
+    bool plusPanel_ = false;
     std::vector<Text> labels_;
     int cursor_ = 0;
 };
@@ -345,6 +402,88 @@ void ChewingEngine::populateConfig() {
     chewing_set_autoShiftCur(ctx, *config_.AutoShiftCursor ? 1 : 0);
     chewing_set_spaceAsSelection(ctx, *config_.SpaceAsSelection ? 1 : 0);
     chewing_set_escCleanAllBuf(ctx, 1);
+
+    chewing_plus::Options o;
+    o.emoji = *config_.PlusEmoji;
+    o.calculator = *config_.PlusCalculator;
+    o.spaceLetters = *config_.PlusSpaceLetters;
+    o.spaceDigits = *config_.PlusSpaceDigits;
+    o.emojiShortcode = *config_.PlusEmojiShortcode;
+    o.emojiPrefix = chewing_plus::EmojiPrefix::Parse(*config_.PlusEmojiShortcodePrefix);
+    o.emojiDoubleTapMs = *config_.PlusEmojiDoubleTapMs;
+    o.english = *config_.PlusEnglish;
+    o.englishHint = *config_.PlusEnglishHint;
+    // Normalize so hand-edited configs ("Control+Shift+e") match key events.
+    englishToggleKeys_.clear();
+    for (const auto &k : *config_.PlusEnglishToggleKeys) {
+        if (k.isValid()) {
+            englishToggleKeys_.push_back(k.normalize());
+        }
+    }
+    englishDoubleTapSyms_.clear();
+    std::string tapLabel;
+    for (const auto &k : *config_.PlusEnglishDoubleTapKeys) {
+        if (k.isValid() && k.isModifier()) {
+            englishDoubleTapSyms_.push_back(k.sym());
+            if (tapLabel.empty()) {
+                tapLabel = Key(k.sym()).toString(KeyStringFormat::Localized) + " ×2";
+            }
+        }
+    }
+    englishDoubleTap_.setWindowMs(*config_.PlusEnglishDoubleTapMs);
+    englishDoubleTap_.reset();
+    std::string combo = englishToggleKeys_.empty()
+        ? std::string()
+        : englishToggleKeys_.front().toString(KeyStringFormat::Localized);
+    o.englishShortcutLabel = !combo.empty() && !tapLabel.empty()
+        ? combo + " / " + tapLabel
+        : (combo.empty() ? tapLabel : combo);
+    plus_.setOptions(o);
+    plus_.reset();
+    loadPlusData();
+}
+
+void ChewingEngine::loadPlusData() {
+    const auto &sp = StandardPaths::global();
+    auto userDir = sp.userDirectory(StandardPathsType::Data) / "fcitx5-chewing";
+    plus_.shortcodes().clear();
+    if (*config_.PlusEmojiShortcode) {
+        auto builtIn = sp.locate(StandardPathsType::PkgData,
+                                 "data/chewing-plus-emoji-shortcodes.txt");
+        if (!builtIn.empty()) {
+            plus_.shortcodes().load(builtIn.string());
+        }
+        plus_.shortcodes().load((userDir / "plus-emoji-shortcodes.txt").string(), true);
+    }
+    plus_.lexicon().clear();
+    if (*config_.PlusEnglish) {
+        auto builtIn = sp.locate(StandardPathsType::PkgData,
+                                 "data/chewing-plus-english.txt");
+        if (!builtIn.empty()) {
+            plus_.lexicon().load(builtIn.string());
+        }
+        plus_.lexicon().load((userDir / "plus-english.txt").string(), true);
+    }
+}
+
+void ChewingEngine::commit(InputContext *ic, const std::string &text) {
+    if (text.empty()) {
+        return;
+    }
+    if (ic->capabilityFlags().testAny(CapabilityFlag::PasswordOrSensitive)) {
+        ic->commitString(text);
+        return;
+    }
+    ic->commitString(plus_.postProcessCommit(text));
+}
+
+bool ChewingEngine::plusToggleEnglish(InputContext *ic) {
+    if (!plus_.toggleEnglish(context_.get(),
+                             [this, ic](const std::string &t) { commit(ic, t); })) {
+        return false;
+    }
+    updateUI(ic);
+    return true;
 }
 
 void ChewingEngine::reset(const InputMethodEntry & /*entry*/,
@@ -354,6 +493,7 @@ void ChewingEngine::reset(const InputMethodEntry & /*entry*/,
 
 void ChewingEngine::doReset(InputContextEvent &event) {
     ChewingContext *ctx = context_.get();
+    plus_.reset();
     chewing_cand_close(ctx);
     chewing_clean_preedit_buf(ctx);
     chewing_clean_bopomofo_buf(ctx);
@@ -463,16 +603,106 @@ bool ChewingEngine::handleCandidateKeyEvent(const KeyEvent &keyEvent) const {
 
 void ChewingEngine::keyEvent(const InputMethodEntry &entry,
                              KeyEvent &keyEvent) {
+    auto *ctx = context_.get();
+    auto *ic = keyEvent.inputContext();
+    const bool sensitive =
+        ic->capabilityFlags().testAny(CapabilityFlag::PasswordOrSensitive);
+    const auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::steady_clock::now().time_since_epoch())
+                           .count();
+
+    if (!englishDoubleTapSyms_.empty() && *config_.PlusEnglish) {
+        bool watched = std::find(englishDoubleTapSyms_.begin(),
+                                 englishDoubleTapSyms_.end(),
+                                 keyEvent.rawKey().sym()) !=
+                       englishDoubleTapSyms_.end();
+        if (englishDoubleTap_.onKey(watched, keyEvent.isRelease(), nowMs) &&
+            !sensitive && plusToggleEnglish(ic)) {
+            keyEvent.filterAndAccept();
+            return;
+        }
+    }
     if (keyEvent.isRelease()) {
         return;
     }
-    auto *ctx = context_.get();
-    auto *ic = keyEvent.inputContext();
+
+    if (!sensitive) {
+        if (*config_.PlusEnglish &&
+            keyEvent.key().checkKeyList(englishToggleKeys_) &&
+            plusToggleEnglish(ic)) {
+            keyEvent.filterAndAccept();
+            return;
+        }
+        const Key &key = keyEvent.key();
+        const Key &raw = keyEvent.rawKey();
+        const bool ctrl = key.states().test(KeyState::Ctrl);
+        const char ascii =
+            (key.isSimple() || key.check(FcitxKey_space) ||
+             (key.states() == KeyState::Shift &&
+              Key::keySymToUnicode(key.sym()) < 0x7f &&
+              Key::keySymToUnicode(key.sym()) > 0x20))
+                ? static_cast<char>(Key::keySymToUnicode(key.sym()))
+                : 0;
+        plus_.setNowMs(nowMs);
+        if (plus_.panel().active()) {
+            // Candidate selection: Ctrl+N (English) or Shift+N (others),
+            // by raw keycode so it works on any layout. 10..18 = digits 1..9.
+            const bool english =
+                plus_.panel().kind == chewing_plus::Panel::Kind::English;
+            const bool selMod = english ? ctrl : raw.states().test(KeyState::Shift);
+            if (selMod && raw.code() >= 10 && raw.code() <= 18) {
+                plus_.select(ctx, raw.code() - 10,
+                             [this, ic](const std::string &t) { commit(ic, t); });
+                updateUI(ic);
+                keyEvent.filterAndAccept();
+                return;
+            }
+            auto *list = ic->inputPanel().candidateList().get();
+            if (list && (key.check(FcitxKey_Down) || key.check(FcitxKey_Up))) {
+                if (auto *m = list->toCursorMovable()) {
+                    key.check(FcitxKey_Down) ? m->nextCandidate() : m->prevCandidate();
+                    plusCursorMoved_ = true;
+                    ic->updateUserInterface(UserInterfaceComponent::InputPanel);
+                }
+                keyEvent.filterAndAccept();
+                return;
+            }
+            if (list && plusCursorMoved_ &&
+                (key.check(FcitxKey_Return) || key.check(FcitxKey_KP_Enter))) {
+                int i = list->cursorIndex();
+                plus_.select(ctx, i < 0 ? 0 : i,
+                             [this, ic](const std::string &t) { commit(ic, t); });
+                updateUI(ic);
+                keyEvent.filterAndAccept();
+                return;
+            }
+        }
+        auto handled = plus_.onKey(
+            ctx, ctrl ? 0 : ascii, ctrl, key.check(FcitxKey_BackSpace),
+            key.check(FcitxKey_Escape),
+            key.check(FcitxKey_Return) || key.check(FcitxKey_KP_Enter),
+            key.check(FcitxKey_space),
+            [this, ic](const std::string &t) { commit(ic, t); });
+        if (handled == chewing_plus::Handled::Yes) {
+            keyEvent.filterAndAccept();
+            updateUI(ic);
+            return;
+        }
+    }
+    const char plusAscii =
+        keyEvent.key().isSimple()
+            ? static_cast<char>(Key::keySymToUnicode(keyEvent.key().sym()))
+            : 0;
+    const bool plusBackspace = keyEvent.key().check(FcitxKey_BackSpace);
 
     chewing_set_easySymbolInput(ctx, 0);
     CHEWING_DEBUG() << "KeyEvent: " << keyEvent.key().toString();
 
     if (handleCandidateKeyEvent(keyEvent)) {
+        keyEvent.filterAndAccept();
+        return;
+    }
+    if (plus_.panel().active()) {  // Panel is modal: never leak keys.
         keyEvent.filterAndAccept();
         return;
     }
@@ -568,8 +798,9 @@ void ChewingEngine::keyEvent(const InputMethodEntry &entry,
     }
     if (chewing_commit_Check(ctx)) {
         keyEvent.filterAndAccept();
-        ic->commitString(safeChewing_commit_String(ctx));
+        commit(ic, safeChewing_commit_String(ctx));
     }
+    plus_.afterChewingKey(ctx, plusAscii, plusBackspace);
     updateUI(ic);
 }
 
@@ -603,6 +834,20 @@ void ChewingEngine::updatePreeditImpl(InputContext *ic) {
     ic->inputPanel().setAuxDown(Text());
 
     ChewingContext *ctx = context_.get();
+    const auto useClientPreeditPlus =
+        ic->capabilityFlags().test(CapabilityFlag::Preedit);
+    if (const auto &panel = plus_.panel(); panel.active()) {
+        Text p;
+        p.append(panel.preedit, useClientPreeditPlus ? TextFormatFlag::Underline
+                                                     : TextFormatFlag::NoFlag);
+        p.setCursor(static_cast<int>(panel.cursor));
+        if (useClientPreeditPlus) {
+            ic->inputPanel().setClientPreedit(p);
+        } else {
+            ic->inputPanel().setPreedit(p);
+        }
+        return;
+    }
     std::string buffer = safeChewing_buffer_String(ctx);
     std::string_view text = buffer;
     std::string zuin = safeChewing_bopomofo_String(ctx);
@@ -638,6 +883,11 @@ void ChewingEngine::updatePreeditImpl(InputContext *ic) {
 
     if (auto aux = safeChewing_aux_String(ctx); !aux.empty()) {
         ic->inputPanel().setAuxDown(Text(std::move(aux)));
+    } else if (!ic->capabilityFlags().testAny(
+                   CapabilityFlag::PasswordOrSensitive)) {
+        if (auto hint = plus_.englishHint(ctx); !hint.empty()) {
+            ic->inputPanel().setAuxDown(Text(std::move(hint)));
+        }
     }
 
     if (useClientPreedit) {
@@ -654,6 +904,7 @@ void ChewingEngine::updatePreedit(InputContext *ic) {
 
 void ChewingEngine::updateUI(InputContext *ic) {
     CHEWING_DEBUG() << "updateUI";
+    plusCursorMoved_ = false;
     // clean up window asap
     ic->inputPanel().reset();
     ic->inputPanel().setCandidateList(
@@ -690,7 +941,7 @@ void ChewingEngine::flushBuffer(InputContextEvent &event) {
         text.append(safeChewing_bopomofo_String(ctx));
     }
     if (!text.empty()) {
-        event.inputContext()->commitString(text);
+        commit(event.inputContext(), text);
     }
     doReset(event);
 }
