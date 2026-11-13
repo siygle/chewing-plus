@@ -8,6 +8,11 @@ set(CHEWING_SOURCES
 add_fcitx5_addon(chewing ${CHEWING_SOURCES})
 target_link_libraries(chewing Fcitx5::Core Fcitx5::Config ${CHEWING_TARGET})
 target_include_directories(chewing PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/plus)
+if (ENABLE_VOXKIT)
+    target_link_libraries(chewing Fcitx5::Module::Voxkit)
+    target_compile_definitions(chewing PRIVATE CHEWING_WITH_VOXKIT=1)
+    message(STATUS "fcitx5-chewing: voxkit dictation integration enabled")
+endif()
 # Plus sources use C++20 (std::string::starts_with).
 set_target_properties(chewing PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
 target_compile_definitions(chewing PRIVATE FCITX_GETTEXT_DOMAIN=\"fcitx5-chewing\")

@@ -30,6 +30,9 @@
 #include <vector>
 
 #include "plus/ChewingPlus.h"
+#ifdef CHEWING_WITH_VOXKIT
+#include <voxkit_public.h>
+#endif
 
 namespace fcitx {
 
@@ -238,6 +241,12 @@ private:
     void updatePreeditImpl(InputContext *ic);
 
     FCITX_ADDON_DEPENDENCY_LOADER(chttrans, instance_->addonManager());
+#ifdef CHEWING_WITH_VOXKIT
+    FCITX_ADDON_DEPENDENCY_LOADER(voxkit, instance_->addonManager());
+    std::unique_ptr<HandlerTableEntry<VoxkitRegistration>> voxkitHandle_;
+    void registerVoxkit();
+    std::vector<std::string> dictationVocabulary();
+#endif
 
     void populateConfig();
     Instance *instance_;

@@ -78,6 +78,12 @@ public:
     // the unfinished reading if it looks like English.
     bool toggleEnglish(ChewingContext *ctx, const Commit &commit);
 
+    // Dictation from the voxkit module: English-only text goes into the
+    // Chewing buffer (stays editable); anything else is committed with the
+    // composition around it, like emoji. Closes any open Plus panel first.
+    void insertDictation(ChewingContext *ctx, const std::string &text,
+                         const Commit &commit);
+
     // Select candidate i of the open panel.
     void select(ChewingContext *ctx, int i, const Commit &commit);
 

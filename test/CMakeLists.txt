@@ -16,3 +16,9 @@ add_dependencies(testplus copy-addon copy-im)
 # non-system libchewing 0.14 build)
 add_test(NAME plus COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/run-plus-test.sh
          ${PROJECT_BINARY_DIR} "$ENV{CHEWING_TEST_DATA}" "$ENV{CHEWING_TEST_LIB}")
+
+if (ENABLE_VOXKIT)
+    add_executable(testvoxkit testvoxkit.cpp)
+    target_link_libraries(testvoxkit Fcitx5::Core Fcitx5::Module::TestFrontend)
+    add_dependencies(testvoxkit copy-addon copy-im)
+endif()

@@ -303,6 +303,30 @@ Handled ChewingPlus::onKey(ChewingContext *ctx, char ascii, bool ctrl,
     return Handled::No;
 }
 
+void ChewingPlus::insertDictation(ChewingContext *ctx, const std::string &text,
+                                  const Commit &commit) {
+    if (text.empty()) {
+        return;
+    }
+    closePanel();
+    chewing_cand_close(ctx);
+    // A half-typed syllable is not part of the text: drop it rather than
+    // committing raw Bopomofo.
+    chewing_clean_bopomofo_buf(ctx);
+    keys_.clear();
+    overwrites_ = 0;
+    overwriteFlags_.clear();
+    lastZuinLen_ = 0;
+    const bool ascii = std::all_of(text.begin(), text.end(), [](char c) {
+        return c >= 0x20 && c < 0x7f;
+    });
+    if (ascii) {
+        InsertAscii(ctx, text, commit);
+    } else {
+        commitAround(ctx, text, commit);
+    }
+}
+
 void ChewingPlus::select(ChewingContext *ctx, int i, const Commit &commit) {
     if (!panel_.active() || i < 0 ||
         static_cast<size_t>(i) >= panel_.values.size()) {

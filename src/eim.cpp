@@ -12,6 +12,7 @@
 #include <chewing.h>
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 #include <fcitx-config/iniparser.h>
 #include <fcitx-utils/capabilityflags.h>
 #include <fcitx-utils/key.h>
@@ -369,7 +370,58 @@ ChewingEngine::ChewingEngine(Instance *instance)
     chewing_set_maxChiSymbolLen(context_.get(), CHEWING_MAX_LEN);
     chewing_set_logger(context_.get(), logger, nullptr);
     reloadConfig();
+#ifdef CHEWING_WITH_VOXKIT
+    registerVoxkit();
+#endif
 }
+
+#ifdef CHEWING_WITH_VOXKIT
+void ChewingEngine::registerVoxkit() {
+    if (!voxkit()) {
+        return;  // module not installed or disabled: nothing to do
+    }
+    VoxkitRegistration r;
+    r.insert = [this](InputContext *ic, const std::string &text) {
+        plus_.insertDictation(context_.get(), text,
+                              [this, ic](const std::string &t) { commit(ic, t); });
+        updateUI(ic);
+        return true;
+    };
+    r.vocabulary = [this]() { return dictationVocabulary(); };
+    voxkitHandle_ = voxkit()->call<IVoxkit::registerInputMethod>("chewing",
+                                                                  std::move(r));
+}
+
+// The user's own Chewing phrases (longest-first, capped) bias recognition
+// toward names and jargon they actually type.
+std::vector<std::string> ChewingEngine::dictationVocabulary() {
+    std::vector<std::string> words;
+    auto *ctx = context_.get();
+    if (chewing_userphrase_enumerate(ctx) != 0) {
+        return words;
+    }
+    unsigned int plen = 0;
+    unsigned int blen = 0;
+    while (chewing_userphrase_has_next(ctx, &plen, &blen) && words.size() < 2000) {
+        std::string phrase(plen, '\0');
+        std::string bopomofo(blen, '\0');
+        if (chewing_userphrase_get(ctx, phrase.data(), plen, bopomofo.data(), blen) != 0) {
+            break;
+        }
+        phrase.resize(std::strlen(phrase.c_str()));
+        if (utf8::length(phrase) >= 2) {
+            words.push_back(std::move(phrase));
+        }
+    }
+    std::stable_sort(words.begin(), words.end(), [](const auto &a, const auto &b) {
+        return a.size() > b.size();
+    });
+    if (words.size() > 80) {
+        words.resize(80);
+    }
+    return words;
+}
+#endif
 
 ChewingEngine::~ChewingEngine() = default;
 

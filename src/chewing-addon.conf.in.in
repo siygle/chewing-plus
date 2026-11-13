@@ -13,4 +13,5 @@ Library=libchewing
 
 [Addon/OptionalDependencies]
 0=chttrans
+1=voxkit
 
