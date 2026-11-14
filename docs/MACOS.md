@@ -41,9 +41,12 @@ macOS. Remaining work, in order:
    currently reads the first candidate and does not show the panel yet.
 5. Code signing and notarization. See below. Not done in CI.
 
-CI on the macOS runner typechecks the Swift against the C headers and runs
-the protocol and fake-daemon tests. It does not produce a signed `.app` and
-it does not load Qwen.
+`macos/typecheck.sh` typechecks the Swift against the C headers and runs
+the protocol and fake-daemon tests. A `macos-14` job was requested on this
+PR. GitHub cancelled it before assigning a runner (the job has no steps and
+an empty runner name), so the workflow does not depend on that job. Run the
+script on a Mac when a runner is available. It does not produce a signed
+`.app` and it does not load Qwen.
 
 ## Apple Developer setup
 
