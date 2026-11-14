@@ -15,7 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15, macos-latest]
+        # macos-14-arm64 is not a supported runner image here.
+        os: [macos-15, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - name: Protocol tests and IMK typecheck

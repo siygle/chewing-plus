@@ -96,13 +96,14 @@ microphone prompt.
 
 ## CI
 
-`.github/workflows/macos.yml` is separate from `check.yml`, so a missing
-Mac runner cannot fail the Linux build. It requests `macos-14`, `macos-15`,
-and `macos-latest` for `macos/typecheck.sh`, and `macos-latest` again for
-`macos/build-app.sh`. Every job sets `continue-on-error: true`. A previous
-`macos-14` job on this PR was cancelled by GitHub before a runner was
-assigned. If that happens again, the Linux checks stay green and this
-workflow is the record of the attempt.
+`.github/workflows/macos.yml` is separate from `check.yml`, and every job
+sets `continue-on-error`. `macos-15` and `macos-latest` run
+`macos/typecheck.sh`. `macos-latest` also runs `macos/build-app.sh`, which
+produced `ChewingPlus.app` on the runner (libchewing 0.14 linked, `libc++`
+required). `macos-14` is not offered for this account
+(`macos-14-arm64-us-default` is not a supported configuration), so the
+workflow does not request it. Linux `check.yml` is unchanged and stays the
+required build.
 
 ## Manual test on your Mac
 
