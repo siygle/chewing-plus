@@ -1,4 +1,4 @@
-add_library(voxkit-protocol STATIC voxkit/protocol.c)
+add_library(voxkit-protocol STATIC voxkit/protocol.c voxkit/client.c)
 target_include_directories(voxkit-protocol
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
@@ -10,6 +10,7 @@ set_target_properties(voxkit-protocol PROPERTIES
     POSITION_INDEPENDENT_CODE ON)
 install(TARGETS voxkit-protocol ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../include/voxkit_protocol.h"
+              "${CMAKE_CURRENT_SOURCE_DIR}/../include/voxkit_client.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
 set(_core_type STATIC)
@@ -73,4 +74,36 @@ if(NOT CHEWING_PLUS_CORE_ONLY)
     configure_file(chewing-addon.conf.in.in chewing-addon.conf.in)
     fcitx5_translate_desktop_file("${CMAKE_CURRENT_BINARY_DIR}/chewing-addon.conf.in" chewing-addon.conf)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/chewing-addon.conf" RENAME chewing.conf DESTINATION "${FCITX_INSTALL_PKGDATADIR}/addon" COMPONENT config)
+endif()
+
+add_library(chewing-plus-ibus-keys STATIC ibus/keys.c)
+target_include_directories(chewing-plus-ibus-keys PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/ibus"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+target_link_libraries(chewing-plus-ibus-keys PUBLIC chewing-plus-core)
+set_target_properties(chewing-plus-ibus-keys PROPERTIES
+    C_STANDARD 99 C_STANDARD_REQUIRED ON POSITION_INDEPENDENT_CODE ON)
+
+if(ENABLE_IBUS)
+    pkg_check_modules(IBus REQUIRED ibus-1.0)
+    set(CHEWING_PLUS_IBUS_EXEC "${CMAKE_INSTALL_FULL_LIBEXECDIR}/ibus-chewing-plus")
+    configure_file(ibus/chewing-plus.xml.in chewing-plus.xml @ONLY)
+    add_executable(ibus-chewing-plus ibus/main.c ibus/engine.c)
+    target_include_directories(ibus-chewing-plus PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/ibus" ${IBus_INCLUDE_DIRS})
+    target_compile_options(ibus-chewing-plus PRIVATE ${IBus_CFLAGS_OTHER})
+    target_link_libraries(ibus-chewing-plus PRIVATE
+        chewing-plus-ibus-keys voxkit-protocol ${IBus_LIBRARIES})
+    target_compile_definitions(ibus-chewing-plus PRIVATE
+        CHEWING_PLUS_IBUS_EMOJI="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-emoji-shortcodes.txt"
+        CHEWING_PLUS_IBUS_ENGLISH="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-english.txt")
+    set_target_properties(ibus-chewing-plus PROPERTIES
+        C_STANDARD 99 C_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_NAME ibus-chewing-plus)
+    install(TARGETS ibus-chewing-plus RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}")
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/chewing-plus.xml"
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/ibus/component")
+    install(FILES "${CMAKE_SOURCE_DIR}/data/plus-emoji-shortcodes.txt"
+                  "${CMAKE_SOURCE_DIR}/data/plus-english.txt"
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/chewing-plus")
 endif()
