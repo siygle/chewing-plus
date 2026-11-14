@@ -84,8 +84,10 @@ a checkout that is not the pinned commit.
 ```bash
 # equivalent manual build of a local checkout.
 # data/ is the libchewing-data submodule; the model files are Git LFS.
+git lfs install --skip-repo
 git -C ~/Work/libchewing submodule update --init --depth 1
-git -C ~/Work/libchewing/data lfs pull
+git -C ~/Work/libchewing/data lfs install --local
+GIT_LFS_SKIP_SMUDGE= git -C ~/Work/libchewing/data lfs pull
 cmake -S ~/Work/libchewing -B ~/Work/libchewing/build -G Ninja \
   -DBUILD_DOC=OFF -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=/tmp/lc-stage
 cmake --build ~/Work/libchewing/build

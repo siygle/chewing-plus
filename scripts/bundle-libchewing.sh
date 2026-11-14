@@ -52,8 +52,19 @@ if ! git lfs version >/dev/null 2>&1; then
     echo "git-lfs is required to fetch libchewing dictionary data" >&2
     exit 1
 fi
+# The filter has to be installed before the submodule checkout. Otherwise
+# `git submodule update` leaves the language-model files as LFS pointers
+# ("Skipping object checkout, Git LFS is not installed") and a later
+# `git lfs pull` can no-op when GIT_LFS_SKIP_SMUDGE is set.
+git lfs install --skip-repo
 git -C "$src" submodule update --init --depth 1 --recursive
-git -C "$src/data" lfs pull
+git -C "$src/data" lfs install --local
+env -u GIT_LFS_SKIP_SMUDGE git -C "$src/data" lfs pull
+arpa="$src/data/dict/chewing_v4/static_lm.arpa"
+if [[ ! -f "$arpa" ]] || head -n 1 "$arpa" | grep -q 'git-lfs.github.com'; then
+    echo "libchewing dictionary data is still a Git LFS pointer: $arpa" >&2
+    exit 1
+fi
 got=$(git -C "$src" rev-parse HEAD)
 if [[ "$got" != "$COMMIT" ]]; then
     echo "libchewing checkout $src is $got, expected $COMMIT ($TAG)" >&2
