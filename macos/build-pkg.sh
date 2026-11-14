@@ -70,13 +70,33 @@ with open(path, "wb") as fh:
     plistlib.dump(rows, fh)
 PY
 
+component="$root/macos/build/ChewingPlus-component.pkg"
 pkgbuild --root "$stage" \
     --component-plist "$plist" \
     --identifier im.chewing.plus.inputmethod \
     --version 5.1.13 \
     --scripts "$root/macos/pkg-scripts" \
     --install-location / \
-    "$root/macos/build/ChewingPlus-component.pkg"
-productbuild --package "$root/macos/build/ChewingPlus-component.pkg" \
+    "$component"
+# pkgbuild can still emit a <relocate> search. Strip it and set the
+# package attribute so Installer will not move the app.
+expanded=$(mktemp -d "${TMPDIR:-/tmp}/chewing-plus-expand.XXXXXX")
+pkgutil --expand "$component" "$expanded"
+python3 - "$expanded/PackageInfo" <<'PY'
+import re
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+text = path.read_text()
+text = re.sub(r"<relocate\b[^>]*/>", "", text)
+text = re.sub(r"<relocate\b[^>]*>.*?</relocate>", "", text, flags=re.S)
+text = text.replace('relocatable="true"', 'relocatable="false"')
+if "relocatable=" not in text:
+    text = text.replace("<pkg-info ", '<pkg-info relocatable="false" ', 1)
+path.write_text(text)
+PY
+pkgutil --flatten "$expanded" "$component"
+rm -rf "$expanded"
+productbuild --package "$component" \
     "$root/macos/build/ChewingPlus.pkg"
 echo "pkg: $root/macos/build/ChewingPlus.pkg (unsigned, not relocatable)"

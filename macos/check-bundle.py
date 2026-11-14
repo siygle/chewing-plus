@@ -115,8 +115,10 @@ def check_pkg(pkg):
         needle = "Library/Input Methods/ChewingPlus.app"
         if needle not in text:
             errors.append("pkg PackageInfo does not install " + needle)
-        if "<relocate" in text:
+        if "<relocate" in text or 'relocatable="true"' in text:
             errors.append("pkg is relocatable")
+        if 'relocatable="false"' not in text:
+            errors.append("pkg PackageInfo is missing relocatable=false")
         listed = payload_listing(expanded, pkg)
         paths = []
         for line in listed.splitlines():
