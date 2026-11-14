@@ -58,7 +58,7 @@ test/run-voxkit-test.sh build /tmp/lc-stage/usr/share/libchewing /tmp/lc-stage/u
 ```
 
 Both conflict with the Arch `libchewing` / `fcitx5-chewing` packages and are swapped in one pacman
-transaction by `packaging/ime-switch/ime-switch`.
+transaction by `packaging/ime-switch/ime-switch` (see its README).
 
 ## Data
 
