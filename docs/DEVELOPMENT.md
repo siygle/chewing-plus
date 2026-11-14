@@ -6,10 +6,13 @@
 - Uses **only the public libchewing C API**; libchewing itself is not patched.
 - Requires libchewing **0.14** (new system data: `static_dict.bin`, `static_lm.bin`, …).
   The plugin locates system data via `static_dict.bin` first, then the old `tsi.dat`.
-- Plus code lives in `src/plus/`:
+- Plus code lives in `libchewing-plus-core` (`src/plus/`, no fcitx headers):
   - `ChewingPlus.*`: panels (calculator, emoji shortcode, English), hint tracking, dictation insert
   - `PlusFeatures.*`, `PlusEmoji.*`, `PlusEnglish.*`, `PlusDoubleTap.h`: shared with fcitx5-mcbopomofo-plus
+  - `src/abi/chewing_plus.cpp` and `include/chewing_plus.h`: stable C ABI for later IBus / macOS frontends ([ABI.md](ABI.md))
+- The fcitx5 addon links that library and still calls the C++ class. Behavior for fcitx users is unchanged.
 - All options default off and are disabled in password/sensitive fields.
+- Cross-platform plan, including voice options that are **not** implemented yet: [CROSS_PLATFORM.md](CROSS_PLATFORM.md).
 
 ### Engine limitations (why some features commit early)
 
@@ -25,15 +28,92 @@ When CMake finds `Fcitx5ModuleVoxkit` (`ENABLE_VOXKIT`, default = found), the en
 insert handler and the user's own phrases as vocabulary. Works with or without the module at runtime
 (`voxkit` is an optional addon dependency).
 
+## libchewing pin
+
+This tree is built and tested against **libchewing 0.14.0-rc.1**
+(`v0.14.0-rc.1`, commit `d1506842db1a5693519efb616044e122cf791181`) from
+<https://codeberg.org/chewing/libchewing>. The same pin is in
+`cmake/ChewingPlusLibchewing.cmake` and `CHEWING_PLUS_LIBCHEWING_PIN`.
+Building that tag needs **Rust 1.85 or newer** (Cargo edition 2024), CMake
+3.27 or newer, and **git-lfs** (the dictionary sources are a submodule, and
+the language-model files are LFS objects). `scripts/bundle-libchewing.sh`
+clones the tag, checks out the submodule, and runs `git lfs pull`.
+
+`scripts/bundle-libchewing.sh` clones that commit and installs it:
+
+```bash
+# shared library (default, and what CI tests). Prefix defaults to
+# third_party/dist: a vendored libchewing.so plus its data files.
+scripts/bundle-libchewing.sh --shared "$HOME/opt/libchewing-0.14"
+
+# static archive. Also copies libchewing_capi.a (the Rust staticlib that the
+# shared library absorbs and a static libchewing.a does not) into the prefix.
+scripts/bundle-libchewing.sh --static "$HOME/opt/libchewing-0.14-static"
+```
+
+`--static` is wired through, but **libchewing 0.14.0-rc.1's own CMake refuses
+to generate a static build**:
+
+```
+install(EXPORT "libchewingTargets" ...) includes target "libchewing" which
+requires target "chewing_capi" that is not in any export set.
+```
+
+This repo does not patch libchewing. Use `--shared` until that export is
+fixed upstream. `-DCHEWING_PLUS_LIBCHEWING_STATIC=ON` links `libchewing.a`
+plus `libchewing_capi.a`, `dl`, `m` and `pthread` when a prefix actually
+contains those archives.
+
+Point a shared prefix at the build:
+
+```bash
+cmake -B build -G Ninja \
+  -DCHEWING_PLUS_BUNDLE_LIBCHEWING=ON \
+  -DCHEWING_PLUS_LIBCHEWING_PREFIX="$HOME/opt/libchewing-0.14"
+cmake --build build
+```
+
+`--shared` is the configuration CI uses (it installs into `/usr` in the
+container).
+
+A checkout you already have (for example `~/Work/libchewing`) still works.
+Install it and export `PKG_CONFIG_PATH` as below, or pass it as
+`CHEWING_PLUS_LIBCHEWING_SRC` so the script will not clone. The script refuses
+a checkout that is not the pinned commit.
+
+```bash
+# equivalent manual build of a local checkout.
+# data/ is the libchewing-data submodule; the model files are Git LFS.
+git -C ~/Work/libchewing submodule update --init --depth 1
+git -C ~/Work/libchewing/data lfs pull
+cmake -S ~/Work/libchewing -B ~/Work/libchewing/build -G Ninja \
+  -DBUILD_DOC=OFF -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=/tmp/lc-stage
+cmake --build ~/Work/libchewing/build
+cmake --install ~/Work/libchewing/build
+
+export PKG_CONFIG_PATH=/tmp/lc-stage/lib/pkgconfig
+cmake -B build -G Ninja && cmake --build build
+```
+
+Core and the C ABI tests do not need fcitx:
+
+```bash
+cmake -B build-core -G Ninja -DCHEWING_PLUS_CORE_ONLY=ON \
+  -DCHEWING_PLUS_BUNDLE_LIBCHEWING=ON \
+  -DCHEWING_PLUS_LIBCHEWING_PREFIX="$HOME/opt/libchewing-0.14"
+cmake --build build-core
+CHEWING_TEST_DATA="$HOME/opt/libchewing-0.14/share/libchewing" \
+  ctest --test-dir build-core --output-on-failure
+```
+
+`-DCHEWING_PLUS_CORE_SHARED=ON` builds `libchewing-plus-core.so` instead of
+the default static archive. The fcitx addon links the static archive, so it
+does not gain a new runtime dependency.
+
 ## Build
 
 ```bash
-# libchewing 0.14 (expected next to this repo as ~/Work/libchewing)
-cmake --preset rust-release -S ~/Work/libchewing -B ~/Work/libchewing/build -DBUILD_DOC=OFF
-cmake --build ~/Work/libchewing/build
-DESTDIR=/tmp/lc-stage cmake --install ~/Work/libchewing/build
-
-export PKG_CONFIG_PATH=/tmp/lc-stage/usr/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=/tmp/lc-stage
+export PKG_CONFIG_PATH=/tmp/lc-stage/lib/pkgconfig   # or the prefix above
 cmake -B build -G Ninja && cmake --build build
 ```
 
@@ -49,6 +129,13 @@ test/run-voxkit-test.sh build /tmp/lc-stage/usr/share/libchewing /tmp/lc-stage/u
 ```
 
 `run-plus-test.sh` also runs the upstream `testchewing` suite.
+
+`plus-core` and `plus-abi` (under `test/core/`) do not link fcitx. They need
+libchewing 0.14 data: set `CHEWING_TEST_DATA` to the directory that contains
+`static_dict.bin`, or install that directory at `/usr/share/libchewing`.
+`plus-abi` passes its own temporary user-dictionary directory into
+`chewing_plus_new`. `testvoxkit` is built only when `ENABLE_VOXKIT` found
+`Fcitx5ModuleVoxkit`.
 
 ## Packaging (Arch)
 
