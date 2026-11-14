@@ -40,13 +40,13 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          # plus (and PRs into plus) build the pinned libchewing instead of
-          # the distro package. That tag needs a Rust that supports edition 2024.
+          # master keeps the distro libchewing. plus and every branch stacked
+          # on it build the pinned 0.14 tag (Rust edition 2024, git-lfs).
           pkgs="base-devel clang cmake ninja extra-cmake-modules fmt libuv boost git"
-          if [ "$GITHUB_REF" = "refs/heads/plus" ] || [ "$GITHUB_BASE_REF" = "plus" ]; then
-            pkgs="$pkgs rust git-lfs"
-          else
+          if [ "$GITHUB_REF" = "refs/heads/master" ] || [ "$GITHUB_BASE_REF" = "master" ]; then
             pkgs="$pkgs libchewing"
+          else
+            pkgs="$pkgs rust git-lfs"
           fi
           pacman -Syu --noconfirm $pkgs
       - uses: actions/checkout@v4
@@ -76,7 +76,7 @@ jobs:
           languages: cpp
           source-root: fcitx5-chewing
       - name: Build pinned libchewing 0.14.0-rc.1
-        if: github.ref == 'refs/heads/plus' || github.base_ref == 'plus'
+        if: github.ref != 'refs/heads/master' && github.base_ref != 'master'
         run: |
           fcitx5-chewing/scripts/bundle-libchewing.sh --shared /usr
           pkg-config --modversion chewing
