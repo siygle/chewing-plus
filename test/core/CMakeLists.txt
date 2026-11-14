@@ -1,3 +1,7 @@
+add_executable(test_voxkit_protocol test_voxkit_protocol.c)
+target_link_libraries(test_voxkit_protocol PRIVATE voxkit-protocol)
+add_test(NAME voxkit-protocol COMMAND test_voxkit_protocol)
+
 add_executable(test_plus_core test_core.cpp)
 target_link_libraries(test_plus_core PRIVATE chewing-plus-core)
 target_include_directories(test_plus_core PRIVATE

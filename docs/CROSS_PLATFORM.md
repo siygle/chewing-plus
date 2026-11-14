@@ -130,6 +130,16 @@ MIT; OpenCC is Apache-2.0; Qwen3-ASR-0.6B is published by Alibaba under
 Apache-2.0 (confirm the model card before redistributing the weights);
 Whisper weights and whisper.cpp are MIT. The weights are not in this repo.
 
+The socket messages are version 1 and are written down in
+[VOXKIT_PROTOCOL.md](VOXKIT_PROTOCOL.md). fcitx5 keeps using the voxkit
+module; that module is already a version-1 client. IBus and macOS speak the
+same socket.
+
+The socket messages are version 1. The normative text is
+[VOXKIT_PROTOCOL.md](VOXKIT_PROTOCOL.md). The fcitx5 chewing addon does not
+open the socket; the voxkit module already speaks version 1, and this tree
+does not change that addon.
+
 The C ABI already has the two hooks a non-fcitx frontend needs:
 `chewing_plus_insert_text` (step 5) and `chewing_plus_user_phrases` (step 6).
 Capture, the hotkey, the model, and the "listening" indicator stay in the
@@ -182,7 +192,7 @@ comes from the IBus input context. No Qt.
 | License | Same as the fcitx stack (MIT daemon, Apache-2.0 model and OpenCC). |
 | Privacy | Local. Same process boundary as fcitx: the daemon holds the mic and the model, the IBus engine only sees text. |
 | Traditional Chinese | Identical to fcitx5-chewing-plus, including OpenCC `s2twp` and the phrase prompt. |
-| Effort | Medium, and only if the socket protocol is treated as a small stable client rather than copied out of the fcitx module. The engine would own the hotkey (IBus has no fcitx "before IM" filter), push audio control messages, and call `chewing_plus_insert_text` with `chewing_plus_user_phrases` as the prompt. One daemon can serve both fcitx and IBus on a machine that has both. The protocol is private today; freezing a client for it is the real work, and it is not done here. |
+| Effort | Medium, and only if the socket protocol is treated as a small stable client rather than copied out of the fcitx module. The engine would own the hotkey (IBus has no fcitx "before IM" filter), push audio control messages, and call `chewing_plus_insert_text` with `chewing_plus_user_phrases` as the prompt. One daemon can serve both fcitx and IBus on a machine that has both. The version-1 messages are specified in [VOXKIT_PROTOCOL.md](VOXKIT_PROTOCOL.md). |
 
 **Option B — whisper.cpp in the IBus process (or a tiny sidecar)**
 
