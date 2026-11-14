@@ -28,15 +28,18 @@ chewing_plus_mac_model_kind(const voxkit_model_info *model) {
     return model ? model->kind : "";
 }
 
-static inline const char *chewing_plus_mac_daemon(const voxkit_message *message) {
+static inline const char *
+chewing_plus_mac_daemon(const voxkit_message *message) {
     return message ? message->daemon : "";
 }
 
-static inline const char *chewing_plus_mac_state(const voxkit_message *message) {
+static inline const char *
+chewing_plus_mac_state(const voxkit_message *message) {
     return message ? message->state : "";
 }
 
-static inline const char *chewing_plus_mac_store(const voxkit_message *message) {
+static inline const char *
+chewing_plus_mac_store(const voxkit_message *message) {
     return message ? message->store : "";
 }
 
@@ -44,7 +47,8 @@ static inline const char *chewing_plus_mac_note(const voxkit_message *message) {
     return message ? message->message : "";
 }
 
-static inline const char *chewing_plus_mac_active(const voxkit_message *message) {
+static inline const char *
+chewing_plus_mac_active(const voxkit_message *message) {
     return message ? message->model : "";
 }
 
