@@ -80,7 +80,8 @@ pkgbuild --root "$stage" \
     "$component"
 # pkgbuild can still emit a <relocate> search. Strip it and set the
 # package attribute so Installer will not move the app.
-expanded=$(mktemp -d "${TMPDIR:-/tmp}/chewing-plus-expand.XXXXXX")
+expand_root=$(mktemp -d "${TMPDIR:-/tmp}/chewing-plus-expand.XXXXXX")
+expanded="$expand_root/pkg"
 pkgutil --expand "$component" "$expanded"
 python3 - "$expanded/PackageInfo" <<'PY'
 import re
@@ -96,7 +97,7 @@ if "relocatable=" not in text:
 path.write_text(text)
 PY
 pkgutil --flatten "$expanded" "$component"
-rm -rf "$expanded"
+rm -rf "$expand_root"
 productbuild --package "$component" \
     "$root/macos/build/ChewingPlus.pkg"
 echo "pkg: $root/macos/build/ChewingPlus.pkg (unsigned, not relocatable)"
