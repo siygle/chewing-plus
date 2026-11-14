@@ -3,6 +3,7 @@
  *
  * Headless push-to-talk: a fake voxkit daemon on a Unix socket, no microphone.
  */
+#define _DARWIN_C_SOURCE 1
 #define _POSIX_C_SOURCE 200809L
 
 #include "voxkit_client.h"

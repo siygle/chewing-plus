@@ -4,6 +4,7 @@
 #include "voxkit_client.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -40,10 +41,11 @@ int voxkit_client_connect(voxkit_client *client, const char *path) {
     if (strlen(use) >= sizeof(addr.sun_path)) {
         return -1;
     }
-    client->fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    client->fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (client->fd < 0) {
         return -1;
     }
+    fcntl(client->fd, F_SETFD, FD_CLOEXEC);
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     memcpy(addr.sun_path, use, strlen(use) + 1);

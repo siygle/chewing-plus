@@ -9,7 +9,7 @@ clang -std=c99 -Wall -Wextra -Werror -I include \
     test/core/test_voxkit_protocol.c src/voxkit/protocol.c
 /tmp/voxkit-protocol-test
 
-clang -std=c99 -Wall -Wextra -Werror -D_POSIX_C_SOURCE=200809L -I include \
+clang -std=c99 -Wall -Wextra -Werror -D_DARWIN_C_SOURCE=1 -D_POSIX_C_SOURCE=200809L -I include \
     -o /tmp/voxkit-client-test \
     test/core/test_voxkit_client.c src/voxkit/protocol.c src/voxkit/client.c
 /tmp/voxkit-client-test
