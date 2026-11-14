@@ -225,9 +225,6 @@ FCITX_CONFIGURATION(
         this, "PlusEnglishDoubleTapMs",
         _("Plus: English mode double-tap window (ms)"), 300,
         IntConstrain(100, 1000)};
-    // The config dialog is a form. It can store the active model id and
-    // show a status line when the dialog opens. Download progress, cancel,
-    // and delete are `chewing-plus-models` (no extra toolkit).
     Option<std::string> VoiceModel{
         this, "VoiceModel",
         _("Voice: active model id (empty keeps the daemon's choice; "
@@ -237,7 +234,7 @@ FCITX_CONFIGURATION(
         this, "VoiceModelStatus",
         _("Voice: daemon, download state, store path, and disk use "
           "(refreshed when this dialog opens)"),
-        ""});
+        ""};);
 
 class ChewingEngine final : public InputMethodEngine {
 public:
