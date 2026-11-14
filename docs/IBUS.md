@@ -36,28 +36,22 @@ Headless tests (no `ibus-daemon`, no microphone): `ibus-keys` and
 `voxkit-client`. The second one is a fake daemon on a Unix socket that
 answers `ping`, `start`, `stop`, `model.status`, and `model.list`.
 
-## Model settings
+## Setup program
 
-The engine does not embed a setup dialog. List, download (with progress),
-cancel, delete, the active model, disk use, and daemon status go through
-`chewing-plus-models`, which calls the shared C client. An empty `model`
-on `start` uses whatever `model.select` stored in the daemon.
+`-DENABLE_IBUS_SETUP=ON` builds `ibus-setup-chewing-plus` and writes its
+path into the component `<setup>` entry. It needs `libadwaita-1` (GTK4).
+The engine does not link libadwaita. The window lists models, shows
+download progress, and can cancel, delete, select, and show disk use and
+daemon status. Those calls are the shared C client. Plus toggles
+(emoji, calculator, spacing, shortcode, English) are written to
+`$XDG_CONFIG_HOME/chewing-plus/ibus.conf`. The engine reads that file on
+focus. `CHEWING_PLUS_IBUS_FEATURES` still overrides the file when it is
+set. `chewing-plus-models` remains for a terminal.
 
 ```bash
-chewing-plus-models list
-chewing-plus-models install qwen3-asr-0.6b
-chewing-plus-models select qwen3-asr-0.6b
+cmake -B build -DENABLE_IBUS=ON -DENABLE_IBUS_SETUP=ON \
+  -DCHEWING_PLUS_CORE_ONLY=ON
+cmake --build build
 ```
 
-An IBus setup window needs a UI toolkit. Nothing in this tree picks one.
-Options, for the owner:
-
-| Toolkit | What you get | Cost |
-|---|---|---|
-| GTK4 | Current GNOME look. IBus's own setup bits are GTK. | A new dependency of the setup program. Not used by the engine. |
-| GTK3 | Matches older IBus setup (`ibus-setup` is GTK3). | Same new dependency, older API. |
-| libadwaita | GNOME HIG on top of GTK4. | Pulls GTK4 plus libadwaita. Heavier than a form needs. |
-| CLI only (`chewing-plus-models`, implemented) | Every model command, progress on a terminal, no new library. | No panel inside IBus preferences. The user runs the command. |
-
-The engine and the C client are done either way. A toolkit only changes
-the setup program.
+fcitx5 keeps its config form and the same CLI. There is no Qt page.

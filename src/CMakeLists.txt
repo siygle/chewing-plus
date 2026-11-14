@@ -85,6 +85,12 @@ if(NOT CHEWING_PLUS_CORE_ONLY)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/chewing-addon.conf" RENAME chewing.conf DESTINATION "${FCITX_INSTALL_PKGDATADIR}/addon" COMPONENT config)
 endif()
 
+add_library(chewing-plus-ibus-prefs STATIC ibus/prefs.c)
+target_include_directories(chewing-plus-ibus-prefs PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/ibus")
+set_target_properties(chewing-plus-ibus-prefs PROPERTIES
+    C_STANDARD 99 C_STANDARD_REQUIRED ON POSITION_INDEPENDENT_CODE ON)
+
 add_library(chewing-plus-ibus-keys STATIC ibus/keys.c)
 target_include_directories(chewing-plus-ibus-keys PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/ibus"
@@ -93,16 +99,27 @@ target_link_libraries(chewing-plus-ibus-keys PUBLIC chewing-plus-core)
 set_target_properties(chewing-plus-ibus-keys PROPERTIES
     C_STANDARD 99 C_STANDARD_REQUIRED ON POSITION_INDEPENDENT_CODE ON)
 
+if(ENABLE_IBUS_SETUP AND NOT ENABLE_IBUS)
+    message(FATAL_ERROR "ENABLE_IBUS_SETUP requires ENABLE_IBUS")
+endif()
+
 if(ENABLE_IBUS)
     pkg_check_modules(IBus REQUIRED ibus-1.0)
     set(CHEWING_PLUS_IBUS_EXEC "${CMAKE_INSTALL_FULL_LIBEXECDIR}/ibus-chewing-plus")
+    if(ENABLE_IBUS_SETUP)
+        set(CHEWING_PLUS_IBUS_SETUP_LINE
+            "<setup>${CMAKE_INSTALL_FULL_LIBEXECDIR}/ibus-setup-chewing-plus</setup>")
+    else()
+        set(CHEWING_PLUS_IBUS_SETUP_LINE "")
+    endif()
     configure_file(ibus/chewing-plus.xml.in chewing-plus.xml @ONLY)
     add_executable(ibus-chewing-plus ibus/main.c ibus/engine.c)
     target_include_directories(ibus-chewing-plus PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/ibus" ${IBus_INCLUDE_DIRS})
     target_compile_options(ibus-chewing-plus PRIVATE ${IBus_CFLAGS_OTHER})
     target_link_libraries(ibus-chewing-plus PRIVATE
-        chewing-plus-ibus-keys voxkit-protocol ${IBus_LIBRARIES})
+        chewing-plus-ibus-keys chewing-plus-ibus-prefs voxkit-protocol
+        ${IBus_LIBRARIES})
     target_compile_definitions(ibus-chewing-plus PRIVATE
         CHEWING_PLUS_IBUS_EMOJI="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-emoji-shortcodes.txt"
         CHEWING_PLUS_IBUS_ENGLISH="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-english.txt")
@@ -115,4 +132,19 @@ if(ENABLE_IBUS)
     install(FILES "${CMAKE_SOURCE_DIR}/data/plus-emoji-shortcodes.txt"
                   "${CMAKE_SOURCE_DIR}/data/plus-english.txt"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/chewing-plus")
+    if(ENABLE_IBUS_SETUP)
+        pkg_check_modules(Adw REQUIRED libadwaita-1)
+        add_executable(ibus-setup-chewing-plus ibus/setup.c)
+        target_include_directories(ibus-setup-chewing-plus PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/ibus" ${Adw_INCLUDE_DIRS})
+        target_compile_options(ibus-setup-chewing-plus PRIVATE
+            ${Adw_CFLAGS_OTHER})
+        target_link_libraries(ibus-setup-chewing-plus PRIVATE
+            chewing-plus-ibus-prefs voxkit-protocol ${Adw_LIBRARIES})
+        set_target_properties(ibus-setup-chewing-plus PROPERTIES
+            C_STANDARD 11 C_STANDARD_REQUIRED ON
+            RUNTIME_OUTPUT_NAME ibus-setup-chewing-plus)
+        install(TARGETS ibus-setup-chewing-plus
+                RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}")
+    endif()
 endif()
