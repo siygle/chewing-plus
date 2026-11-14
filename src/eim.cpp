@@ -8,8 +8,8 @@
 #include "eim.h"
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <chewing.h>
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -188,8 +188,9 @@ public:
             const bool english =
                 panel.kind == chewing_plus::Panel::Kind::English;
             for (size_t i = 0; i < panel.labels.size() && i < 9; i++) {
-                candidateWords_.emplace_back(std::make_unique<PlusCandidateWord>(
-                    engine_, panel.labels[i], static_cast<int>(i)));
+                candidateWords_.emplace_back(
+                    std::make_unique<PlusCandidateWord>(
+                        engine_, panel.labels[i], static_cast<int>(i)));
                 // Digits are text in these panels: select with Ctrl/Shift+N.
                 labels_.emplace_back(std::string(english ? "^" : "⇧") +
                                      std::to_string(i + 1) + ". ");
@@ -378,18 +379,19 @@ ChewingEngine::ChewingEngine(Instance *instance)
 #ifdef CHEWING_WITH_VOXKIT
 void ChewingEngine::registerVoxkit() {
     if (!voxkit()) {
-        return;  // module not installed or disabled: nothing to do
+        return; // module not installed or disabled: nothing to do
     }
     VoxkitRegistration r;
     r.insert = [this](InputContext *ic, const std::string &text) {
-        plus_.insertDictation(context_.get(), text,
-                              [this, ic](const std::string &t) { commit(ic, t); });
+        plus_.insertDictation(
+            context_.get(), text,
+            [this, ic](const std::string &t) { commit(ic, t); });
         updateUI(ic);
         return true;
     };
     r.vocabulary = [this]() { return dictationVocabulary(); };
-    voxkitHandle_ = voxkit()->call<IVoxkit::registerInputMethod>("chewing",
-                                                                  std::move(r));
+    voxkitHandle_ =
+        voxkit()->call<IVoxkit::registerInputMethod>("chewing", std::move(r));
 }
 
 // The user's own Chewing phrases (longest-first, capped) bias recognition
@@ -402,10 +404,12 @@ std::vector<std::string> ChewingEngine::dictationVocabulary() {
     }
     unsigned int plen = 0;
     unsigned int blen = 0;
-    while (chewing_userphrase_has_next(ctx, &plen, &blen) && words.size() < 2000) {
+    while (chewing_userphrase_has_next(ctx, &plen, &blen) &&
+           words.size() < 2000) {
         std::string phrase(plen, '\0');
         std::string bopomofo(blen, '\0');
-        if (chewing_userphrase_get(ctx, phrase.data(), plen, bopomofo.data(), blen) != 0) {
+        if (chewing_userphrase_get(ctx, phrase.data(), plen, bopomofo.data(),
+                                   blen) != 0) {
             break;
         }
         phrase.resize(std::strlen(phrase.c_str()));
@@ -413,9 +417,9 @@ std::vector<std::string> ChewingEngine::dictationVocabulary() {
             words.push_back(std::move(phrase));
         }
     }
-    std::stable_sort(words.begin(), words.end(), [](const auto &a, const auto &b) {
-        return a.size() > b.size();
-    });
+    std::stable_sort(
+        words.begin(), words.end(),
+        [](const auto &a, const auto &b) { return a.size() > b.size(); });
     if (words.size() > 80) {
         words.resize(80);
     }
@@ -461,7 +465,8 @@ void ChewingEngine::populateConfig() {
     o.spaceLetters = *config_.PlusSpaceLetters;
     o.spaceDigits = *config_.PlusSpaceDigits;
     o.emojiShortcode = *config_.PlusEmojiShortcode;
-    o.emojiPrefix = chewing_plus::EmojiPrefix::Parse(*config_.PlusEmojiShortcodePrefix);
+    o.emojiPrefix =
+        chewing_plus::EmojiPrefix::Parse(*config_.PlusEmojiShortcodePrefix);
     o.emojiDoubleTapMs = *config_.PlusEmojiDoubleTapMs;
     o.english = *config_.PlusEnglish;
     o.englishHint = *config_.PlusEnglishHint;
@@ -478,18 +483,20 @@ void ChewingEngine::populateConfig() {
         if (k.isValid() && k.isModifier()) {
             englishDoubleTapSyms_.push_back(k.sym());
             if (tapLabel.empty()) {
-                tapLabel = Key(k.sym()).toString(KeyStringFormat::Localized) + " ×2";
+                tapLabel =
+                    Key(k.sym()).toString(KeyStringFormat::Localized) + " ×2";
             }
         }
     }
     englishDoubleTap_.setWindowMs(*config_.PlusEnglishDoubleTapMs);
     englishDoubleTap_.reset();
-    std::string combo = englishToggleKeys_.empty()
-        ? std::string()
-        : englishToggleKeys_.front().toString(KeyStringFormat::Localized);
+    std::string combo =
+        englishToggleKeys_.empty()
+            ? std::string()
+            : englishToggleKeys_.front().toString(KeyStringFormat::Localized);
     o.englishShortcutLabel = !combo.empty() && !tapLabel.empty()
-        ? combo + " / " + tapLabel
-        : (combo.empty() ? tapLabel : combo);
+                                 ? combo + " / " + tapLabel
+                                 : (combo.empty() ? tapLabel : combo);
     plus_.setOptions(o);
     plus_.reset();
     loadPlusData();
@@ -505,7 +512,8 @@ void ChewingEngine::loadPlusData() {
         if (!builtIn.empty()) {
             plus_.shortcodes().load(builtIn.string());
         }
-        plus_.shortcodes().load((userDir / "plus-emoji-shortcodes.txt").string(), true);
+        plus_.shortcodes().load(
+            (userDir / "plus-emoji-shortcodes.txt").string(), true);
     }
     plus_.lexicon().clear();
     if (*config_.PlusEnglish) {
@@ -530,8 +538,9 @@ void ChewingEngine::commit(InputContext *ic, const std::string &text) {
 }
 
 bool ChewingEngine::plusToggleEnglish(InputContext *ic) {
-    if (!plus_.toggleEnglish(context_.get(),
-                             [this, ic](const std::string &t) { commit(ic, t); })) {
+    if (!plus_.toggleEnglish(context_.get(), [this, ic](const std::string &t) {
+            commit(ic, t);
+        })) {
         return false;
     }
     updateUI(ic);
@@ -664,10 +673,10 @@ void ChewingEngine::keyEvent(const InputMethodEntry &entry,
                            .count();
 
     if (!englishDoubleTapSyms_.empty() && *config_.PlusEnglish) {
-        bool watched = std::find(englishDoubleTapSyms_.begin(),
-                                 englishDoubleTapSyms_.end(),
-                                 keyEvent.rawKey().sym()) !=
-                       englishDoubleTapSyms_.end();
+        bool watched =
+            std::find(englishDoubleTapSyms_.begin(),
+                      englishDoubleTapSyms_.end(),
+                      keyEvent.rawKey().sym()) != englishDoubleTapSyms_.end();
         if (englishDoubleTap_.onKey(watched, keyEvent.isRelease(), nowMs) &&
             !sensitive && plusToggleEnglish(ic)) {
             keyEvent.filterAndAccept();
@@ -701,10 +710,12 @@ void ChewingEngine::keyEvent(const InputMethodEntry &entry,
             // by raw keycode so it works on any layout. 10..18 = digits 1..9.
             const bool english =
                 plus_.panel().kind == chewing_plus::Panel::Kind::English;
-            const bool selMod = english ? ctrl : raw.states().test(KeyState::Shift);
+            const bool selMod =
+                english ? ctrl : raw.states().test(KeyState::Shift);
             if (selMod && raw.code() >= 10 && raw.code() <= 18) {
-                plus_.select(ctx, raw.code() - 10,
-                             [this, ic](const std::string &t) { commit(ic, t); });
+                plus_.select(
+                    ctx, raw.code() - 10,
+                    [this, ic](const std::string &t) { commit(ic, t); });
                 updateUI(ic);
                 keyEvent.filterAndAccept();
                 return;
@@ -712,7 +723,8 @@ void ChewingEngine::keyEvent(const InputMethodEntry &entry,
             auto *list = ic->inputPanel().candidateList().get();
             if (list && (key.check(FcitxKey_Down) || key.check(FcitxKey_Up))) {
                 if (auto *m = list->toCursorMovable()) {
-                    key.check(FcitxKey_Down) ? m->nextCandidate() : m->prevCandidate();
+                    key.check(FcitxKey_Down) ? m->nextCandidate()
+                                             : m->prevCandidate();
                     plusCursorMoved_ = true;
                     ic->updateUserInterface(UserInterfaceComponent::InputPanel);
                 }
@@ -722,8 +734,9 @@ void ChewingEngine::keyEvent(const InputMethodEntry &entry,
             if (list && plusCursorMoved_ &&
                 (key.check(FcitxKey_Return) || key.check(FcitxKey_KP_Enter))) {
                 int i = list->cursorIndex();
-                plus_.select(ctx, i < 0 ? 0 : i,
-                             [this, ic](const std::string &t) { commit(ic, t); });
+                plus_.select(
+                    ctx, i < 0 ? 0 : i,
+                    [this, ic](const std::string &t) { commit(ic, t); });
                 updateUI(ic);
                 keyEvent.filterAndAccept();
                 return;
@@ -754,7 +767,7 @@ void ChewingEngine::keyEvent(const InputMethodEntry &entry,
         keyEvent.filterAndAccept();
         return;
     }
-    if (plus_.panel().active()) {  // Panel is modal: never leak keys.
+    if (plus_.panel().active()) { // Panel is modal: never leak keys.
         keyEvent.filterAndAccept();
         return;
     }

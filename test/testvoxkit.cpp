@@ -63,7 +63,9 @@ struct H {
             key(Key(static_cast<KeySym>(static_cast<unsigned char>(c))));
         }
     }
-    std::string preedit() const { return ic->inputPanel().preedit().toString(); }
+    std::string preedit() const {
+        return ic->inputPanel().preedit().toString();
+    }
 };
 
 const Key kAltR(FcitxKey_Alt_R);
@@ -72,17 +74,17 @@ const Key kAltRUp(FcitxKey_Alt_R, KeyState::Alt);
 bool tick(H &h) {
     const std::string text = std::getenv("FAKE_TEXT");
     switch (h.step++) {
-    case 0:  // empty buffer: dictation commits directly
+    case 0: // empty buffer: dictation commits directly
         h.send(kAltR);
         break;
     case 4:
         h.send(kAltRUp, true);
         break;
     case 8:
-        check(h.committed == text, "empty buffer: commits dictation, got [" +
-                                       h.committed + "]");
+        check(h.committed == text,
+              "empty buffer: commits dictation, got [" + h.committed + "]");
         h.committed.clear();
-        h.type("su3cl3");  // 你好, cursor at end
+        h.type("su3cl3"); // 你好, cursor at end
         h.send(kAltR);
         break;
     case 12:

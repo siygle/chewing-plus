@@ -182,22 +182,49 @@ FCITX_CONFIGURATION(
     ChewingLayoutOption Layout{this, "Layout", _("Keyboard Layout"),
                                ChewingLayout::Default};
     // Plus features (all off by default).
-    Option<bool> PlusEmoji{this, "PlusEmoji", _("Plus: Emoji suggestions"), false};
-    Option<bool> PlusCalculator{this, "PlusCalculator", _("Plus: Calculator (=)"), false};
-    Option<bool> PlusSpaceLetters{this, "PlusSpaceLetters", _("Plus: Space between Chinese and ASCII letters"), false};
-    Option<bool> PlusSpaceDigits{this, "PlusSpaceDigits", _("Plus: Space between Chinese and digits"), false};
-    Option<bool> PlusEmojiShortcode{this, "PlusEmojiShortcode", _("Plus: Emoji shortcodes (prefix + name, e.g. ;;smile)"), false};
-    Option<std::string> PlusEmojiShortcodePrefix{this, "PlusEmojiShortcodePrefix", _("Plus: Emoji shortcode prefix (one key, or the key twice for double-tap)"), ";;"};
-    Option<int, IntConstrain> PlusEmojiDoubleTapMs{this, "PlusEmojiDoubleTapMs", _("Plus: Double-tap window (ms)"), 300, IntConstrain(100, 1000)};
-    Option<bool> PlusEnglish{this, "PlusEnglish", _("Plus: English buffer mode (shortcut toggles)"), false};
-    Option<bool> PlusEnglishHint{this, "PlusEnglishHint", _("Plus: Hint when typed keys look like an English word"), false};
-    KeyListOption PlusEnglishToggleKeys{this, "PlusEnglishToggleKeys", _("Plus: English mode shortcut"),
-        {Key("Control+Shift+space")}, KeyListConstrain()};
-    KeyListOption PlusEnglishDoubleTapKeys{this, "PlusEnglishDoubleTapKeys",
-        _("Plus: English mode double-tap key (modifier, e.g. Right Shift)"), {},
-        KeyListConstrain({KeyConstrainFlag::AllowModifierOnly, KeyConstrainFlag::AllowModifierLess})};
-    Option<int, IntConstrain> PlusEnglishDoubleTapMs{this, "PlusEnglishDoubleTapMs",
-        _("Plus: English mode double-tap window (ms)"), 300, IntConstrain(100, 1000)};);
+    Option<bool> PlusEmoji{this, "PlusEmoji", _("Plus: Emoji suggestions"),
+                           false};
+    Option<bool> PlusCalculator{this, "PlusCalculator",
+                                _("Plus: Calculator (=)"), false};
+    Option<bool> PlusSpaceLetters{
+        this, "PlusSpaceLetters",
+        _("Plus: Space between Chinese and ASCII letters"), false};
+    Option<bool> PlusSpaceDigits{this, "PlusSpaceDigits",
+                                 _("Plus: Space between Chinese and digits"),
+                                 false};
+    Option<bool> PlusEmojiShortcode{
+        this, "PlusEmojiShortcode",
+        _("Plus: Emoji shortcodes (prefix + name, e.g. ;;smile)"), false};
+    Option<std::string> PlusEmojiShortcodePrefix{
+        this, "PlusEmojiShortcodePrefix",
+        _("Plus: Emoji shortcode prefix (one key, or the key twice for "
+          "double-tap)"),
+        ";;"};
+    Option<int, IntConstrain> PlusEmojiDoubleTapMs{
+        this, "PlusEmojiDoubleTapMs", _("Plus: Double-tap window (ms)"), 300,
+        IntConstrain(100, 1000)};
+    Option<bool> PlusEnglish{this, "PlusEnglish",
+                             _("Plus: English buffer mode (shortcut toggles)"),
+                             false};
+    Option<bool> PlusEnglishHint{
+        this, "PlusEnglishHint",
+        _("Plus: Hint when typed keys look like an English word"), false};
+    KeyListOption PlusEnglishToggleKeys{this,
+                                        "PlusEnglishToggleKeys",
+                                        _("Plus: English mode shortcut"),
+                                        {Key("Control+Shift+space")},
+                                        KeyListConstrain()};
+    KeyListOption PlusEnglishDoubleTapKeys{
+        this,
+        "PlusEnglishDoubleTapKeys",
+        _("Plus: English mode double-tap key (modifier, e.g. Right Shift)"),
+        {},
+        KeyListConstrain({KeyConstrainFlag::AllowModifierOnly,
+                          KeyConstrainFlag::AllowModifierLess})};
+    Option<int, IntConstrain> PlusEnglishDoubleTapMs{
+        this, "PlusEnglishDoubleTapMs",
+        _("Plus: English mode double-tap window (ms)"), 300,
+        IntConstrain(100, 1000)};);
 
 class ChewingEngine final : public InputMethodEngine {
 public:

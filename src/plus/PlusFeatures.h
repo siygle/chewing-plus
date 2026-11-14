@@ -9,9 +9,9 @@
 
 namespace chewing_plus {
 // No shell, interpreter, network, or locale-dependent parsing.
-std::optional<std::string> Calculate(const std::string& expression);
-std::string AutoSpace(const std::string& text, bool letters, bool digits);
-std::vector<std::string> EmojiForText(const std::string& text);
+std::optional<std::string> Calculate(const std::string &expression);
+std::string AutoSpace(const std::string &text, bool letters, bool digits);
+std::vector<std::string> EmojiForText(const std::string &text);
 
-}  // namespace chewing_plus
+} // namespace chewing_plus
 #endif

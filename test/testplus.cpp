@@ -11,7 +11,6 @@
 #include "testfrontend_public.h"
 #include <cstdio>
 #include <cstdlib>
-#include <vector>
 #include <fcitx-config/rawconfig.h>
 #include <fcitx-utils/eventdispatcher.h>
 #include <fcitx-utils/key.h>
@@ -27,6 +26,7 @@
 #include <fcitx/inputpanel.h>
 #include <fcitx/instance.h>
 #include <string>
+#include <vector>
 
 using namespace fcitx;
 
@@ -70,16 +70,17 @@ void testPlus(Instance *instance) {
         // Collect commits instead of pre-registering expectations.
         std::string committed;
         auto conn = ic->watch();
-        auto *handler = instance->watchEvent(
-                                    EventType::InputContextCommitString,
-                                    EventWatcherPhase::PreInputMethod,
-                                    [&committed, ic](Event &e) {
-                                        auto &ce = static_cast<CommitStringEvent &>(e);
-                                        if (ce.inputContext() == ic) {
-                                            committed += ce.text();
-                                        }
-                                    })
-                            .release();
+        auto *handler =
+            instance
+                ->watchEvent(EventType::InputContextCommitString,
+                             EventWatcherPhase::PreInputMethod,
+                             [&committed, ic](Event &e) {
+                                 auto &ce = static_cast<CommitStringEvent &>(e);
+                                 if (ce.inputContext() == ic) {
+                                     committed += ce.text();
+                                 }
+                             })
+                .release();
         auto send = [&](const Key &k, bool release = false) {
             tf->call<ITestFrontend::keyEvent>(uuid, k, release);
         };
@@ -117,7 +118,8 @@ void testPlus(Instance *instance) {
         // --- calculator
         reset();
         type("=1+2*3");
-        check(preedit() == "[計算器] =1+2*3", "calculator preedit, got " + preedit());
+        check(preedit() == "[計算器] =1+2*3",
+              "calculator preedit, got " + preedit());
         check(cand(0) == "7", "calculator result 7, got " + cand(0));
         key(Key(FcitxKey_Return));
         check(committed == "7", "calculator commits 7, got " + committed);
@@ -127,13 +129,15 @@ void testPlus(Instance *instance) {
         type("su3cl3");
         key(Key(FcitxKey_A, KeyState::Shift));
         key(Key(FcitxKey_Return));
-        check(committed == "你好 A", "auto space 你好 A, got [" + committed + "]");
+        check(committed == "你好 A",
+              "auto space 你好 A, got [" + committed + "]");
 
         // --- emoji shortcode: ;; then smile, Space commits; Chinese kept
         reset();
         type("su3cl3");
         type(";;");
-        check(preedit() == "你好;;", "double tap ;; opens panel keeping 你好, got " + preedit());
+        check(preedit() == "你好;;",
+              "double tap ;; opens panel keeping 你好, got " + preedit());
         type("thumbsup");
         check(cand(0) == "👍 :thumbsup", "thumbsup first, got " + cand(0));
         key(Key(FcitxKey_space));
@@ -152,9 +156,11 @@ void testPlus(Instance *instance) {
         type("github");
         check(cand(0) == "GitHub", "github -> GitHub, got " + cand(0));
         key(Key(FcitxKey_space));
-        check(preedit() == "你好GitHub ", "English inserted into buffer, got [" + preedit() + "]");
+        check(preedit() == "你好GitHub ",
+              "English inserted into buffer, got [" + preedit() + "]");
         key(Key(FcitxKey_Return));
-        check(committed == "你好 GitHub ", "commit with spacing, got [" + committed + "]");
+        check(committed == "你好 GitHub ",
+              "commit with spacing, got [" + committed + "]");
 
         // --- Enter = as typed; Ctrl+2 picks 2nd
         reset();
@@ -168,7 +174,8 @@ void testPlus(Instance *instance) {
         type("iphone");
         key(Key(FcitxKey_2, KeyState::Ctrl, 11));
         key(Key(FcitxKey_Return));
-        check(committed == "iphone", "Ctrl+2 picks 2nd (as typed), got " + committed);
+        check(committed == "iphone",
+              "Ctrl+2 picks 2nd (as typed), got " + committed);
 
         // --- digits and symbols are typed in EN mode
         reset();
@@ -184,10 +191,12 @@ void testPlus(Instance *instance) {
         check(aux() == "Control+Shift+Space / Right Shift ×2 → GitHub",
               "hint shown, got [" + aux() + "]");
         key(Key("Control+Shift+space"));
-        check(preedit() == "你[EN] github", "hint converts keys, got " + preedit());
+        check(preedit() == "你[EN] github",
+              "hint converts keys, got " + preedit());
         key(Key(FcitxKey_space));
         key(Key(FcitxKey_Return));
-        check(committed == "你 GitHub ", "converted commit, got [" + committed + "]");
+        check(committed == "你 GitHub ",
+              "converted commit, got [" + committed + "]");
 
         // --- no hint for real Zhuyin
         reset();
@@ -202,7 +211,8 @@ void testPlus(Instance *instance) {
         };
         tapShift();
         tapShift();
-        check(preedit() == "[EN] ", "Right Shift x2 enters EN, got " + preedit());
+        check(preedit() == "[EN] ",
+              "Right Shift x2 enters EN, got " + preedit());
 
         // --- emoji suggestion after phrase (開心 = d9 vup)
         reset();
@@ -218,7 +228,8 @@ void testPlus(Instance *instance) {
         reset();
         ic->setCapabilityFlags(CapabilityFlag::Password);
         type("=");
-        check(preedit().find("計算器") == std::string::npos, "no Plus in password field");
+        check(preedit().find("計算器") == std::string::npos,
+              "no Plus in password field");
         ic->setCapabilityFlags(CapabilityFlags{});
 
         delete handler;

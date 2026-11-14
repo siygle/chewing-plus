@@ -24,20 +24,19 @@ std::string Buffer(ChewingContext *ctx) {
     return chewing_buffer_Check(ctx) ? Str(chewing_buffer_String(ctx)) : "";
 }
 std::string Zuin(ChewingContext *ctx) {
-    return chewing_bopomofo_Check(ctx) ? Str(chewing_bopomofo_String(ctx))
-                                       : "";
+    return chewing_bopomofo_Check(ctx) ? Str(chewing_bopomofo_String(ctx)) : "";
 }
 size_t CodePoints(const std::string &s) {
-    return std::count_if(s.begin(), s.end(), [](unsigned char c) {
-        return (c & 0xC0) != 0x80;
-    });
+    return std::count_if(s.begin(), s.end(),
+                         [](unsigned char c) { return (c & 0xC0) != 0x80; });
 }
 // Byte offset where the n-th code point starts (or size() past the end).
 size_t ByteOffset(const std::string &s, size_t n) {
     size_t i = 0;
     while (i < s.size() && n) {
         ++i;
-        while (i < s.size() && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) {
+        while (i < s.size() &&
+               (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) {
             ++i;
         }
         --n;
@@ -212,9 +211,10 @@ Handled ChewingPlus::onKey(ChewingContext *ctx, char ascii, bool ctrl,
                 }
                 refreshPanel(ctx);
             }
-            return Handled::Yes;  // modal
+            return Handled::Yes; // modal
         }
-        if (isReturn || (isSpace && panel_.kind == Panel::Kind::EmojiShortcode)) {
+        if (isReturn ||
+            (isSpace && panel_.kind == Panel::Kind::EmojiShortcode)) {
             if (!panel_.values.empty()) {
                 select(ctx, 0, commit);
             }
@@ -237,7 +237,8 @@ Handled ChewingPlus::onKey(ChewingContext *ctx, char ascii, bool ctrl,
             refreshPanel(ctx);
         } else if (panel_.kind == Panel::Kind::EmojiShortcode &&
                    CodeChar(ascii) && in.size() < 40) {
-            in += static_cast<char>(std::tolower(static_cast<unsigned char>(ascii)));
+            in += static_cast<char>(
+                std::tolower(static_cast<unsigned char>(ascii)));
             refreshPanel(ctx);
         }
         return Handled::Yes;
@@ -294,7 +295,7 @@ Handled ChewingPlus::onKey(ChewingContext *ctx, char ascii, bool ctrl,
                 return Handled::Yes;
             }
         }
-        if (Zuin(ctx).empty()) {  // Only a fresh tap can be a first tap.
+        if (Zuin(ctx).empty()) { // Only a fresh tap can be a first tap.
             prefixPendingMs_ = nowMs_;
             prefixPendingBuffer_ = Buffer(ctx);
             prefixPendingZuin_.clear();
@@ -317,9 +318,8 @@ void ChewingPlus::insertDictation(ChewingContext *ctx, const std::string &text,
     overwrites_ = 0;
     overwriteFlags_.clear();
     lastZuinLen_ = 0;
-    const bool ascii = std::all_of(text.begin(), text.end(), [](char c) {
-        return c >= 0x20 && c < 0x7f;
-    });
+    const bool ascii = std::all_of(
+        text.begin(), text.end(), [](char c) { return c >= 0x20 && c < 0x7f; });
     if (ascii) {
         InsertAscii(ctx, text, commit);
     } else {
@@ -340,7 +340,7 @@ void ChewingPlus::select(ChewingContext *ctx, int i, const Commit &commit) {
         break;
     case Panel::Kind::Calculator:
         closePanel();
-        commit(value);  // Only opened on an empty buffer.
+        commit(value); // Only opened on an empty buffer.
         break;
     case Panel::Kind::EmojiShortcode:
         // Not ASCII: Chewing's buffer cannot hold it, so commit the
