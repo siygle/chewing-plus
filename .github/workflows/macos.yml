@@ -31,3 +31,10 @@ jobs:
         run: bash macos/build-app.sh
       - name: Build unsigned package
         run: bash macos/build-pkg.sh
+      - name: Check IMK bundle and package
+        run: >-
+          python3 macos/check-bundle.py
+          --source .
+          --app macos/build/ChewingPlus.app
+          --pkg macos/build/ChewingPlus.pkg
+          --component-plist macos/build/component.plist

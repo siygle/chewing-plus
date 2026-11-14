@@ -64,6 +64,8 @@ and `KeepAlive` only restarts a non-zero exit, with a 30 second throttle,
 so an empty model store does not respawn the job in a loop. The daemon
 stays up without weights and answers `model.*`.
 
+`macos/build-pkg.sh` installs the app at `/Library/Input Methods/ChewingPlus.app` and marks that bundle non-relocatable, so Installer does not move it onto another copy with the same id. The package also carries `voxkit` and `chewing-plus-models`; the postinstall copies them into the console user's `~/Library/Application Support/ChewingPlus`. `macos/check-bundle.py` checks the IMK keys and that path.
+
 `build-app.sh` refuses to run on Linux. `libchewing` 0.14.0-rc.1's CMake
 cannot emit a static archive (the `chewing_capi` export error), so the app
 bundles the shared `libchewing.dylib` plus `static_dict.bin` and the Plus

@@ -75,6 +75,8 @@ jobs:
         with:
           languages: cpp
           source-root: fcitx5-chewing
+      - name: Check IMK Info.plist
+        run: python3 fcitx5-chewing/macos/check-bundle.py --source fcitx5-chewing
       - name: Build pinned libchewing 0.14.0-rc.1
         if: github.ref != 'refs/heads/master' && github.base_ref != 'master'
         run: |

@@ -30,6 +30,12 @@ app="$root/macos/build/ChewingPlus.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Frameworks" "$app/Contents/Resources/libchewing"
 cp "$root/macos/ChewingPlus/Info.plist" "$app/Contents/Info.plist"
+cp "$root/macos/ChewingPlus/chewing-plus.pdf" "$app/Contents/Resources/"
+mkdir -p "$app/Contents/Resources/zh-Hant.lproj" "$app/Contents/Resources/Base.lproj"
+cp "$root/macos/ChewingPlus/zh-Hant.lproj/InfoPlist.strings" \
+    "$app/Contents/Resources/zh-Hant.lproj/"
+cp "$root/macos/ChewingPlus/Base.lproj/InfoPlist.strings" \
+    "$app/Contents/Resources/Base.lproj/"
 cp "$prefix/share/libchewing/"*.bin "$prefix/share/libchewing/"*.dat \
     "$app/Contents/Resources/libchewing/" 2>/dev/null || true
 cp "$root/data/plus-emoji-shortcodes.txt" "$root/data/plus-english.txt" \

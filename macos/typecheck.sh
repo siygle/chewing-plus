@@ -14,6 +14,12 @@ clang -std=c99 -Wall -Wextra -Werror -D_DARWIN_C_SOURCE=1 -D_POSIX_C_SOURCE=2008
     test/core/test_voxkit_client.c src/voxkit/protocol.c src/voxkit/client.c
 /tmp/voxkit-client-test
 
+clang -std=c99 -Wall -Wextra -Werror -D_DARWIN_C_SOURCE=1 -D_POSIX_C_SOURCE=200809L \
+    -I src/ibus \
+    -o /tmp/ibus-prefs-test \
+    test/core/test_ibus_prefs.c src/ibus/prefs.c
+/tmp/ibus-prefs-test
+
 sdk=$(xcrun --sdk macosx --show-sdk-path)
 xcrun swiftc -typecheck \
     -sdk "$sdk" \

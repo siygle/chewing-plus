@@ -5,6 +5,8 @@ import InputMethodKit
 /// Native InputMethodKit controller. Drawing is IMKCandidates (AppKit).
 /// Composition is libchewing-plus-core. Voice is a version-1 client of the
 /// voxkit launchd helper. This process does not load a model.
+/// The Objective-C name matches InputMethodServerControllerClass.
+@objc(ChewingPlusInputController)
 final class ChewingPlusInputController: IMKInputController {
     private var session: OpaquePointer?
     private var voice = UnsafeMutablePointer<voxkit_client>.allocate(capacity: 1)
@@ -30,7 +32,7 @@ final class ChewingPlusInputController: IMKInputController {
 
     override func menu() -> NSMenu! {
         let menu = NSMenu(title: "新酷音 Plus")
-        let item = NSMenuItem(title: "语音模型…", action: #selector(openModels(_:)),
+        let item = NSMenuItem(title: "語音模型…", action: #selector(openModels(_:)),
                               keyEquivalent: "")
         item.target = self
         menu.addItem(item)

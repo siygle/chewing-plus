@@ -1,11 +1,13 @@
 #!/bin/bash
-# Build an unsigned installer. The .app inside is ad-hoc signed when
-# codesign exists, so a local install can load it. productsign is not run.
+# Unsigned installer. The app is ad-hoc signed when codesign exists.
+# The component is not relocatable: Installer must not move ChewingPlus.app
+# onto some other bundle that happens to share the same id.
 #
 #   macos/build-pkg.sh
 #
 # Output: macos/build/ChewingPlus.pkg
 set -euo pipefail
+export COPYFILE_DISABLE=1
 if [[ "$(uname)" != Darwin ]]; then
     echo "macos/build-pkg.sh must run on macOS" >&2
     exit 1
@@ -15,14 +17,61 @@ if [[ ! -d "$root/macos/build/ChewingPlus.app" ]]; then
     bash "$root/macos/build-app.sh"
 fi
 app="$root/macos/build/ChewingPlus.app"
-stage=$(mktemp -d)
-trap 'rm -rf "$stage"' EXIT
-mkdir -p "$stage/Library/Input Methods" "$root/macos/build"
-cp -R "$app" "$stage/Library/Input Methods/ChewingPlus.app"
-if command -v codesign >/dev/null 2>&1; then
-    codesign --force --sign - "$stage/Library/Input Methods/ChewingPlus.app" || true
+models="$root/macos/build/core/src/chewing-plus-models"
+if [[ ! -x "$models" ]]; then
+    cmake --build "$root/macos/build/core" --target chewing-plus-models
 fi
+voxkit=${VOXKIT_BIN:-"$root/macos/build/fcitx5-voxkit/daemon/target/release/voxkit"}
+if [[ ! -x "$voxkit" ]]; then
+    bash "$root/macos/build-voxkit.sh"
+    voxkit="$root/macos/build/fcitx5-voxkit/daemon/target/release/voxkit"
+fi
+
+# Staging lives outside macos/build so the tree that produced the app is
+# not also inside the payload. Only one ChewingPlus.app is copied, at the
+# install path.
+stage=$(mktemp -d "${TMPDIR:-/tmp}/chewing-plus-pkg.XXXXXX")
+trap 'rm -rf "$stage"' EXIT
+dest="$stage/Library/Input Methods/ChewingPlus.app"
+support="$stage/Library/Application Support/ChewingPlus"
+mkdir -p "$dest" "$support" "$root/macos/build"
+ditto --norsrc "$app" "$dest"
+ditto --norsrc "$voxkit" "$support/voxkit"
+ditto --norsrc "$models" "$support/chewing-plus-models"
+chmod 755 "$support/voxkit" "$support/chewing-plus-models"
+find "$stage" -name '._*' -delete
+find "$stage" -name '.DS_Store' -delete
+if command -v dot_clean >/dev/null 2>&1; then
+    dot_clean -m "$stage" >/dev/null
+fi
+# The source app stays in macos/build and is not part of this root.
+apps=$(find "$stage" -name 'ChewingPlus.app' -type d | wc -l | tr -d ' ')
+if [[ "$apps" != 1 ]]; then
+    echo "payload has $apps ChewingPlus.app bundles; expected 1" >&2
+    exit 1
+fi
+if command -v codesign >/dev/null 2>&1; then
+    codesign --force --sign - "$dest" || true
+fi
+
+plist="$root/macos/build/component.plist"
+pkgbuild --analyze --root "$stage" "$plist"
+python3 - "$plist" <<'PY'
+import plistlib
+import sys
+path = sys.argv[1]
+with open(path, "rb") as fh:
+    rows = plistlib.load(fh)
+if not rows:
+    raise SystemExit("pkgbuild --analyze produced an empty component list")
+for row in rows:
+    row["BundleIsRelocatable"] = False
+with open(path, "wb") as fh:
+    plistlib.dump(rows, fh)
+PY
+
 pkgbuild --root "$stage" \
+    --component-plist "$plist" \
     --identifier im.chewing.plus.inputmethod \
     --version 5.1.13 \
     --scripts "$root/macos/pkg-scripts" \
@@ -30,4 +79,4 @@ pkgbuild --root "$stage" \
     "$root/macos/build/ChewingPlus-component.pkg"
 productbuild --package "$root/macos/build/ChewingPlus-component.pkg" \
     "$root/macos/build/ChewingPlus.pkg"
-echo "pkg: $root/macos/build/ChewingPlus.pkg (unsigned)"
+echo "pkg: $root/macos/build/ChewingPlus.pkg (unsigned, not relocatable)"
