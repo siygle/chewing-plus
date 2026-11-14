@@ -48,6 +48,7 @@ xcrun swiftc -O -emit-executable \
     -Xlinker -lchewing-plus-core \
     -Xlinker -lvoxkit-protocol \
     -Xlinker -lchewing \
+    -Xlinker -lc++ \
     -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
     -framework Cocoa -framework InputMethodKit -framework Carbon \
     -o "$app/Contents/MacOS/ChewingPlus" \
