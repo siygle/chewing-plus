@@ -130,6 +130,21 @@ static int parse_string(const char **pp, char *dest, size_t cap) {
     return 0;
 }
 
+static int parse_bool(const char **pp, int *out) {
+    const char *p = *pp;
+    if (strncmp(p, "true", 4) == 0) {
+        *out = 1;
+        *pp = p + 4;
+        return 0;
+    }
+    if (strncmp(p, "false", 5) == 0) {
+        *out = 0;
+        *pp = p + 5;
+        return 0;
+    }
+    return -1;
+}
+
 static int parse_number(const char **pp, double *out) {
     char *end = NULL;
     *out = strtod(*pp, &end);
@@ -250,6 +265,13 @@ static voxkit_msg_type type_from_name(const char *name) {
         {"error", VOXKIT_MSG_ERROR},
         {"level", VOXKIT_MSG_LEVEL},
         {"pong", VOXKIT_MSG_PONG},
+        {"model.list", VOXKIT_MSG_MODEL_LIST},
+        {"model.install", VOXKIT_MSG_MODEL_INSTALL},
+        {"model.progress", VOXKIT_MSG_MODEL_PROGRESS},
+        {"model.cancel", VOXKIT_MSG_MODEL_CANCEL},
+        {"model.remove", VOXKIT_MSG_MODEL_REMOVE},
+        {"model.select", VOXKIT_MSG_MODEL_SELECT},
+        {"model.status", VOXKIT_MSG_MODEL_STATUS},
     };
     size_t i;
     for (i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
@@ -286,6 +308,20 @@ const char *voxkit_proto_type_name(voxkit_msg_type type) {
         return "level";
     case VOXKIT_MSG_PONG:
         return "pong";
+    case VOXKIT_MSG_MODEL_LIST:
+        return "model.list";
+    case VOXKIT_MSG_MODEL_INSTALL:
+        return "model.install";
+    case VOXKIT_MSG_MODEL_PROGRESS:
+        return "model.progress";
+    case VOXKIT_MSG_MODEL_CANCEL:
+        return "model.cancel";
+    case VOXKIT_MSG_MODEL_REMOVE:
+        return "model.remove";
+    case VOXKIT_MSG_MODEL_SELECT:
+        return "model.select";
+    case VOXKIT_MSG_MODEL_STATUS:
+        return "model.status";
     default:
         return "";
     }
@@ -360,6 +396,32 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
                 return VOXKIT_PROTO_ERR_PARSE;
             }
             out->has_rms = 1;
+        } else if (strcmp(key, "bytes") == 0 || strcmp(key, "received") == 0 ||
+                   strcmp(key, "store_bytes") == 0) {
+            double num = 0;
+            if (parse_number(&p, &num) != 0 || num < 0) {
+                set_err(err, err_n, "bad size");
+                return VOXKIT_PROTO_ERR_PARSE;
+            }
+            if (strcmp(key, "bytes") == 0) {
+                out->bytes = (uint64_t)num;
+            } else if (strcmp(key, "received") == 0) {
+                out->received = (uint64_t)num;
+            } else {
+                out->store_bytes = (uint64_t)num;
+            }
+        } else if (strcmp(key, "installed") == 0 ||
+                   strcmp(key, "active") == 0) {
+            int flag = 0;
+            if (parse_bool(&p, &flag) != 0) {
+                set_err(err, err_n, "bad flag");
+                return VOXKIT_PROTO_ERR_PARSE;
+            }
+            if (strcmp(key, "installed") == 0) {
+                out->installed = flag;
+            } else {
+                out->active = flag;
+            }
         } else if (*p == '"') {
             char value[4096];
             if (parse_string(&p, value, sizeof(value)) != 0) {
@@ -384,6 +446,12 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
                 copy_field(out->convert, sizeof(out->convert), value);
             } else if (strcmp(key, "model") == 0) {
                 copy_field(out->model, sizeof(out->model), value);
+            } else if (strcmp(key, "store") == 0) {
+                copy_field(out->store, sizeof(out->store), value);
+            } else if (strcmp(key, "state") == 0) {
+                copy_field(out->state, sizeof(out->state), value);
+            } else if (strcmp(key, "daemon") == 0) {
+                copy_field(out->daemon, sizeof(out->daemon), value);
             }
         } else if (skip_value(&p) != 0) {
             set_err(err, err_n, "bad value");
@@ -480,6 +548,60 @@ static int write_simple(char *buf, size_t n, uint64_t req, const char *type) {
     return finish(buf, n, used);
 }
 
+int voxkit_proto_write_model_list(char *buf, size_t n, uint64_t req) {
+    return write_simple(buf, n, req, "model.list");
+}
+
+int voxkit_proto_write_model_progress(char *buf, size_t n, uint64_t req) {
+    return write_simple(buf, n, req, "model.progress");
+}
+
+int voxkit_proto_write_model_cancel(char *buf, size_t n, uint64_t req) {
+    return write_simple(buf, n, req, "model.cancel");
+}
+
+int voxkit_proto_write_model_status(char *buf, size_t n, uint64_t req) {
+    return write_simple(buf, n, req, "model.status");
+}
+
+static int write_model_id(char *buf, size_t n, uint64_t req, const char *type,
+                          const char *model) {
+    size_t used = 0;
+    char prefix[96];
+    int wrote;
+    if (!buf || n == 0 || !model) {
+        return -1;
+    }
+    buf[0] = '\0';
+    wrote = snprintf(prefix, sizeof(prefix),
+                     "{\"v\":1,\"type\":\"%s\",\"req\":%llu,\"model\":", type,
+                     (unsigned long long)req);
+    if (wrote < 0 || (size_t)wrote >= sizeof(prefix)) {
+        return -1;
+    }
+    if (append(buf, n, &used, prefix) != 0 ||
+        append_json_string(buf, n, &used, model) != 0 ||
+        append(buf, n, &used, "}") != 0) {
+        return -1;
+    }
+    return finish(buf, n, used);
+}
+
+int voxkit_proto_write_model_install(char *buf, size_t n, uint64_t req,
+                                     const char *model) {
+    return write_model_id(buf, n, req, "model.install", model);
+}
+
+int voxkit_proto_write_model_remove(char *buf, size_t n, uint64_t req,
+                                    const char *model) {
+    return write_model_id(buf, n, req, "model.remove", model);
+}
+
+int voxkit_proto_write_model_select(char *buf, size_t n, uint64_t req,
+                                    const char *model) {
+    return write_model_id(buf, n, req, "model.select", model);
+}
+
 int voxkit_proto_write_ping(char *buf, size_t n, uint64_t req) {
     return write_simple(buf, n, req, "ping");
 }
@@ -564,6 +686,173 @@ int voxkit_proto_default_socket(char *buf, size_t n) {
     }
     wrote = snprintf(buf, n, "/tmp/voxkit-%lu.sock", (unsigned long)getuid());
     if (wrote < 0 || (size_t)wrote >= n) {
+        return VOXKIT_PROTO_ERR_RANGE;
+    }
+    return VOXKIT_PROTO_OK;
+}
+
+static int parse_one_model(const char **pp, voxkit_model_info *info) {
+    const char *p = skip(*pp);
+    char key[64];
+    memset(info, 0, sizeof(*info));
+    if (*p != '{') {
+        return -1;
+    }
+    p++;
+    while (1) {
+        p = skip(p);
+        if (*p == '}') {
+            p++;
+            break;
+        }
+        if (parse_string(&p, key, sizeof(key)) != 0) {
+            return -1;
+        }
+        p = skip(p);
+        if (*p != ':') {
+            return -1;
+        }
+        p = skip(p + 1);
+        if (strcmp(key, "id") == 0) {
+            if (parse_string(&p, info->id, sizeof(info->id)) != 0) {
+                return -1;
+            }
+        } else if (strcmp(key, "kind") == 0) {
+            if (parse_string(&p, info->kind, sizeof(info->kind)) != 0) {
+                return -1;
+            }
+        } else if (strcmp(key, "blurb") == 0) {
+            if (parse_string(&p, info->blurb, sizeof(info->blurb)) != 0) {
+                return -1;
+            }
+        } else if (strcmp(key, "bytes") == 0 ||
+                   strcmp(key, "size_on_disk") == 0) {
+            double num = 0;
+            if (parse_number(&p, &num) != 0 || num < 0) {
+                return -1;
+            }
+            if (strcmp(key, "bytes") == 0) {
+                info->bytes = (uint64_t)num;
+            } else {
+                info->size_on_disk = (uint64_t)num;
+            }
+        } else if (strcmp(key, "installed") == 0 ||
+                   strcmp(key, "active") == 0) {
+            int flag = 0;
+            if (parse_bool(&p, &flag) != 0) {
+                return -1;
+            }
+            if (strcmp(key, "installed") == 0) {
+                info->installed = flag;
+            } else {
+                info->active = flag;
+            }
+        } else if (skip_value(&p) != 0) {
+            return -1;
+        }
+        p = skip(p);
+        if (*p == ',') {
+            p++;
+            continue;
+        }
+        if (*p == '}') {
+            p++;
+            break;
+        }
+        return -1;
+    }
+    *pp = p;
+    return 0;
+}
+
+int voxkit_proto_parse_models(const char *line, voxkit_model_info *out,
+                              size_t cap, size_t *count, char *err,
+                              size_t err_n) {
+    const char *p;
+    size_t stored = 0;
+    int overflow = 0;
+    if (count) {
+        *count = 0;
+    }
+    if (!line) {
+        set_err(err, err_n, "null");
+        return VOXKIT_PROTO_ERR_PARSE;
+    }
+    p = skip(line);
+    if (*p != '{') {
+        set_err(err, err_n, "expected object");
+        return VOXKIT_PROTO_ERR_PARSE;
+    }
+    p++;
+    while (1) {
+        char key[64];
+        p = skip(p);
+        if (*p == '}') {
+            break;
+        }
+        if (parse_string(&p, key, sizeof(key)) != 0) {
+            set_err(err, err_n, "bad key");
+            return VOXKIT_PROTO_ERR_PARSE;
+        }
+        p = skip(p);
+        if (*p != ':') {
+            set_err(err, err_n, "expected colon");
+            return VOXKIT_PROTO_ERR_PARSE;
+        }
+        p = skip(p + 1);
+        if (strcmp(key, "models") == 0 && *p == '[') {
+            p++;
+            while (1) {
+                p = skip(p);
+                if (*p == ']') {
+                    p++;
+                    break;
+                }
+                if (stored < cap && out) {
+                    if (parse_one_model(&p, &out[stored]) != 0) {
+                        set_err(err, err_n, "bad model");
+                        return VOXKIT_PROTO_ERR_PARSE;
+                    }
+                    stored++;
+                } else {
+                    overflow = 1;
+                    if (skip_value(&p) != 0) {
+                        set_err(err, err_n, "bad model");
+                        return VOXKIT_PROTO_ERR_PARSE;
+                    }
+                }
+                p = skip(p);
+                if (*p == ',') {
+                    p++;
+                    continue;
+                }
+                if (*p == ']') {
+                    p++;
+                    break;
+                }
+                set_err(err, err_n, "bad models");
+                return VOXKIT_PROTO_ERR_PARSE;
+            }
+        } else if (skip_value(&p) != 0) {
+            set_err(err, err_n, "bad value");
+            return VOXKIT_PROTO_ERR_PARSE;
+        }
+        p = skip(p);
+        if (*p == ',') {
+            p++;
+            continue;
+        }
+        if (*p == '}') {
+            break;
+        }
+        set_err(err, err_n, "expected comma");
+        return VOXKIT_PROTO_ERR_PARSE;
+    }
+    if (count) {
+        *count = stored;
+    }
+    if (overflow) {
+        set_err(err, err_n, "too many models");
         return VOXKIT_PROTO_ERR_RANGE;
     }
     return VOXKIT_PROTO_OK;

@@ -1,0 +1,32 @@
+#!/bin/bash
+# Per-user LaunchAgent. A missing voxkit binary makes the wrapper exit 0,
+# and KeepAlive does not restart a successful exit.
+set -euo pipefail
+user=$(stat -f '%Su' /dev/console)
+if [[ -z "$user" || "$user" == "root" ]]; then
+    exit 0
+fi
+home=$(dscl . -read "/Users/$user" NFSHomeDirectory | awk '{print $2}')
+uid=$(id -u "$user")
+support="$home/Library/Application Support/ChewingPlus"
+mkdir -p "$support/models" "$home/Library/LaunchAgents"
+cat > "$support/voxkit-launch.sh" <<'EOF'
+#!/bin/sh
+set -eu
+home=${HOME:?}
+bin="$home/Library/Application Support/ChewingPlus/voxkit"
+if [ ! -x "$bin" ]; then
+    echo "voxkit: binary missing; not restarting" >&2
+    exit 0
+fi
+exec "$bin" serve
+EOF
+chmod 755 "$support/voxkit-launch.sh"
+sed "s|__HOME__|$home|g" "$(dirname "$0")/agent.plist" \
+    > "$home/Library/LaunchAgents/im.chewing.plus.voxkit.plist"
+chown "$user" "$support/voxkit-launch.sh" \
+    "$home/Library/LaunchAgents/im.chewing.plus.voxkit.plist"
+launchctl bootout "gui/$uid/im.chewing.plus.voxkit" 2>/dev/null || true
+launchctl bootstrap "gui/$uid" \
+    "$home/Library/LaunchAgents/im.chewing.plus.voxkit.plist" || true
+exit 0

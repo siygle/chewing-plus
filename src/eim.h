@@ -224,7 +224,20 @@ FCITX_CONFIGURATION(
     Option<int, IntConstrain> PlusEnglishDoubleTapMs{
         this, "PlusEnglishDoubleTapMs",
         _("Plus: English mode double-tap window (ms)"), 300,
-        IntConstrain(100, 1000)};);
+        IntConstrain(100, 1000)};
+    // The config dialog is a form. It can store the active model id and
+    // show a status line when the dialog opens. Download progress, cancel,
+    // and delete are `chewing-plus-models` (no extra toolkit).
+    Option<std::string> VoiceModel{
+        this, "VoiceModel",
+        _("Voice: active model id (empty keeps the daemon's choice; "
+          "list, download, cancel, and delete with chewing-plus-models)"),
+        ""};
+    Option<std::string> VoiceModelStatus{
+        this, "VoiceModelStatus",
+        _("Voice: daemon, download state, store path, and disk use "
+          "(refreshed when this dialog opens)"),
+        ""});
 
 class ChewingEngine final : public InputMethodEngine {
 public:
@@ -244,10 +257,15 @@ public:
                InputContextEvent &event) override;
     void save() override;
 
-    const Configuration *getConfig() const override { return &config_; }
+    const Configuration *getConfig() const override {
+        refreshVoiceStatus();
+        return &config_;
+    }
     void setConfig(const RawConfig &config) override {
         config_.load(config, true);
         populateConfig();
+        refreshVoiceStatus();
+        applyVoiceModel();
         safeSaveAsIni(config_, "conf/chewing.conf");
     }
 
@@ -276,6 +294,8 @@ private:
 #endif
 
     void populateConfig();
+    void refreshVoiceStatus() const;
+    void applyVoiceModel();
     Instance *instance_;
     ChewingConfig config_;
     UniqueCPtr<ChewingContext, chewing_delete> context_;

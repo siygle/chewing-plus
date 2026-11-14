@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>im.chewing.plus.voxkit</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__HOME__/Library/Application Support/ChewingPlus/voxkit-launch.sh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>VOXKIT_SOCKET</key>
+        <string>/tmp/chewing-plus-voxkit.sock</string>
+        <key>VOXKIT_MODEL</key>
+        <string>qwen3-asr-0.6b</string>
+        <key>VOXKIT_MODELS_DIR</key>
+        <string>__HOME__/Library/Application Support/ChewingPlus/models</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+</dict>
+</plist>

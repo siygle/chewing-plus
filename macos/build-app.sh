@@ -9,7 +9,7 @@ fi
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 prefix=${CHEWING_PREFIX:-"$root/macos/build/libchewing"}
 if [ ! -f "$prefix/lib/libchewing.dylib" ] && [ ! -f "$prefix/lib/libchewing.3.dylib" ]; then
-    "$root/scripts/bundle-libchewing.sh" --shared "$prefix"
+    bash "$root/scripts/bundle-libchewing.sh" --shared "$prefix"
 fi
 # libchewing's shared library name.
 libchewing=$(ls "$prefix"/lib/libchewing.dylib "$prefix"/lib/libchewing.*.dylib 2>/dev/null | head -1)
@@ -53,7 +53,8 @@ xcrun swiftc -O -emit-executable \
     -framework Cocoa -framework InputMethodKit -framework Carbon \
     -o "$app/Contents/MacOS/ChewingPlus" \
     "$root/macos/ChewingPlus/main.swift" \
-    "$root/macos/ChewingPlus/ChewingPlusInputController.swift"
+    "$root/macos/ChewingPlus/ChewingPlusInputController.swift" \
+    "$root/macos/ChewingPlus/ModelPreferences.swift"
 
 install_name_tool -add_rpath @executable_path/../Frameworks \
     "$app/Contents/MacOS/ChewingPlus" || true

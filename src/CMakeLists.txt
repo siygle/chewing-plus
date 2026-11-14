@@ -13,6 +13,14 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../include/voxkit_protocol.h"
               "${CMAKE_CURRENT_SOURCE_DIR}/../include/voxkit_client.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
+add_executable(chewing-plus-models models-cli.c)
+target_link_libraries(chewing-plus-models PRIVATE voxkit-protocol)
+set_target_properties(chewing-plus-models PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED ON
+    RUNTIME_OUTPUT_NAME chewing-plus-models)
+install(TARGETS chewing-plus-models RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}")
+
 set(_core_type STATIC)
 if(CHEWING_PLUS_CORE_SHARED)
     set(_core_type SHARED)
@@ -56,7 +64,8 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../include/chewing_plus.h"
 if(NOT CHEWING_PLUS_CORE_ONLY)
     set(CHEWING_SOURCES eim.cpp)
     add_fcitx5_addon(chewing ${CHEWING_SOURCES})
-    target_link_libraries(chewing Fcitx5::Core Fcitx5::Config chewing-plus-core ${CHEWING_TARGET})
+    target_link_libraries(chewing Fcitx5::Core Fcitx5::Config chewing-plus-core
+                          voxkit-protocol ${CHEWING_TARGET})
     target_include_directories(chewing PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/plus)
     if(ENABLE_VOXKIT)
         target_link_libraries(chewing Fcitx5::Module::Voxkit)

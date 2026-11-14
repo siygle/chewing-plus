@@ -16,6 +16,7 @@ env -i PATH="$PATH" HOME="$root/home" \
   XDG_DATA_HOME="$root/home/.local/share" XDG_CONFIG_HOME="$root/config" \
   XDG_RUNTIME_DIR="$root" XDG_DATA_DIRS="$root/share" \
   CHEWING_PATH="$root/share/libchewing" CHEWING_USER_PATH="$root/home/chewing" \
+  CHEWING_TEST_DATA="$data" \
   VOXKIT_SOCKET="$root/voxkit.sock" VOXKIT_ADDON_DIR="$vkbuild/module" \
   VOXKIT_DATA_DIR="$root/vkdata" FAKE_TEXT="$text" FAKE_LOG="$root/fake.log" \
   LD_LIBRARY_PATH="$lib" \

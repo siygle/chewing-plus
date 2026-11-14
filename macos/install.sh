@@ -20,18 +20,20 @@ cp -R "$app" "$dest"
 # at libexec and tell the user.
 voxkit=${VOXKIT_BIN:-"$root/macos/build/fcitx5-voxkit/daemon/target/release/voxkit"}
 helper_dest="$home/Library/Application Support/ChewingPlus/voxkit"
+launch_dest="$home/Library/Application Support/ChewingPlus/voxkit-launch.sh"
+cp "$root/macos/voxkit-launch.sh" "$launch_dest"
+chmod 755 "$launch_dest"
 if [ -x "$voxkit" ]; then
     cp "$voxkit" "$helper_dest"
     chmod 755 "$helper_dest"
 else
     echo "voxkit binary not found at $voxkit"
     echo "run: macos/build-voxkit.sh"
-    helper_dest="/usr/local/libexec/voxkit"
+    echo "the LaunchAgent exits quietly until that binary exists"
 fi
 
 agent="$home/Library/LaunchAgents/im.chewing.plus.voxkit.plist"
 sed -e "s|__HOME__|$home|g" \
-    -e "s|/usr/local/libexec/voxkit|$helper_dest|g" \
     "$root/macos/launchd/im.chewing.plus.voxkit.plist" > "$agent"
 uid=$(id -u)
 domain="gui/$uid"

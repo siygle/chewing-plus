@@ -6,6 +6,8 @@
  *
  */
 #include "eim.h"
+
+#include "voxkit_client.h"
 #include <algorithm>
 #include <array>
 #include <chewing.h>
@@ -432,6 +434,50 @@ ChewingEngine::~ChewingEngine() = default;
 void ChewingEngine::reloadConfig() {
     readAsIni(config_, "conf/chewing.conf");
     populateConfig();
+    applyVoiceModel();
+}
+
+void ChewingEngine::refreshVoiceStatus() const {
+    voxkit_client client;
+    voxkit_message msg;
+    char err[256] = "";
+    std::string text = "voxkit is not running";
+    voxkit_client_init(&client);
+    if (voxkit_client_connect(&client, nullptr) == 0) {
+        if (voxkit_client_model_status(&client, 1, &msg, 300, err,
+                                       sizeof(err)) == 0) {
+            text = std::string(msg.daemon[0] ? msg.daemon : "running") + " / " +
+                   (msg.state[0] ? msg.state : "idle") + " / " + msg.store +
+                   " / " + std::to_string(msg.store_bytes) +
+                   " bytes / active " + msg.model;
+            if (msg.message[0]) {
+                text += " / ";
+                text += msg.message;
+            }
+        } else if (err[0]) {
+            text = err;
+        }
+        voxkit_client_close(&client);
+    }
+    const_cast<ChewingEngine *>(this)->config_.VoiceModelStatus.setValue(
+        std::move(text));
+}
+
+void ChewingEngine::applyVoiceModel() {
+    const std::string id = *config_.VoiceModel;
+    voxkit_client client;
+    voxkit_message msg;
+    char err[128];
+    if (id.empty()) {
+        return;
+    }
+    voxkit_client_init(&client);
+    if (voxkit_client_connect(&client, nullptr) != 0) {
+        return;
+    }
+    voxkit_client_model_select(&client, 1, id.c_str(), &msg, 300, err,
+                               sizeof(err));
+    voxkit_client_close(&client);
 }
 
 void ChewingEngine::populateConfig() {

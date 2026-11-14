@@ -78,7 +78,7 @@ jobs:
       - name: Build pinned libchewing 0.14.0-rc.1
         if: github.ref != 'refs/heads/master' && github.base_ref != 'master'
         run: |
-          fcitx5-chewing/scripts/bundle-libchewing.sh --shared /usr
+          bash fcitx5-chewing/scripts/bundle-libchewing.sh --shared /usr
           pkg-config --modversion chewing
           test -f /usr/share/libchewing/static_dict.bin
       - name: Build and Install fcitx5-chewing

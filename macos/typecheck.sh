@@ -20,5 +20,6 @@ xcrun swiftc -typecheck \
     -import-objc-header macos/ChewingPlus/ChewingPlus-Bridging-Header.h \
     -Xcc -I -Xcc include \
     macos/ChewingPlus/main.swift \
-    macos/ChewingPlus/ChewingPlusInputController.swift
+    macos/ChewingPlus/ChewingPlusInputController.swift \
+    macos/ChewingPlus/ModelPreferences.swift
 echo "macOS typecheck OK"

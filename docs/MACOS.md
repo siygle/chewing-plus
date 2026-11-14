@@ -19,7 +19,9 @@ The fcitx5 addon is not part of this build.
 | `macos/launchd/im.chewing.plus.voxkit.plist` | User agent. `__HOME__` is replaced by `install.sh` |
 | `macos/patches/voxkit-macos-opencc.patch` | Teaches fcitx5-voxkit `9acbb719` to find Homebrew OpenCC and `libopencc*.dylib` |
 | `macos/build-voxkit.sh` | Clone that commit, apply the patch, `cargo build --release` |
+| `macos/ChewingPlus/ModelPreferences.swift` | AppKit window: list, download, cancel, delete, select, disk use, daemon status |
 | `macos/build-app.sh` | On macOS: bundle libchewing 0.14, build the core, emit `ChewingPlus.app` |
+| `macos/build-pkg.sh` | Unsigned `.pkg` (ad-hoc signature on the `.app` when `codesign` exists) |
 | `macos/sign.sh` | Developer ID if `APPLE_SIGN_ID` is set, otherwise ad-hoc `codesign -` |
 | `macos/install.sh` / `macos/uninstall.sh` | `~/Library/Input Methods` and LaunchAgents |
 | `macos/typecheck.sh` | Protocol tests plus `swiftc -typecheck` (no `.app`) |
@@ -50,7 +52,17 @@ macos/sign.sh macos/build/ChewingPlus.app \
 
 # 4. Install (rewrites __HOME__, bootstraps launchd).
 macos/install.sh
+
+# 5. Optional unsigned package. Ad-hoc signs the .app, not the pkg.
+bash macos/build-pkg.sh
 ```
+
+The input-source menu item 语音模型… opens the AppKit catalog. It calls
+the same C client as `chewing-plus-models`. The LaunchAgent runs
+`voxkit-launch.sh`. If the daemon binary is missing the wrapper exits 0,
+and `KeepAlive` only restarts a non-zero exit, with a 30 second throttle,
+so an empty model store does not respawn the job in a loop. The daemon
+stays up without weights and answers `model.*`.
 
 `build-app.sh` refuses to run on Linux. `libchewing` 0.14.0-rc.1's CMake
 cannot emit a static archive (the `chewing_capi` export error), so the app

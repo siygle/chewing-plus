@@ -34,4 +34,30 @@ Override with `CHEWING_PLUS_EMOJI`, `CHEWING_PLUS_ENGLISH`, `CHEWING_PATH`,
 
 Headless tests (no `ibus-daemon`, no microphone): `ibus-keys` and
 `voxkit-client`. The second one is a fake daemon on a Unix socket that
-answers `ping`, `start`, and `stop` with `final` `測試`.
+answers `ping`, `start`, `stop`, `model.status`, and `model.list`.
+
+## Model settings
+
+The engine does not embed a setup dialog. List, download (with progress),
+cancel, delete, the active model, disk use, and daemon status go through
+`chewing-plus-models`, which calls the shared C client. An empty `model`
+on `start` uses whatever `model.select` stored in the daemon.
+
+```bash
+chewing-plus-models list
+chewing-plus-models install qwen3-asr-0.6b
+chewing-plus-models select qwen3-asr-0.6b
+```
+
+An IBus setup window needs a UI toolkit. Nothing in this tree picks one.
+Options, for the owner:
+
+| Toolkit | What you get | Cost |
+|---|---|---|
+| GTK4 | Current GNOME look. IBus's own setup bits are GTK. | A new dependency of the setup program. Not used by the engine. |
+| GTK3 | Matches older IBus setup (`ibus-setup` is GTK3). | Same new dependency, older API. |
+| libadwaita | GNOME HIG on top of GTK4. | Pulls GTK4 plus libadwaita. Heavier than a form needs. |
+| CLI only (`chewing-plus-models`, implemented) | Every model command, progress on a terminal, no new library. | No panel inside IBus preferences. The user runs the command. |
+
+The engine and the C client are done either way. A toolkit only changes
+the setup program.

@@ -39,7 +39,7 @@ static void *serve(void *arg) {
         buf[len] = '\0';
         while ((nl = strchr(buf, '\n')) != NULL) {
             voxkit_message msg;
-            char reply[256];
+            char reply[1024];
             *nl = '\0';
             if (voxkit_proto_parse(buf, &msg, NULL, 0) != VOXKIT_PROTO_OK) {
                 break;
@@ -56,6 +56,23 @@ static void *serve(void *arg) {
                          "\"stable\":\"\",\"tentative\":\"聆聽中\"}\n",
                          (unsigned long long)msg.req,
                          (unsigned long long)msg.req);
+            } else if (msg.type == VOXKIT_MSG_MODEL_STATUS) {
+                snprintf(reply, sizeof(reply),
+                         "{\"v\":1,\"type\":\"model.status\",\"req\":%llu,"
+                         "\"daemon\":\"running\",\"state\":\"idle\","
+                         "\"store\":\"/tmp/models\",\"store_bytes\":0,"
+                         "\"model\":\"\"}\n",
+                         (unsigned long long)msg.req);
+            } else if (msg.type == VOXKIT_MSG_MODEL_LIST) {
+                snprintf(
+                    reply, sizeof(reply),
+                    "{\"v\":1,\"type\":\"model.list\",\"req\":%llu,"
+                    "\"daemon\":\"running\",\"store\":\"/tmp/models\","
+                    "\"store_bytes\":0,\"model\":\"\","
+                    "\"models\":[{\"id\":\"whisper-tiny\",\"kind\":\"asr\","
+                    "\"bytes\":10,\"installed\":false,\"active\":false,"
+                    "\"blurb\":\"tiny\"}]}\n",
+                    (unsigned long long)msg.req);
             } else if (msg.type == VOXKIT_MSG_STOP) {
                 snprintf(reply, sizeof(reply),
                          "{\"v\":1,\"type\":\"final\",\"req\":%llu,"
@@ -115,6 +132,23 @@ int main(void) {
     check(voxkit_client_next(&client, &msg, 1000, err, sizeof(err)) == 1,
           "read pong");
     check(msg.type == VOXKIT_MSG_PONG && msg.req == 4, "pong req");
+
+    {
+        voxkit_model_info rows[2];
+        size_t count = 99;
+        check(voxkit_client_model_status(&client, 8, &msg, 1000, err,
+                                         sizeof(err)) == 0,
+              "status round trip");
+        check(strcmp(msg.daemon, "running") == 0 &&
+                  strcmp(msg.state, "idle") == 0,
+              "daemon idle");
+        check(voxkit_client_model_list(&client, 9, rows, 2, &count, &msg, 1000,
+                                       err, sizeof(err)) == 0,
+              "list round trip");
+        check(count == 1 && strcmp(rows[0].id, "whisper-tiny") == 0 &&
+                  !rows[0].installed,
+              "catalog row");
+    }
 
     check(voxkit_proto_write_start(line, sizeof(line), 1, "zh", "s2twp", NULL,
                                    NULL, 0) > 0,

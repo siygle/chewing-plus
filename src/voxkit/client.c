@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -17,6 +18,7 @@ void voxkit_client_init(voxkit_client *client) {
     }
     client->fd = -1;
     client->in_len = 0;
+    client->last_line[0] = '\0';
 }
 
 int voxkit_client_fd(const voxkit_client *client) {
@@ -105,6 +107,7 @@ static int take_line(voxkit_client *client, voxkit_message *msg, char *err,
     }
     memcpy(line, client->in, len);
     line[len] = '\0';
+    memcpy(client->last_line, line, len + 1);
     client->in_len -= len + 1;
     memmove(client->in, nl + 1, client->in_len);
     rc = voxkit_proto_parse(line, msg, err, err_n);
@@ -161,4 +164,121 @@ int voxkit_client_next(voxkit_client *client, voxkit_message *msg,
         }
         timeout_ms = 0;
     }
+}
+
+static void set_client_err(char *err, size_t n, const char *text) {
+    if (err && n) {
+        snprintf(err, n, "%s", text);
+    }
+}
+
+static int roundtrip(voxkit_client *client, const char *line,
+                     voxkit_msg_type expect, voxkit_message *reply,
+                     int timeout_ms, char *err, size_t err_n) {
+    voxkit_message local;
+    voxkit_message *dest = reply ? reply : &local;
+    int rc;
+    if (voxkit_client_send(client, line) != 0) {
+        set_client_err(err, err_n, "send failed");
+        return -1;
+    }
+    rc = voxkit_client_next(client, dest, timeout_ms, err, err_n);
+    if (rc != 1) {
+        if (rc == 0) {
+            set_client_err(err, err_n, "timeout");
+        }
+        return -1;
+    }
+    if (dest->type == VOXKIT_MSG_ERROR) {
+        set_client_err(err, err_n,
+                       dest->message[0] ? dest->message : dest->code);
+        return -1;
+    }
+    if (dest->type != expect) {
+        set_client_err(err, err_n, "unexpected reply");
+        return -1;
+    }
+    return 0;
+}
+
+int voxkit_client_model_list(voxkit_client *client, uint64_t req,
+                             voxkit_model_info *models, size_t cap,
+                             size_t *count, voxkit_message *summary,
+                             int timeout_ms, char *err, size_t err_n) {
+    char line[128];
+    if (voxkit_proto_write_model_list(line, sizeof(line), req) < 0) {
+        return -1;
+    }
+    if (roundtrip(client, line, VOXKIT_MSG_MODEL_LIST, summary, timeout_ms, err,
+                  err_n) != 0) {
+        return -1;
+    }
+    return voxkit_proto_parse_models(client->last_line, models, cap, count, err,
+                                     err_n);
+}
+
+int voxkit_client_model_install(voxkit_client *client, uint64_t req,
+                                const char *model, voxkit_message *reply,
+                                int timeout_ms, char *err, size_t err_n) {
+    char line[256];
+    if (voxkit_proto_write_model_install(line, sizeof(line), req, model) < 0) {
+        return -1;
+    }
+    return roundtrip(client, line, VOXKIT_MSG_MODEL_PROGRESS, reply, timeout_ms,
+                     err, err_n);
+}
+
+int voxkit_client_model_progress(voxkit_client *client, uint64_t req,
+                                 voxkit_message *reply, int timeout_ms,
+                                 char *err, size_t err_n) {
+    char line[128];
+    if (voxkit_proto_write_model_progress(line, sizeof(line), req) < 0) {
+        return -1;
+    }
+    return roundtrip(client, line, VOXKIT_MSG_MODEL_PROGRESS, reply, timeout_ms,
+                     err, err_n);
+}
+
+int voxkit_client_model_cancel(voxkit_client *client, uint64_t req,
+                               voxkit_message *reply, int timeout_ms, char *err,
+                               size_t err_n) {
+    char line[128];
+    if (voxkit_proto_write_model_cancel(line, sizeof(line), req) < 0) {
+        return -1;
+    }
+    return roundtrip(client, line, VOXKIT_MSG_MODEL_PROGRESS, reply, timeout_ms,
+                     err, err_n);
+}
+
+int voxkit_client_model_remove(voxkit_client *client, uint64_t req,
+                               const char *model, voxkit_message *reply,
+                               int timeout_ms, char *err, size_t err_n) {
+    char line[256];
+    if (voxkit_proto_write_model_remove(line, sizeof(line), req, model) < 0) {
+        return -1;
+    }
+    return roundtrip(client, line, VOXKIT_MSG_MODEL_REMOVE, reply, timeout_ms,
+                     err, err_n);
+}
+
+int voxkit_client_model_select(voxkit_client *client, uint64_t req,
+                               const char *model, voxkit_message *reply,
+                               int timeout_ms, char *err, size_t err_n) {
+    char line[256];
+    if (voxkit_proto_write_model_select(line, sizeof(line), req, model) < 0) {
+        return -1;
+    }
+    return roundtrip(client, line, VOXKIT_MSG_MODEL_SELECT, reply, timeout_ms,
+                     err, err_n);
+}
+
+int voxkit_client_model_status(voxkit_client *client, uint64_t req,
+                               voxkit_message *reply, int timeout_ms, char *err,
+                               size_t err_n) {
+    char line[128];
+    if (voxkit_proto_write_model_status(line, sizeof(line), req) < 0) {
+        return -1;
+    }
+    return roundtrip(client, line, VOXKIT_MSG_MODEL_STATUS, reply, timeout_ms,
+                     err, err_n);
 }

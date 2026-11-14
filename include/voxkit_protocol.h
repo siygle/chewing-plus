@@ -39,7 +39,16 @@ typedef enum voxkit_msg_type {
     VOXKIT_MSG_DISCARDED,
     VOXKIT_MSG_ERROR,
     VOXKIT_MSG_LEVEL,
-    VOXKIT_MSG_PONG
+    VOXKIT_MSG_PONG,
+    /* v1 extension. Old daemons answer these with error/bad-request.
+     * Old clients never send them. `v` stays 1. */
+    VOXKIT_MSG_MODEL_LIST,
+    VOXKIT_MSG_MODEL_INSTALL,
+    VOXKIT_MSG_MODEL_PROGRESS,
+    VOXKIT_MSG_MODEL_CANCEL,
+    VOXKIT_MSG_MODEL_REMOVE,
+    VOXKIT_MSG_MODEL_SELECT,
+    VOXKIT_MSG_MODEL_STATUS
 } voxkit_msg_type;
 
 /* Flat view of one JSON object. Strings are UTF-8 and NUL-terminated.
@@ -60,7 +69,27 @@ typedef struct voxkit_message {
     char message[1024];
     double rms_dbfs;
     int has_rms;
+    /* Model-management extension. Empty or zero when the line omitted them. */
+    char store[512];
+    char state[32];
+    char daemon[32];
+    uint64_t bytes;
+    uint64_t received;
+    uint64_t store_bytes;
+    int installed;
+    int active;
 } voxkit_message;
+
+/* One catalog row from a model.list line. */
+typedef struct voxkit_model_info {
+    char id[64];
+    char kind[16];
+    char blurb[512];
+    uint64_t bytes;
+    uint64_t size_on_disk;
+    int installed;
+    int active;
+} voxkit_model_info;
 
 /* Parse one line. A trailing newline is optional. `err` may be NULL. */
 int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
@@ -76,6 +105,23 @@ int voxkit_proto_write_start(char *buf, size_t n, uint64_t req,
                              const char *language, const char *convert,
                              const char *model, const char *const *vocabulary,
                              size_t vocabulary_count);
+int voxkit_proto_write_model_list(char *buf, size_t n, uint64_t req);
+int voxkit_proto_write_model_progress(char *buf, size_t n, uint64_t req);
+int voxkit_proto_write_model_cancel(char *buf, size_t n, uint64_t req);
+int voxkit_proto_write_model_status(char *buf, size_t n, uint64_t req);
+int voxkit_proto_write_model_install(char *buf, size_t n, uint64_t req,
+                                     const char *model);
+int voxkit_proto_write_model_remove(char *buf, size_t n, uint64_t req,
+                                    const char *model);
+int voxkit_proto_write_model_select(char *buf, size_t n, uint64_t req,
+                                    const char *model);
+
+/* Fill `out[0..*count)` from a model.list line. `count` may be NULL.
+ * Returns VOXKIT_PROTO_ERR_RANGE when more rows exist than `cap` (the
+ * first `cap` rows are still written). */
+int voxkit_proto_parse_models(const char *line, voxkit_model_info *out,
+                              size_t cap, size_t *count, char *err,
+                              size_t err_n);
 
 /* VOXKIT_SOCKET, else $XDG_RUNTIME_DIR/voxkit.sock, else
  * /tmp/voxkit-<uid>.sock. Returns 0 or VOXKIT_PROTO_ERR_RANGE. */

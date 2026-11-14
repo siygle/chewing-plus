@@ -17,6 +17,7 @@ env -i PATH="$PATH" HOME="$root/home" \
   XDG_DATA_HOME="$root/home/.local/share" XDG_CONFIG_HOME="$root/config" \
   XDG_RUNTIME_DIR="$root" XDG_DATA_DIRS="$root/share" \
   CHEWING_PATH="$root/share/libchewing" CHEWING_USER_PATH="$root/home/chewing" \
+  CHEWING_TEST_DATA="$data" \
   PLUS_TEST_FCITX_DATA="$root/share/fcitx5" \
   ${lib:+LD_LIBRARY_PATH="$lib"} \
   "$build/test/testplus"
@@ -27,5 +28,6 @@ env -i PATH="$PATH" HOME="$root/home" \
   XDG_DATA_HOME="$root/home/.local/share" XDG_CONFIG_HOME="$root/config" \
   XDG_RUNTIME_DIR="$root" XDG_DATA_DIRS="$root/share" \
   CHEWING_PATH="$root/share/libchewing" CHEWING_USER_PATH="$root/home/chewing2" \
+  CHEWING_TEST_DATA="$data" \
   ${lib:+LD_LIBRARY_PATH="$lib"} \
   "$build/test/testchewing" >/dev/null 2>&1 && echo "UPSTREAM TEST OK" || { echo "UPSTREAM TEST FAILED"; exit 1; }

@@ -28,4 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build ChewingPlus.app
-        run: sh macos/build-app.sh
+        run: bash macos/build-app.sh
+      - name: Build unsigned package
+        run: bash macos/build-pkg.sh
