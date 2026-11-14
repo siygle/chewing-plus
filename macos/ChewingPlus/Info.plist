@@ -26,6 +26,8 @@
     <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>新酷音 Plus 的語音在本機辨識。錄音留在這台 Mac，不會上傳。</string>
     <key>tsInputMethodCharacterRepertoireKey</key>
     <array>
         <string>Hant</string>

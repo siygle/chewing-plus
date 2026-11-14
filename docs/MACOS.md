@@ -1,92 +1,157 @@
 # macOS InputMethodKit app
 
-This is the native macOS frontend. It is AppKit and InputMethodKit only.
-There is no Qt and no shared UI toolkit. The composition engine is
-`libchewing-plus-core`. Voice is option C from
-[CROSS_PLATFORM.md](CROSS_PLATFORM.md): a launchd helper that is the voxkit
-daemon (Qwen3-ASR, Silero VAD, OpenCC `s2twp`, all local). The input method
-only speaks [VOXKIT_PROTOCOL.md](VOXKIT_PROTOCOL.md) version 1.
+Native macOS frontend. AppKit and InputMethodKit only: no Qt and no shared
+UI toolkit. Composition is `libchewing-plus-core`. Voice is the voxkit
+daemon (Qwen3-ASR, Silero VAD, OpenCC `s2twp`, all local) started by
+launchd. The input method speaks [VOXKIT_PROTOCOL.md](VOXKIT_PROTOCOL.md)
+version 1 and does not load a model.
 
-## What is in this tree
+The fcitx5 addon is not part of this build.
 
-| Path | State |
+## Layout
+
+| Path | Role |
 |---|---|
-| `macos/ChewingPlus/*.swift` | IMK controller. Right Option is push-to-talk. Marked text comes from `chewing_plus_preedit`. A `final` event calls `chewing_plus_insert_text`. |
-| `macos/ChewingPlus/Info.plist` | Bundle id `im.chewing.plus.inputmethod`. |
-| `macos/launchd/im.chewing.plus.voxkit.plist` | User agent. Socket `/tmp/chewing-plus-voxkit.sock`. Model `qwen3-asr-0.6b`. |
-| `macos/typecheck.sh` | What CI runs on the macOS runner. |
+| `macos/ChewingPlus/ChewingPlusInputController.swift` | IMK controller: marked text, `IMKCandidates`, digit selection, English toggle via the core, secure input, Right Option push-to-talk |
+| `macos/ChewingPlus/Info.plist` | Bundle id `im.chewing.plus.inputmethod`, IMK keys, microphone usage string |
+| `macos/ChewingPlus/main.swift` | `IMKServer` named `ChewingPlus_Connection` |
+| `macos/Voxkit/Info.plist` | Usage string for a helper bundle, if you wrap the daemon |
+| `macos/launchd/im.chewing.plus.voxkit.plist` | User agent. `__HOME__` is replaced by `install.sh` |
+| `macos/patches/voxkit-macos-opencc.patch` | Teaches fcitx5-voxkit `9acbb719` to find Homebrew OpenCC and `libopencc*.dylib` |
+| `macos/build-voxkit.sh` | Clone that commit, apply the patch, `cargo build --release` |
+| `macos/build-app.sh` | On macOS: bundle libchewing 0.14, build the core, emit `ChewingPlus.app` |
+| `macos/sign.sh` | Developer ID if `APPLE_SIGN_ID` is set, otherwise ad-hoc `codesign -` |
+| `macos/install.sh` / `macos/uninstall.sh` | `~/Library/Input Methods` and LaunchAgents |
+| `macos/typecheck.sh` | Protocol tests plus `swiftc -typecheck` (no `.app`) |
 
-Plus features stay off unless `CHEWING_PLUS_FEATURES` lists the same tokens
-as the IBus engine. The fcitx5 addon is not involved.
+Plus features stay off unless `CHEWING_PLUS_FEATURES` (or
+`CHEWING_PLUS_IBUS_FEATURES`) contains the same tokens as the IBus engine:
+`emoji`, `calculator`, `space`, `shortcode`, `english`.
 
-## What is not done
+## Build on a Mac
 
-The voxkit **daemon binary is not built or vendored here**. It lives in
-[fcitx5-voxkit](https://github.com/siygle/fcitx5-voxkit) `daemon/` (Rust,
-transcribe-cpp, cpal, OpenCC via `dlopen` of `s2twp.json`). That stack is
-the one the owner chose; copying it in would not add a new kind of
-dependency, but the Linux `dlopen` paths and the ALSA notes do not apply on
-macOS. Remaining work, in order:
+Needs Xcode command-line tools (`xcrun`, `swiftc`, `clang`), Rust 1.85+,
+CMake, Ninja, git-lfs. OpenCC is the same library the daemon already uses;
+Homebrew's `opencc` formula supplies `libopencc` and `s2twp.json`. That is
+not a new kind of dependency. Do not add another converter.
 
-1. Build `voxkit` on macOS. cpal already has a CoreAudio backend. Point
-   OpenCC at a Homebrew or bundled `s2twp.json` plus `libopencc`, or link
-   OpenCC statically. Do not download model weights inside the input method.
-2. Replace `__HOME__` in the plist at install time. `launchctl bootstrap
-   gui/$UID ~/Library/LaunchAgents/im.chewing.plus.voxkit.plist`.
-3. Link `ChewingPlus.app` against `libchewing-plus-core.a` and a bundled
-   libchewing 0.14 (`scripts/bundle-libchewing.sh --shared`, Rust 1.85+,
-   git-lfs). Ship `static_dict.bin` inside the app and pass its directory
-   to `chewing_plus_new`.
-4. Draw candidates with `IMKCandidates` (still AppKit). The controller
-   currently reads the first candidate and does not show the panel yet.
-5. Code signing and notarization. See below. Not done in CI.
+```bash
+# 1. Daemon (existing fcitx5-voxkit tree, patched). Weights are optional.
+macos/build-voxkit.sh
+# or: macos/build-voxkit.sh --download-models
+#     (~850 MB, Qwen3-ASR-0.6B Q8, stays under Application Support)
 
-`macos/typecheck.sh` typechecks the Swift against the C headers and runs
-the protocol and fake-daemon tests. A `macos-14` job was requested on this
-PR. GitHub cancelled it before assigning a runner (the job has no steps and
-an empty runner name), so the workflow does not depend on that job. Run the
-script on a Mac when a runner is available. It does not produce a signed
-`.app` and it does not load Qwen.
+# 2. Input method. Bundles libchewing 0.14 and static_dict.bin.
+macos/build-app.sh
 
-## Apple Developer setup
+# 3. Sign. Ad-hoc when APPLE_SIGN_ID is unset.
+macos/sign.sh macos/build/ChewingPlus.app \
+    macos/build/fcitx5-voxkit/daemon/target/release/voxkit
 
-Notarization needs an Apple Developer Program membership. CI does not have
-those secrets.
+# 4. Install (rewrites __HOME__, bootstraps launchd).
+macos/install.sh
+```
 
-1. Identifiers: `im.chewing.plus.inputmethod` for the app,
-   `im.chewing.plus.voxkit` for the helper.
-2. The helper needs the microphone. Entitlement
-   `com.apple.security.device.audio-input` if it is sandboxed. Unsandboxed,
-   the first `cpal` open triggers the system prompt. The prompt is attributed
-   to the helper, not the input method, because the helper opens the device.
-3. Install the app at `~/Library/Input Methods/ChewingPlus.app`, then log out
-   or `killall ChewingPlus` and enable it in System Settings → Keyboard →
-   Input Sources. Input methods are not notarized App Store apps; Developer
-   ID Application plus notarization is what Gatekeeper accepts for a
-   download.
-4. Sign:
+`build-app.sh` refuses to run on Linux. `libchewing` 0.14.0-rc.1's CMake
+cannot emit a static archive (the `chewing_capi` export error), so the app
+bundles the shared `libchewing.dylib` plus `static_dict.bin` and the Plus
+word lists under `Contents/Resources`.
 
-   ```bash
-   codesign --force --options runtime --timestamp \
-     --sign "Developer ID Application: <Team>" \
-     ChewingPlus.app
-   codesign --force --options runtime --timestamp \
-     --sign "Developer ID Application: <Team>" \
-     voxkit
-   ```
+The patch was applied to commit `9acbb719` and `cargo check` of that daemon
+succeeded on Linux (the macOS `cfg` branch is not compiled there). A Mac
+build of the daemon still has to be run on a Mac because cpal links
+CoreAudio.
 
-5. Notarize the zip or dmg:
+## Install layout
 
-   ```bash
-   xcrun notarytool submit ChewingPlus.zip --keychain-profile AC_NOTARY --wait
-   xcrun stapler staple ChewingPlus.app
-   ```
+- `~/Library/Input Methods/ChewingPlus.app`
+- `~/Library/LaunchAgents/im.chewing.plus.voxkit.plist`
+- `~/Library/Application Support/ChewingPlus/voxkit` (the daemon binary)
+- `~/Library/Application Support/ChewingPlus/models` (weights; not deleted by uninstall)
 
-   `AC_NOTARY` is an app-specific password or an App Store Connect API key
-   stored with `notarytool store-credentials`. Do not put that secret in
-   this repo.
+Socket after install: `/tmp/chewing-plus-voxkit.sock` (`VOXKIT_SOCKET`).
+Model id: `qwen3-asr-0.6b`.
 
-6. Hardened runtime plus the microphone entitlement means the helper's
-   entitlements file must list `com.apple.security.device.audio-input` and,
-   if the dictionary is outside the bundle, a read exception for
-   `~/Library/Application Support/ChewingPlus`.
+## Signing and notarization
+
+`macos/sign.sh` signs every dylib in the app, then the app, then the helper
+if you pass it.
+
+- `APPLE_SIGN_ID` unset: `codesign --sign -` (ad-hoc). Fine for a local
+  `~/Library/Input Methods` copy you built yourself. A zip from the internet
+  will be rejected by Gatekeeper.
+- `APPLE_SIGN_ID="Developer ID Application: Name (TEAMID)"`: hardened runtime
+  and a timestamp.
+- Also set `NOTARY_KEYCHAIN_PROFILE` to a profile created with
+  `xcrun notarytool store-credentials`. The script submits a zip and staples
+  the ticket. Do not commit that credential.
+
+Identifiers: `im.chewing.plus.inputmethod`, `im.chewing.plus.voxkit`.
+
+The helper opens the microphone, so the TCC prompt is attributed to it.
+`NSMicrophoneUsageDescription` is on both Info.plists. Sandboxed builds need
+the entitlement `com.apple.security.device.audio-input`. This tree does not
+sandbox the processes. The first `cpal` open on macOS raises the system
+microphone prompt.
+
+## CI
+
+`.github/workflows/macos.yml` is separate from `check.yml`, so a missing
+Mac runner cannot fail the Linux build. It requests `macos-14`, `macos-15`,
+and `macos-latest` for `macos/typecheck.sh`, and `macos-latest` again for
+`macos/build-app.sh`. Every job sets `continue-on-error: true`. A previous
+`macos-14` job on this PR was cancelled by GitHub before a runner was
+assigned. If that happens again, the Linux checks stay green and this
+workflow is the record of the attempt.
+
+## Manual test on your Mac
+
+Do these in order. Stop at the first failure and note the exact message.
+
+1. `xcode-select -p` prints a developer directory. `cargo --version` is
+   1.85 or newer. `git lfs version` works.
+2. `macos/build-voxkit.sh` prints a path ending in `target/release/voxkit`.
+   `file` on that binary says Mach-O.
+3. `macos/build-app.sh` prints `app: .../ChewingPlus.app`.
+   `ChewingPlus.app/Contents/Resources/libchewing/static_dict.bin` exists.
+   `ChewingPlus.app/Contents/Frameworks` contains `libchewing.dylib`.
+   `otool -L ChewingPlus.app/Contents/MacOS/ChewingPlus` shows
+   `@rpath/libchewing.dylib` or a Frameworks path, not a path under `/tmp`.
+4. `APPLE_SIGN_ID= macos/sign.sh macos/build/ChewingPlus.app` (ad-hoc)
+   exits 0. `codesign -dv macos/build/ChewingPlus.app` says `Signature=adhoc`.
+5. `macos/install.sh` copies the app into `~/Library/Input Methods` and
+   `launchctl print gui/$UID/im.chewing.plus.voxkit` shows the service.
+   The plist on disk does not contain the text `__HOME__`.
+6. Log out and back in, or reboot. System Settings → Keyboard → Input
+   Sources → add 新酷音 Plus (Traditional Chinese). Switch to it in a
+   TextEdit window.
+7. Type `su3cl3` (standard bopomofo). The marked text becomes `你好`.
+   Return commits `你好` and clears the marked text.
+8. `export CHEWING_PLUS_FEATURES=emoji,calculator,space,shortcode,english`
+   before launching, or set that in the app's environment, then:
+   - empty field, `=1+2*3`, Return commits `7`
+   - `;;thumbsup` then Space commits 👍
+   - Ctrl+Shift+Space, type `github`, Space inserts `GitHub`
+   - tap Right Shift twice: marked text shows `[EN]`
+9. While composing, the candidate panel lists rows. Click one, or press
+   1–9 with no modifiers when that many rows are visible. The chosen row
+   is committed or inserted and the panel hides.
+10. Focus a password field (Safari saved-password prompt, or Terminal
+    `sudo`). Keystrokes must go to the field, not into a marked `你好`.
+    Right Option must not start dictation. (Secure Event Input is on.)
+11. `VOXKIT_MODELS_DIR="$HOME/Library/Application Support/ChewingPlus/models" \
+    "$HOME/Library/Application Support/ChewingPlus/voxkit" model install qwen3-asr-0.6b`
+    then `launchctl kickstart -k gui/$UID/im.chewing.plus.voxkit`.
+    macOS asks for microphone access for the helper. Allow it.
+    Hold Right Option, say a short Traditional Chinese phrase, release.
+    The text is inserted at the caret. The recording never leaves the Mac.
+12. `macos/uninstall.sh`. The input source disappears after the next login.
+    Model files are still in Application Support.
+
+## Still only verifiable on a Mac
+
+- `swiftc` linking the `.app` (this environment is Linux).
+- CoreAudio capture and the microphone prompt.
+- IMKCandidates placement and secure-input fields.
+- launchctl bootstrap.
+- Developer ID notarization (no credential in CI).
