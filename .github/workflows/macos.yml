@@ -1,0 +1,31 @@
+name: macOS
+# Separate from check.yml so a missing macOS runner cannot turn the Linux
+# build red. continue-on-error keeps a cancelled or failed runner non-blocking.
+on:
+  pull_request:
+  push:
+    branches:
+      - plus
+      - cursor/macos-imk-8b76
+jobs:
+  typecheck:
+    name: typecheck (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-14-arm64 is not a supported runner image here.
+        os: [macos-15, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Protocol tests and IMK typecheck
+        run: sh macos/typecheck.sh
+  bundle:
+    name: bundle app (macos-latest)
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ChewingPlus.app
+        run: sh macos/build-app.sh
