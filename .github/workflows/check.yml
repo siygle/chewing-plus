@@ -46,7 +46,7 @@ jobs:
           if [ "$GITHUB_REF" = "refs/heads/master" ] || [ "$GITHUB_BASE_REF" = "master" ]; then
             pkgs="$pkgs libchewing"
           else
-            pkgs="$pkgs rust git-lfs"
+            pkgs="$pkgs rust git-lfs ibus"
           fi
           pacman -Syu --noconfirm $pkgs
       - uses: actions/checkout@v4
@@ -85,6 +85,8 @@ jobs:
         uses: fcitx/github-actions@cmake
         with:
           path: fcitx5-chewing
+          cmake-option: >-
+            ${{ (github.ref != 'refs/heads/master' && github.base_ref != 'master') && '-DENABLE_IBUS=ON' || '' }}
         env:
           CHEWING_TEST_DATA: /usr/share/libchewing
       - name: Test

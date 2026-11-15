@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component>
+    <name>org.freedesktop.IBus.ChewingPlus</name>
+    <description>Chewing Plus (libchewing-plus-core)</description>
+    <exec>@CHEWING_PLUS_IBUS_EXEC@ --ibus</exec>
+    <version>@PROJECT_VERSION@</version>
+    <author>siygle</author>
+    <license>LGPL-2.1-or-later</license>
+    <textdomain>fcitx5-chewing</textdomain>
+    <engines>
+        <engine>
+            <name>chewing-plus</name>
+            <language>zh_TW</language>
+            <license>LGPL-2.1-or-later</license>
+            <layout>us</layout>
+            <longname>新酷音 Plus</longname>
+            <description>Zhuyin via libchewing-plus-core. Right Alt is push-to-talk when voxkit is listening.</description>
+            <rank>99</rank>
+            <symbol>注</symbol>
+        </engine>
+    </engines>
+</component>

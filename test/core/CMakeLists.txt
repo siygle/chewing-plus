@@ -1,3 +1,13 @@
+add_executable(test_ibus_keys test_ibus_keys.c)
+target_link_libraries(test_ibus_keys PRIVATE chewing-plus-ibus-keys)
+set_target_properties(test_ibus_keys PROPERTIES LINKER_LANGUAGE CXX)
+add_test(NAME ibus-keys COMMAND test_ibus_keys)
+
+find_package(Threads REQUIRED)
+add_executable(test_voxkit_client test_voxkit_client.c)
+target_link_libraries(test_voxkit_client PRIVATE voxkit-protocol Threads::Threads)
+add_test(NAME voxkit-client COMMAND test_voxkit_client)
+
 add_executable(test_voxkit_protocol test_voxkit_protocol.c)
 target_link_libraries(test_voxkit_protocol PRIVATE voxkit-protocol)
 add_test(NAME voxkit-protocol COMMAND test_voxkit_protocol)
