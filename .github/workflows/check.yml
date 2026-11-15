@@ -3,9 +3,11 @@ on:
   push:
     branches:
       - master
+      - plus
   pull_request:
     branches:
       - master
+      - plus
 jobs:
   clang-format:
     name: Check clang-format
@@ -38,7 +40,15 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          pacman -Syu --noconfirm base-devel clang cmake ninja extra-cmake-modules fmt libuv boost git libchewing
+          # plus (and PRs into plus) build the pinned libchewing instead of
+          # the distro package. That tag needs a Rust that supports edition 2024.
+          pkgs="base-devel clang cmake ninja extra-cmake-modules fmt libuv boost git"
+          if [ "$GITHUB_REF" = "refs/heads/plus" ] || [ "$GITHUB_BASE_REF" = "plus" ]; then
+            pkgs="$pkgs rust git-lfs"
+          else
+            pkgs="$pkgs libchewing"
+          fi
+          pacman -Syu --noconfirm $pkgs
       - uses: actions/checkout@v4
         with:
           repository: fcitx/fcitx5
@@ -65,12 +75,22 @@ jobs:
         with:
           languages: cpp
           source-root: fcitx5-chewing
+      - name: Build pinned libchewing 0.14.0-rc.1
+        if: github.ref == 'refs/heads/plus' || github.base_ref == 'plus'
+        run: |
+          fcitx5-chewing/scripts/bundle-libchewing.sh --shared /usr
+          pkg-config --modversion chewing
+          test -f /usr/share/libchewing/static_dict.bin
       - name: Build and Install fcitx5-chewing
         uses: fcitx/github-actions@cmake
         with:
           path: fcitx5-chewing
+        env:
+          CHEWING_TEST_DATA: /usr/share/libchewing
       - name: Test
         run: |
-          ctest --test-dir fcitx5-chewing/build
+          ctest --test-dir fcitx5-chewing/build --output-on-failure
+        env:
+          CHEWING_TEST_DATA: /usr/share/libchewing
       - name: CodeQL Analysis
         uses: github/codeql-action/analyze@v2

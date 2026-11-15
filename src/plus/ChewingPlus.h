@@ -32,8 +32,8 @@ struct Options {
     bool emojiShortcode = false; // ;;smile
     EmojiPrefix emojiPrefix = EmojiPrefix::Parse(";;");
     int emojiDoubleTapMs = 300;
-    bool english = false;        // [EN] buffer mode
-    bool englishHint = false;    // "Ctrl+Shift+Space -> GitHub"
+    bool english = false;     // [EN] buffer mode
+    bool englishHint = false; // "Ctrl+Shift+Space -> GitHub"
     std::string englishShortcutLabel = "Control+Shift+Space";
 };
 
@@ -41,18 +41,18 @@ struct Options {
 struct Panel {
     enum class Kind { None, Calculator, EmojiShortcode, English };
     Kind kind = Kind::None;
-    std::string input;                 // what the user typed in the panel
-    std::string preedit;               // full preedit to display
-    size_t cursor = 0;                 // byte offset in preedit
-    std::vector<std::string> labels;   // candidate display text
-    std::vector<std::string> values;   // text committed when chosen
+    std::string input;               // what the user typed in the panel
+    std::string preedit;             // full preedit to display
+    size_t cursor = 0;               // byte offset in preedit
+    std::vector<std::string> labels; // candidate display text
+    std::vector<std::string> values; // text committed when chosen
     bool active() const { return kind != Kind::None; }
 };
 
 // Result of a Plus key handler.
 enum class Handled {
-    No,      // fall through to the normal Chewing path
-    Yes,     // consumed; frontend refreshes UI from panel()/context
+    No,  // fall through to the normal Chewing path
+    Yes, // consumed; frontend refreshes UI from panel()/context
 };
 
 class ChewingPlus {
@@ -128,7 +128,7 @@ private:
     // Hint tracking: raw keys of the current reading.
     std::string keys_;
     int overwrites_ = 0;
-    std::vector<bool> overwriteFlags_;  // per key, for Backspace
+    std::vector<bool> overwriteFlags_; // per key, for Backspace
     size_t lastZuinLen_ = 0;
     // Emoji double tap.
     int64_t prefixPendingMs_ = -1;
