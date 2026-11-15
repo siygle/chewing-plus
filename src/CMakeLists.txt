@@ -1,3 +1,17 @@
+add_library(voxkit-protocol STATIC voxkit/protocol.c)
+target_include_directories(voxkit-protocol
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+set_target_properties(voxkit-protocol PROPERTIES
+    OUTPUT_NAME voxkit-protocol
+    C_STANDARD 99
+    C_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON)
+install(TARGETS voxkit-protocol ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../include/voxkit_protocol.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
 set(_core_type STATIC)
 if(CHEWING_PLUS_CORE_SHARED)
     set(_core_type SHARED)
