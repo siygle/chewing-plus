@@ -44,11 +44,11 @@ clones the tag, checks out the submodule, and runs `git lfs pull`.
 ```bash
 # shared library (default, and what CI tests). Prefix defaults to
 # third_party/dist: a vendored libchewing.so plus its data files.
-scripts/bundle-libchewing.sh --shared "$HOME/opt/libchewing-0.14"
+bash scripts/bundle-libchewing.sh --shared "$HOME/opt/libchewing-0.14"
 
 # static archive. Also copies libchewing_capi.a (the Rust staticlib that the
 # shared library absorbs and a static libchewing.a does not) into the prefix.
-scripts/bundle-libchewing.sh --static "$HOME/opt/libchewing-0.14-static"
+bash scripts/bundle-libchewing.sh --static "$HOME/opt/libchewing-0.14-static"
 ```
 
 `--static` is wired through, but **libchewing 0.14.0-rc.1's own CMake refuses
@@ -135,6 +135,17 @@ test/run-voxkit-test.sh build /tmp/lc-stage/usr/share/libchewing /tmp/lc-stage/u
 `plus-core` and `plus-abi` (under `test/core/`) do not link fcitx. They need
 libchewing 0.14 data: set `CHEWING_TEST_DATA` to the directory that contains
 `static_dict.bin`, or install that directory at `/usr/share/libchewing`.
+`test/run-plus-test.sh` and `test/run-voxkit-test.sh` export
+`CHEWING_TEST_DATA` from the data directory you pass in. CI sets it to
+`/usr/share/libchewing` after `bash scripts/bundle-libchewing.sh`.
+
+fcitx5's config dialog can store the active voice model id (`VoiceModel`)
+and shows daemon, download state, store path, and disk use in
+`VoiceModelStatus` when the dialog opens. It cannot draw a progress bar.
+`chewing-plus-models` does list, download, cancel, and delete. A richer
+fcitx page would be a custom widget inside fcitx5-configtool (Qt, the
+toolkit that program already uses) or a D-Bus page. Neither is in this
+tree.
 `plus-abi` passes its own temporary user-dictionary directory into
 `chewing_plus_new`. `testvoxkit` is built only when `ENABLE_VOXKIT` found
 `Fcitx5ModuleVoxkit`.

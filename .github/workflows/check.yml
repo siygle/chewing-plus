@@ -46,7 +46,7 @@ jobs:
           if [ "$GITHUB_REF" = "refs/heads/master" ] || [ "$GITHUB_BASE_REF" = "master" ]; then
             pkgs="$pkgs libchewing"
           else
-            pkgs="$pkgs rust git-lfs ibus"
+            pkgs="$pkgs rust git-lfs ibus libadwaita"
           fi
           pacman -Syu --noconfirm $pkgs
       - uses: actions/checkout@v4
@@ -75,10 +75,12 @@ jobs:
         with:
           languages: cpp
           source-root: fcitx5-chewing
+      - name: Check IMK Info.plist
+        run: python3 fcitx5-chewing/macos/check-bundle.py --source fcitx5-chewing
       - name: Build pinned libchewing 0.14.0-rc.1
         if: github.ref != 'refs/heads/master' && github.base_ref != 'master'
         run: |
-          fcitx5-chewing/scripts/bundle-libchewing.sh --shared /usr
+          bash fcitx5-chewing/scripts/bundle-libchewing.sh --shared /usr
           pkg-config --modversion chewing
           test -f /usr/share/libchewing/static_dict.bin
       - name: Build and Install fcitx5-chewing
@@ -86,7 +88,7 @@ jobs:
         with:
           path: fcitx5-chewing
           cmake-option: >-
-            ${{ (github.ref != 'refs/heads/master' && github.base_ref != 'master') && '-DENABLE_IBUS=ON' || '' }}
+            ${{ (github.ref != 'refs/heads/master' && github.base_ref != 'master') && '-DENABLE_IBUS=ON -DENABLE_IBUS_SETUP=ON' || '' }}
         env:
           CHEWING_TEST_DATA: /usr/share/libchewing
       - name: Test

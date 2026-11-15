@@ -86,6 +86,54 @@ static void test_roundtrip(void) {
           "unknown type rejected");
 }
 
+static void test_models(void) {
+    char buf[256];
+    char err[128];
+    voxkit_message msg;
+    voxkit_model_info rows[4];
+    size_t count = 0;
+    const char *line =
+        "{\"v\":1,\"type\":\"model.list\",\"req\":3,\"daemon\":\"running\","
+        "\"store\":\"/tmp/"
+        "models\",\"store_bytes\":12,\"model\":\"whisper-tiny\","
+        "\"models\":[{\"id\":\"whisper-tiny\",\"kind\":\"asr\",\"bytes\":10,"
+        "\"size_on_disk\":10,\"installed\":true,\"active\":true,\"blurb\":"
+        "\"tiny\"},"
+        "{\"id\":\"silero-vad\",\"kind\":\"vad\",\"bytes\":4,\"installed\":"
+        "false,"
+        "\"active\":false,\"blurb\":\"vad\"}]}";
+
+    check(voxkit_proto_write_model_install(buf, sizeof(buf), 2,
+                                           "qwen3-asr-0.6b") > 0,
+          "install writes");
+    check(voxkit_proto_parse(buf, &msg, err, sizeof(err)) == VOXKIT_PROTO_OK,
+          "install parses");
+    check(msg.type == VOXKIT_MSG_MODEL_INSTALL &&
+              strcmp(msg.model, "qwen3-asr-0.6b") == 0,
+          "install model");
+    check(voxkit_proto_parse(line, &msg, err, sizeof(err)) == VOXKIT_PROTO_OK,
+          "list parses");
+    check(msg.type == VOXKIT_MSG_MODEL_LIST && msg.store_bytes == 12 &&
+              strcmp(msg.daemon, "running") == 0,
+          "list fields");
+    check(voxkit_proto_parse_models(line, rows, 4, &count, err, sizeof(err)) ==
+              VOXKIT_PROTO_OK,
+          "list rows");
+    check(count == 2 && rows[0].installed && rows[0].active &&
+              strcmp(rows[0].id, "whisper-tiny") == 0 &&
+              strcmp(rows[1].kind, "vad") == 0 && !rows[1].installed,
+          "row values");
+    check(voxkit_proto_parse(
+              "{\"v\":1,\"type\":\"model.progress\",\"req\":2,\"model\":"
+              "\"whisper-tiny\",\"state\":\"downloading\",\"received\":5,"
+              "\"bytes\":10}",
+              &msg, err, sizeof(err)) == VOXKIT_PROTO_OK,
+          "progress parses");
+    check(msg.type == VOXKIT_MSG_MODEL_PROGRESS && msg.received == 5 &&
+              msg.bytes == 10 && strcmp(msg.state, "downloading") == 0,
+          "progress fields");
+}
+
 static void test_socket(void) {
     char buf[256];
     setenv("VOXKIT_SOCKET", "/run/user/1/voxkit.sock", 1);
@@ -97,6 +145,7 @@ static void test_socket(void) {
 
 int main(void) {
     test_roundtrip();
+    test_models();
     test_socket();
     printf(failures ? "PROTOCOL TESTS FAILED (%d)\n" : "PROTOCOL TESTS OK\n",
            failures);

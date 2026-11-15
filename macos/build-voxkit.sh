@@ -29,6 +29,9 @@ git -C "$src" checkout --detach "$pin"
 if ! grep -q 'libopencc.1.dylib' "$src/daemon/voxkit/src/convert.rs"; then
     patch -d "$src" -p1 < "$root/macos/patches/voxkit-macos-opencc.patch"
 fi
+if [ ! -f "$src/daemon/voxkit/src/models_ctl.rs" ]; then
+    patch -d "$src" -p1 < "$root/patches/voxkit-model-commands.patch"
+fi
 
 (
     cd "$src/daemon"

@@ -5,6 +5,8 @@ import InputMethodKit
 /// Native InputMethodKit controller. Drawing is IMKCandidates (AppKit).
 /// Composition is libchewing-plus-core. Voice is a version-1 client of the
 /// voxkit launchd helper. This process does not load a model.
+/// The Objective-C name matches InputMethodServerControllerClass.
+@objc(ChewingPlusInputController)
 final class ChewingPlusInputController: IMKInputController {
     private var session: OpaquePointer?
     private var voice = UnsafeMutablePointer<voxkit_client>.allocate(capacity: 1)
@@ -26,6 +28,19 @@ final class ChewingPlusInputController: IMKInputController {
         voxkit_client_close(voice)
         voice.deallocate()
         chewing_plus_free(session)
+    }
+
+    override func menu() -> NSMenu! {
+        let menu = NSMenu(title: "新酷音 Plus")
+        let item = NSMenuItem(title: "語音模型…", action: #selector(openModels(_:)),
+                              keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
+        return menu
+    }
+
+    @objc private func openModels(_: Any?) {
+        ModelPreferences.shared.show()
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
@@ -145,9 +160,11 @@ final class ChewingPlusInputController: IMKInputController {
         var hlLen = 0
         let raw = chewing_plus_preedit(session, &cursor, &hlStart, &hlLen)
         let text = raw.map { String(cString: $0) } ?? ""
-        let caret = NSRange(location: cursor, length: 0)
+        let selection = hlLen > 0
+            ? NSRange(location: hlStart, length: hlLen)
+            : NSRange(location: cursor, length: 0)
         let replace = NSRange(location: NSNotFound, length: NSNotFound)
-        lastClient?.setMarkedText(text, selectionRange: caret, replacementRange: replace)
+        lastClient?.setMarkedText(text, selectionRange: selection, replacementRange: replace)
         let count = chewing_plus_candidate_count(session)
         if count > 0 {
             panel?.update()

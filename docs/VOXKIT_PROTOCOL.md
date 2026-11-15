@@ -107,6 +107,45 @@ closes. That code is not sent by the daemon.
 
 `ping` is answered with `pong` and does not touch the microphone.
 
+## Model management (v1 extension)
+
+These commands are a version-1 extension. `v` stays 1. A daemon that does
+not know them replies `error` / `bad-request` and keeps serving `start`.
+Clients that only dictate never send them. Unknown fields are still ignored.
+
+The chewing-plus patch for fcitx5-voxkit `9acbb719` is
+`patches/voxkit-model-commands.patch` (`macos/build-voxkit.sh` applies it).
+Until that patch is in the daemon, the settings UIs can connect but every
+`model.*` call fails with `bad-request`.
+
+```json
+{"v":1,"type":"model.list","req":1}
+{"v":1,"type":"model.install","req":2,"model":"qwen3-asr-0.6b"}
+{"v":1,"type":"model.progress","req":3}
+{"v":1,"type":"model.cancel","req":4}
+{"v":1,"type":"model.remove","req":5,"model":"whisper-tiny"}
+{"v":1,"type":"model.select","req":6,"model":"qwen3-asr-0.6b"}
+{"v":1,"type":"model.status","req":7}
+```
+
+`model.list` answers one line. `models` is an array of
+`id`, `kind` (`asr` or `vad`), `bytes`, `size_on_disk`, `installed`,
+`active`, `blurb`. The same line carries `daemon` (`running` when the
+process answered), `state` (`idle`, `downloading`, `done`, `error`,
+`cancelled`), `store`, `store_bytes`, and `model` (the selected id).
+
+`model.install` starts one download on the daemon and answers
+`model.progress` immediately (`state` `downloading`, or `error` /
+`busy` / `bad-model`). Poll `model.progress` for `received` and `bytes`.
+`model.cancel` stops that download and answers `model.progress`.
+`model.remove` deletes one installed file and answers `model.remove`.
+`model.select` writes `selected.txt` in the store and answers
+`model.select`. The next `start` that omits `model` uses that id.
+`model.status` is the same summary as `model.list` without the array.
+
+`chewing-plus-models` is the toolkit-free client for those commands.
+`include/voxkit_client.h` is the same client for the frontends.
+
 ## What this version does not promise
 
 - No binary audio framing. A future version would bump `v`.

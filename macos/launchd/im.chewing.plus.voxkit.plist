@@ -6,8 +6,7 @@
     <string>im.chewing.plus.voxkit</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/libexec/voxkit</string>
-        <string>serve</string>
+        <string>__HOME__/Library/Application Support/ChewingPlus/voxkit-launch.sh</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
@@ -21,6 +20,11 @@
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <true/>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
 </dict>
 </plist>

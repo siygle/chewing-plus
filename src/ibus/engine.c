@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 #include "keys.h"
+#include "prefs.h"
 
 #include "voxkit_client.h"
 
@@ -31,6 +32,18 @@ static void on_commit(void *user, const char *utf8);
 G_DEFINE_TYPE(ChewingPlusEngine, chewing_plus_engine, IBUS_TYPE_ENGINE)
 
 static void refresh(ChewingPlusEngine *self);
+
+static void apply_features(chewing_plus_session *session) {
+    chewing_plus_ibus_prefs prefs;
+    chewing_plus_ibus_prefs_load(&prefs);
+    chewing_plus_set_emoji(session, prefs.emoji);
+    chewing_plus_set_calculator(session, prefs.calculator);
+    chewing_plus_set_spacing(session, prefs.space, prefs.space);
+    chewing_plus_set_emoji_shortcode(session, prefs.shortcode, ";;", 300);
+    chewing_plus_set_english(session, prefs.english, prefs.english,
+                             "Control+Shift+Space");
+    chewing_plus_set_english_double_tap(session, prefs.english, 300);
+}
 
 static int sensitive(IBusEngine *engine) {
     guint purpose = IBUS_INPUT_PURPOSE_FREE_FORM;
@@ -75,29 +88,7 @@ static void ensure_session(ChewingPlusEngine *self) {
         english = CHEWING_PLUS_IBUS_ENGLISH;
     }
     chewing_plus_set_data_paths(self->session, emoji, "", english, "");
-    /* Same defaults as fcitx5-chewing: every Plus feature off until the
-     * user opts in. CHEWING_PLUS_IBUS_FEATURES is a comma list:
-     * emoji,calculator,space,shortcode,english,voice. */
-    {
-        const char *features = getenv("CHEWING_PLUS_IBUS_FEATURES");
-        if (features && strstr(features, "emoji")) {
-            chewing_plus_set_emoji(self->session, 1);
-        }
-        if (features && strstr(features, "calculator")) {
-            chewing_plus_set_calculator(self->session, 1);
-        }
-        if (features && strstr(features, "space")) {
-            chewing_plus_set_spacing(self->session, 1, 1);
-        }
-        if (features && strstr(features, "shortcode")) {
-            chewing_plus_set_emoji_shortcode(self->session, 1, ";;", 300);
-        }
-        if (features && strstr(features, "english")) {
-            chewing_plus_set_english(self->session, 1, 1,
-                                     "Control+Shift+Space");
-            chewing_plus_set_english_double_tap(self->session, 1, 300);
-        }
-    }
+    apply_features(self->session);
     {
         chewing_plus_callbacks cb;
         memset(&cb, 0, sizeof(cb));
@@ -325,6 +316,9 @@ static void focus_in(IBusEngine *engine) {
     ChewingPlusEngine *self = (ChewingPlusEngine *)engine;
     parent_class->focus_in(engine);
     ensure_session(self);
+    if (self->session) {
+        apply_features(self->session);
+    }
     apply_sensitive(self);
     self->voice_failed = 0;
     refresh(self);

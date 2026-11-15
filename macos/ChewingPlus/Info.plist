@@ -4,6 +4,8 @@
 <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>zh-Hant</string>
+    <key>CFBundleDisplayName</key>
+    <string>新酷音 Plus</string>
     <key>CFBundleExecutable</key>
     <string>ChewingPlus</string>
     <key>CFBundleIdentifier</key>
@@ -13,25 +15,71 @@
     <key>CFBundleName</key>
     <string>新酷音 Plus</string>
     <key>CFBundlePackageType</key>
-    <string>BNDL</string>
+    <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>0.1</string>
+    <key>CFBundleSignature</key>
+    <string>CWPL</string>
     <key>CFBundleVersion</key>
     <string>1</string>
-    <key>InputMethodConnectionName</key>
-    <string>ChewingPlus_Connection</string>
-    <key>InputMethodServerControllerClass</key>
-    <string>ChewingPlusInputController</string>
-    <key>LSBackgroundOnly</key>
+    <key>LSHasLocalizedDisplayName</key>
+    <true/>
+    <key>LSUIElement</key>
     <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>新酷音 Plus 的語音在本機辨識。錄音留在這台 Mac，不會上傳。</string>
+    <key>InputMethodConnectionName</key>
+    <string>ChewingPlus_Connection</string>
+    <key>InputMethodServerControllerClass</key>
+    <string>ChewingPlusInputController</string>
+    <key>InputMethodServerDelegateClass</key>
+    <string>ChewingPlusInputController</string>
+    <key>TISInputSourceID</key>
+    <string>im.chewing.plus.inputmethod</string>
+    <key>TISIntendedLanguage</key>
+    <string>zh-Hant</string>
     <key>tsInputMethodCharacterRepertoireKey</key>
     <array>
         <string>Hant</string>
         <string>Latn</string>
     </array>
+    <key>tsInputMethodIconFileKey</key>
+    <string>chewing-plus.pdf</string>
+    <key>ComponentInputModeDict</key>
+    <dict>
+        <key>tsInputModeListKey</key>
+        <dict>
+            <key>im.chewing.plus.inputmethod.Bopomofo</key>
+            <dict>
+                <key>TISInputSourceID</key>
+                <string>im.chewing.plus.inputmethod.Bopomofo</string>
+                <key>TISIntendedLanguage</key>
+                <string>zh-Hant</string>
+                <key>tsInputModeScriptKey</key>
+                <string>smTradChinese</string>
+                <key>tsInputModePrimaryInScriptKey</key>
+                <true/>
+                <key>tsInputModeIsVisibleKey</key>
+                <true/>
+                <key>tsInputModeDefaultStateKey</key>
+                <true/>
+                <key>tsInputModeMenuIconFileKey</key>
+                <string>chewing-plus.pdf</string>
+                <key>tsInputModePaletteIconFileKey</key>
+                <string>chewing-plus.pdf</string>
+                <key>tsInputModeCharacterRepertoireKey</key>
+                <array>
+                    <string>Hant</string>
+                    <string>Latn</string>
+                </array>
+            </dict>
+        </dict>
+        <key>tsVisibleInputModeOrderedArrayKey</key>
+        <array>
+            <string>im.chewing.plus.inputmethod.Bopomofo</string>
+        </array>
+    </dict>
 </dict>
 </plist>

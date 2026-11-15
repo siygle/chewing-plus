@@ -1,3 +1,7 @@
+add_executable(test_ibus_prefs test_ibus_prefs.c)
+target_link_libraries(test_ibus_prefs PRIVATE chewing-plus-ibus-prefs)
+add_test(NAME ibus-prefs COMMAND test_ibus_prefs)
+
 add_executable(test_ibus_keys test_ibus_keys.c)
 target_link_libraries(test_ibus_keys PRIVATE chewing-plus-ibus-keys)
 set_target_properties(test_ibus_keys PROPERTIES LINKER_LANGUAGE CXX)
