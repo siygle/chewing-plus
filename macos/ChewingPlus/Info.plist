@@ -24,6 +24,8 @@
     <string>1</string>
     <key>LSHasLocalizedDisplayName</key>
     <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSPrincipalClass</key>

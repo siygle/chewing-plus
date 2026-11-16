@@ -17,8 +17,7 @@ The fcitx5 addon is not part of this build.
 | `macos/ChewingPlus/main.swift` | `IMKServer` named `ChewingPlus_Connection` |
 | `macos/Voxkit/Info.plist` | Usage string for a helper bundle, if you wrap the daemon |
 | `macos/launchd/im.chewing.plus.voxkit.plist` | User agent. `__HOME__` is replaced by `install.sh` |
-| `macos/patches/voxkit-macos-opencc.patch` | Teaches fcitx5-voxkit `9acbb719` to find Homebrew OpenCC and `libopencc*.dylib` |
-| `macos/build-voxkit.sh` | Clone that commit, apply the patch, `cargo build --release` |
+| `macos/build-voxkit.sh` | Clone fcitx5-voxkit at `packaging/release/voxkit-pin` (the same commit the Linux release uses) and `cargo build --release --locked` |
 | `macos/ChewingPlus/ModelPreferences.swift` | AppKit window: list, download, cancel, delete, select, disk use, daemon status |
 | `macos/build-app.sh` | On macOS: bundle libchewing 0.14, build the core, emit `ChewingPlus.app` |
 | `macos/build-pkg.sh` | Unsigned `.pkg` (ad-hoc signature on the `.app` when `codesign` exists) |
@@ -38,7 +37,7 @@ Homebrew's `opencc` formula supplies `libopencc` and `s2twp.json`. That is
 not a new kind of dependency. Do not add another converter.
 
 ```bash
-# 1. Daemon (existing fcitx5-voxkit tree, patched). Weights are optional.
+# 1. Daemon (fcitx5-voxkit at the shared pin). Weights are optional.
 macos/build-voxkit.sh
 # or: macos/build-voxkit.sh --download-models
 #     (~850 MB, Qwen3-ASR-0.6B Q8, stays under Application Support)
@@ -71,10 +70,13 @@ cannot emit a static archive (the `chewing_capi` export error), so the app
 bundles the shared `libchewing.dylib` plus `static_dict.bin` and the Plus
 word lists under `Contents/Resources`.
 
-The patch was applied to commit `9acbb719` and `cargo check` of that daemon
-succeeded on Linux (the macOS `cfg` branch is not compiled there). A Mac
-build of the daemon still has to be run on a Mac because cpal links
-CoreAudio.
+fcitx5-voxkit itself finds Homebrew OpenCC (`/opt/homebrew`,
+`libopencc*.dylib`, `OPENCC_DATA_DIR`), so no patch is applied. A Mac build
+of the daemon still has to be run on a Mac because cpal links CoreAudio.
+
+Every binary targets macOS 13.0 (`MACOSX_DEPLOYMENT_TARGET`, also written to
+`LSMinimumSystemVersion`). Without it the app inherits the runner's macOS
+version and older systems will not load the input method.
 
 ## Install layout
 

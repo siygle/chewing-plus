@@ -1,10 +1,11 @@
 #!/bin/sh
 # Build the existing fcitx5-voxkit daemon for this machine.
-# On macOS the OpenCC lookup patch in macos/patches is applied first.
+# The pin is shared with packaging/release/voxkit-pin (Linux release).
 # Does not download model weights unless --download-models is passed.
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-pin=9acbb7192733fee96ab787cf20f670349d05cefc
+export MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET:-13.0}
+pin=$(cat "$root/packaging/release/voxkit-pin")
 url=https://github.com/siygle/fcitx5-voxkit.git
 src=${VOXKIT_SRC:-"$root/macos/build/fcitx5-voxkit"}
 download=0
@@ -25,17 +26,12 @@ if [ ! -d "$src/.git" ]; then
     git clone "$url" "$src"
 fi
 git -C "$src" fetch --depth 1 origin "$pin"
+git -C "$src" reset -q --hard
 git -C "$src" checkout --detach "$pin"
-if ! grep -q 'libopencc.1.dylib' "$src/daemon/voxkit/src/convert.rs"; then
-    patch -d "$src" -p1 < "$root/macos/patches/voxkit-macos-opencc.patch"
-fi
-if [ ! -f "$src/daemon/voxkit/src/models_ctl.rs" ]; then
-    patch -d "$src" -p1 < "$root/patches/voxkit-model-commands.patch"
-fi
 
 (
     cd "$src/daemon"
-    cargo build --release
+    cargo build --release --locked
 )
 bin="$src/daemon/target/release/voxkit"
 echo "voxkit binary: $bin"

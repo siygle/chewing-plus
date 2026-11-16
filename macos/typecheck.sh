@@ -23,6 +23,7 @@ clang -std=c99 -Wall -Wextra -Werror -D_DARWIN_C_SOURCE=1 -D_POSIX_C_SOURCE=2008
 sdk=$(xcrun --sdk macosx --show-sdk-path)
 xcrun swiftc -typecheck \
     -sdk "$sdk" \
+    -target "$(uname -m)-apple-macos${MACOSX_DEPLOYMENT_TARGET:-13.0}" \
     -import-objc-header macos/ChewingPlus/ChewingPlus-Bridging-Header.h \
     -Xcc -I -Xcc include \
     macos/ChewingPlus/main.swift \

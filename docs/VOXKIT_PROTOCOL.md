@@ -113,10 +113,10 @@ These commands are a version-1 extension. `v` stays 1. A daemon that does
 not know them replies `error` / `bad-request` and keeps serving `start`.
 Clients that only dictate never send them. Unknown fields are still ignored.
 
-The chewing-plus patch for fcitx5-voxkit `9acbb719` is
-`patches/voxkit-model-commands.patch` (`macos/build-voxkit.sh` applies it).
-Until that patch is in the daemon, the settings UIs can connect but every
-`model.*` call fails with `bad-request`.
+These commands are in fcitx5-voxkit itself. Linux and macOS releases build
+the commit in `packaging/release/voxkit-pin`. An older daemon without them
+lets the settings UIs connect, but every `model.*` call fails with
+`bad-request`.
 
 ```json
 {"v":1,"type":"model.list","req":1}

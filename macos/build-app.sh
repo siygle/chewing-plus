@@ -7,6 +7,9 @@ if [ "$(uname)" != Darwin ]; then
     exit 1
 fi
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+# Oldest macOS the app runs on. CMake, cargo and swiftc all read this, so the
+# runner's own macOS version does not leak into the bundle.
+export MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET:-13.0}
 prefix=${CHEWING_PREFIX:-"$root/macos/build/libchewing"}
 if [ ! -f "$prefix/lib/libchewing.dylib" ] && [ ! -f "$prefix/lib/libchewing.3.dylib" ]; then
     bash "$root/scripts/bundle-libchewing.sh" --shared "$prefix"
@@ -30,6 +33,8 @@ app="$root/macos/build/ChewingPlus.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Frameworks" "$app/Contents/Resources/libchewing"
 cp "$root/macos/ChewingPlus/Info.plist" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $MACOSX_DEPLOYMENT_TARGET" \
+    "$app/Contents/Info.plist"
 cp "$root/macos/ChewingPlus/chewing-plus.pdf" "$app/Contents/Resources/"
 mkdir -p "$app/Contents/Resources/zh-Hant.lproj" "$app/Contents/Resources/Base.lproj"
 cp "$root/macos/ChewingPlus/zh-Hant.lproj/InfoPlist.strings" \
@@ -47,6 +52,7 @@ find "$prefix/lib" -name 'libchewing*.dylib' -exec cp -a {} "$app/Contents/Frame
 sdk=$(xcrun --sdk macosx --show-sdk-path)
 xcrun swiftc -O -emit-executable \
     -sdk "$sdk" \
+    -target "$(uname -m)-apple-macos$MACOSX_DEPLOYMENT_TARGET" \
     -import-objc-header "$root/macos/ChewingPlus/ChewingPlus-Bridging-Header.h" \
     -Xcc -I -Xcc "$root/include" \
     -Xlinker -L"$root/macos/build/core/src" \

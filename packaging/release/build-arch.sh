@@ -20,9 +20,9 @@ version=${CHEWING_PLUS_VERSION:-$(git -C "$root" describe --tags --always)}
 # pacman versions cannot contain '-'.
 pkgver=$(printf '%s' "$version" | sed 's/^v//; s/-/./g')
 
-# fcitx5-voxkit main (model.* socket commands, read-only model dirs).
+# Same fcitx5-voxkit commit as macos/build-voxkit.sh.
 VOXKIT_URL=https://github.com/siygle/fcitx5-voxkit.git
-VOXKIT_COMMIT=4dad8c9366c06f0044eaffd7af2b2544edb27213
+VOXKIT_COMMIT=$(cat "$here/voxkit-pin")
 
 if [[ $(id -u) -ne 0 ]]; then
     echo "build-arch.sh expects to run as root in a throwaway container" >&2
