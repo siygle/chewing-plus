@@ -12,7 +12,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-MODE = "im.chewing.plus.inputmethod.Bopomofo"
+BUNDLE_ID = "im.chewing.inputmethod.ChewingPlus"
+MODE = BUNDLE_ID + ".Bopomofo"
 MODE_KEYS = (
     "TISInputSourceID",
     "TISIntendedLanguage",
@@ -40,7 +41,15 @@ def check_dict(info, resource_root, label):
         errors.append(label + " CFBundlePackageType is not APPL")
     if info.get("LSUIElement") is not True:
         errors.append(label + " LSUIElement is not true")
-    if info.get("TISInputSourceID") != "im.chewing.plus.inputmethod":
+    bundle_id = info.get("CFBundleIdentifier", "")
+    if bundle_id != BUNDLE_ID:
+        errors.append(label + " CFBundleIdentifier is not " + BUNDLE_ID)
+    # Text Input Sources only indexes a bundle whose id has ".inputmethod."
+    # in the middle. Without it TISRegisterInputSource returns noErr and the
+    # input method never shows up (issue #7).
+    if ".inputmethod." not in bundle_id:
+        errors.append(label + " CFBundleIdentifier has no '.inputmethod.' component")
+    if info.get("TISInputSourceID") != BUNDLE_ID:
         errors.append(label + " TISInputSourceID")
     if info.get("TISIntendedLanguage") != "zh-Hant":
         errors.append(label + " TISIntendedLanguage")

@@ -20,18 +20,29 @@ func registerInputSource() -> Int32 {
     guard let list = TISCreateInputSourceList(filter, true)?.takeRetainedValue()
         as? [TISInputSource], !list.isEmpty
     else {
-        print("no input source for \(bundleID); log out and back in")
+        print("no input source for \(bundleID) at \(Bundle.main.bundlePath)")
+        print("log out and back in; if it is still missing, open an issue with this output")
         return 1
     }
+    var failed = false
+    var sawMode = false
     for source in list {
         let idPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID)
         let sourceID = idPtr.map {
             Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String
         } ?? "?"
+        if sourceID == bundleID + ".Bopomofo" {
+            sawMode = true
+        }
         let enabled = TISEnableInputSource(source)
+        failed = failed || enabled != noErr
         print("enable \(sourceID): \(enabled == noErr ? "ok" : "error \(enabled)")")
     }
-    return 0
+    if !sawMode {
+        print("input mode \(bundleID).Bopomofo is missing")
+        return 1
+    }
+    return failed ? 1 : 0
 }
 
 if CommandLine.arguments.contains("--register") {

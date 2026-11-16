@@ -40,7 +40,7 @@ Plus 功能預設關閉，在 fcitx5 設定 → 新酷音 → 設定中開啟 `P
    "/Library/Input Methods/ChewingPlus.app/Contents/MacOS/ChewingPlus" --register
    ```
 
-   輸出 `enable im.chewing.plus.inputmethod.Bopomofo: ok` 代表已註冊。
+   輸出 `enable im.chewing.inputmethod.ChewingPlus.Bopomofo: ok` 代表已註冊。
 
 語音輸入需要 Homebrew 的 OpenCC（`brew install opencc`）做繁體轉換，第一次錄音時要允許麥克風權限。
 

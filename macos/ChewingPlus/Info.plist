@@ -9,7 +9,7 @@
     <key>CFBundleExecutable</key>
     <string>ChewingPlus</string>
     <key>CFBundleIdentifier</key>
-    <string>im.chewing.plus.inputmethod</string>
+    <string>im.chewing.inputmethod.ChewingPlus</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -39,7 +39,7 @@
     <key>InputMethodServerDelegateClass</key>
     <string>ChewingPlusInputController</string>
     <key>TISInputSourceID</key>
-    <string>im.chewing.plus.inputmethod</string>
+    <string>im.chewing.inputmethod.ChewingPlus</string>
     <key>TISIntendedLanguage</key>
     <string>zh-Hant</string>
     <key>tsInputMethodCharacterRepertoireKey</key>
@@ -53,10 +53,10 @@
     <dict>
         <key>tsInputModeListKey</key>
         <dict>
-            <key>im.chewing.plus.inputmethod.Bopomofo</key>
+            <key>im.chewing.inputmethod.ChewingPlus.Bopomofo</key>
             <dict>
                 <key>TISInputSourceID</key>
-                <string>im.chewing.plus.inputmethod.Bopomofo</string>
+                <string>im.chewing.inputmethod.ChewingPlus.Bopomofo</string>
                 <key>TISIntendedLanguage</key>
                 <string>zh-Hant</string>
                 <key>tsInputModeScriptKey</key>
@@ -80,7 +80,7 @@
         </dict>
         <key>tsVisibleInputModeOrderedArrayKey</key>
         <array>
-            <string>im.chewing.plus.inputmethod.Bopomofo</string>
+            <string>im.chewing.inputmethod.ChewingPlus.Bopomofo</string>
         </array>
     </dict>
 </dict>

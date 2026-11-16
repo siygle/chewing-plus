@@ -38,3 +38,13 @@ jobs:
           --app macos/build/ChewingPlus.app
           --pkg macos/build/ChewingPlus.pkg
           --component-plist macos/build/component.plist
+      - name: Install the package and check Text Input Sources
+        run: |
+          # The build copy has the same bundle id; drop it so TIS only sees
+          # the installed app.
+          lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+          "$lsregister" -u "$PWD/macos/build/ChewingPlus.app" || true
+          rm -rf macos/build/ChewingPlus.app
+          sudo installer -pkg macos/build/ChewingPlus.pkg -target /
+          "/Library/Input Methods/ChewingPlus.app/Contents/MacOS/ChewingPlus" --register
+          xcrun swift macos/check-tis.swift im.chewing.inputmethod.ChewingPlus.Bopomofo

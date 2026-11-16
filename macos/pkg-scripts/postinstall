@@ -45,6 +45,14 @@ launchctl bootstrap "gui/$uid" \
 # the input menu without logging out. A stale copy is stopped first.
 app="/Library/Input Methods/ChewingPlus.app"
 pkill -u "$uid" -x ChewingPlus 2>/dev/null || true
+# A per-user copy from macos/install.sh would shadow this one (same bundle
+# id), so Text Input Sources may pick either. The pkg owns the system copy.
+user_app="$home/Library/Input Methods/ChewingPlus.app"
+if [[ -d "$user_app" ]]; then
+    lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+    "$lsregister" -u "$user_app" 2>/dev/null || true
+    rm -rf "$user_app"
+fi
 launchctl asuser "$uid" sudo -u "$user" \
     "$app/Contents/MacOS/ChewingPlus" --register || true
 exit 0
