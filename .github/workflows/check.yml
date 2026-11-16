@@ -18,7 +18,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm git clang diffutils
           git config --global --add safe.directory $GITHUB_WORKSPACE
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: fcitx/github-actions@clang-format
   check:
     name: Build and test
@@ -52,12 +52,12 @@ jobs:
             pkgs="$pkgs rust git-lfs ibus libadwaita"
           fi
           pacman -Syu --noconfirm $pkgs
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: fcitx/fcitx5
           path: fcitx5
       - name: Cache fcitx5 data files
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: 'fcitx5/**/*.tar.*'
           key: ${{ runner.os }}-${{ hashFiles('fcitx5/src/modules/spell/CMakeLists.txt')
@@ -69,13 +69,13 @@ jobs:
           cmake-option: >-
             -DENABLE_KEYBOARD=Off -DENABLE_X11=Off -DENABLE_WAYLAND=Off -DENABLE_ENCHANT=Off
             -DENABLE_DBUS=Off -DENABLE_SERVER=Off -DENABLE_EMOJI=Off -DUSE_SYSTEMD=Off
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: fcitx5-chewing
           submodules: true
       - name: Init CodeQL
         if: matrix.compiler == 'gcc'
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: cpp
           source-root: fcitx5-chewing
@@ -102,5 +102,7 @@ jobs:
           CHEWING_TEST_DATA: /usr/share/libchewing
       - name: CodeQL Analysis
         if: matrix.compiler == 'gcc'
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
+        with:
+          checkout_path: ${{ github.workspace }}/fcitx5-chewing
 
