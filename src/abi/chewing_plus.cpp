@@ -650,6 +650,16 @@ void chewing_plus_set_english(chewing_plus_session *session, int enabled,
     s->reloadData();
 }
 
+void chewing_plus_set_english_hint_commit(chewing_plus_session *session,
+                                          int enabled) {
+    if (!session) {
+        return;
+    }
+    auto *s = S(session);
+    s->opt.englishHintCommit = enabled != 0;
+    s->applyOptions();
+}
+
 void chewing_plus_set_english_double_tap(chewing_plus_session *session,
                                          int enabled, int window_ms) {
     if (!session) {

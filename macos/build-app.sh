@@ -35,7 +35,8 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Frameworks" "$app/Contents/Resourc
 cp "$root/macos/ChewingPlus/Info.plist" "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $MACOSX_DEPLOYMENT_TARGET" \
     "$app/Contents/Info.plist"
-cp "$root/macos/ChewingPlus/chewing-plus.pdf" "$app/Contents/Resources/"
+cp "$root/macos/ChewingPlus/chewing-plus.pdf" "$root/macos/ChewingPlus/chewing-plus.tiff" \
+    "$root/macos/ChewingPlus/chewing-plus.icns" "$app/Contents/Resources/"
 mkdir -p "$app/Contents/Resources/zh-Hant.lproj" "$app/Contents/Resources/Base.lproj"
 cp "$root/macos/ChewingPlus/zh-Hant.lproj/InfoPlist.strings" \
     "$app/Contents/Resources/zh-Hant.lproj/"
@@ -66,7 +67,8 @@ xcrun swiftc -O -emit-executable \
     -o "$app/Contents/MacOS/ChewingPlus" \
     "$root/macos/ChewingPlus/main.swift" \
     "$root/macos/ChewingPlus/ChewingPlusInputController.swift" \
-    "$root/macos/ChewingPlus/ModelPreferences.swift"
+    "$root/macos/ChewingPlus/ModelPreferences.swift" \
+    "$root/macos/ChewingPlus/Shortcuts.swift"
 
 install_name_tool -add_rpath @executable_path/../Frameworks \
     "$app/Contents/MacOS/ChewingPlus" || true

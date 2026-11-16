@@ -162,6 +162,19 @@ bool ChewingPlus::toggleEnglish(ChewingContext *ctx, const Commit &commit) {
         chewing_cand_TotalChoice(ctx) > 0) {
         return false;
     }
+    if (options_.englishHintCommit && !englishHint(ctx).empty()) {
+        // The reading spells a known word (the hint is showing): put that
+        // word in place of the unfinished syllable, keeping the rest of the
+        // buffer, as Space would after typing it in the [EN] panel.
+        std::string word = lexicon_.canonical(keys_);
+        chewing_clean_bopomofo_buf(ctx);
+        keys_.clear();
+        overwrites_ = 0;
+        overwriteFlags_.clear();
+        lastZuinLen_ = 0;
+        InsertAscii(ctx, word + " ", commit);
+        return true;
+    }
     std::string keys;
     if (!Zuin(ctx).empty()) {
         // Convert the unfinished reading only if it was typed as plain keys we

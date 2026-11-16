@@ -34,6 +34,9 @@ struct Options {
     int emojiDoubleTapMs = 300;
     bool english = false;     // [EN] buffer mode
     bool englishHint = false; // "Ctrl+Shift+Space -> GitHub"
+    // The shortcut commits the hinted word directly instead of opening the
+    // [EN] panel with the reading converted.
+    bool englishHintCommit = false;
     std::string englishShortcutLabel = "Control+Shift+Space";
 };
 

@@ -28,5 +28,6 @@ xcrun swiftc -typecheck \
     -Xcc -I -Xcc include \
     macos/ChewingPlus/main.swift \
     macos/ChewingPlus/ChewingPlusInputController.swift \
-    macos/ChewingPlus/ModelPreferences.swift
+    macos/ChewingPlus/ModelPreferences.swift \
+    macos/ChewingPlus/Shortcuts.swift
 echo "macOS typecheck OK"

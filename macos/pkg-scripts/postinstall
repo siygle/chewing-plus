@@ -12,6 +12,8 @@ uid=$(id -u "$user")
 support="$home/Library/Application Support/ChewingPlus"
 payload="/Library/Application Support/ChewingPlus"
 mkdir -p "$support/models" "$home/Library/LaunchAgents"
+# postinstall runs as root; the user's daemon writes model files here.
+chown "$user" "$support" "$support/models" "$home/Library/LaunchAgents"
 if [[ -f "$payload/voxkit" ]]; then
     cp "$payload/voxkit" "$support/voxkit"
     chown "$user" "$support/voxkit"

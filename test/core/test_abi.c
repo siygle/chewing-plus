@@ -244,6 +244,39 @@ static void test_double_shift(void) {
     }
 }
 
+static void test_hint_commit(void) {
+    const char *got;
+    reset();
+    type_text("su3github");
+    check(strstr(aux(), "GitHub") != NULL, "hint names GitHub");
+    tap(CHEWING_PLUS_KEY_SHIFT_R, 0, 0);
+    tap(CHEWING_PLUS_KEY_SHIFT_R, 0, 0);
+    check(chewing_plus_panel(session) == CHEWING_PLUS_PANEL_ENGLISH,
+          "hint commit off: Right Shift x2 opens [EN]");
+    reset();
+    chewing_plus_set_english_hint_commit(session, 1);
+    type_text("su3github");
+    tap(CHEWING_PLUS_KEY_SHIFT_R, 0, 0);
+    tap(CHEWING_PLUS_KEY_SHIFT_R, 0, 0);
+    check(chewing_plus_panel(session) == CHEWING_PLUS_PANEL_NONE,
+          "hint commit on: no [EN] panel");
+    check(strstr(preedit(), "GitHub") != NULL && strstr(preedit(), "你") != NULL,
+          "hint commit on: GitHub replaces the reading, 你 kept");
+    tap(CHEWING_PLUS_KEY_RETURN, 0, 0);
+    got = chewing_plus_take_commit(session);
+    check(strcmp(got, "你 GitHub ") == 0, "hint commit on: commit text");
+    if (strcmp(got, "你 GitHub ") != 0) {
+        fprintf(stderr, "  commit=[%s] preedit=[%s]\n", got, preedit());
+    }
+    reset();
+    type_text("su3");
+    tap(CHEWING_PLUS_KEY_SHIFT_R, 0, 0);
+    tap(CHEWING_PLUS_KEY_SHIFT_R, 0, 0);
+    check(chewing_plus_panel(session) == CHEWING_PLUS_PANEL_ENGLISH,
+          "hint commit on, no hint: Right Shift x2 still opens [EN]");
+    chewing_plus_set_english_hint_commit(session, 0);
+}
+
 static void test_emoji_candidate(void) {
     int found;
     reset();
@@ -338,6 +371,7 @@ int main(void) {
     test_shortcode();
     test_english();
     test_double_shift();
+    test_hint_commit();
     test_emoji_candidate();
     test_sensitive();
 

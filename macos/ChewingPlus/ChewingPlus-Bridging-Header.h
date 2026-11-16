@@ -19,6 +19,16 @@ chewing_plus_mac_message_text(const voxkit_message *message) {
 }
 
 static inline const char *
+chewing_plus_mac_message_tentative(const voxkit_message *message) {
+    return message ? message->tentative : "";
+}
+
+static inline const char *
+chewing_plus_mac_message_error(const voxkit_message *message) {
+    return message ? message->message : "";
+}
+
+static inline const char *
 chewing_plus_mac_model_id(const voxkit_model_info *model) {
     return model ? model->id : "";
 }

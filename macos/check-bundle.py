@@ -55,7 +55,7 @@ def check_dict(info, resource_root, label):
         errors.append(label + " TISIntendedLanguage")
     if info.get("InputMethodServerControllerClass") != "ChewingPlusInputController":
         errors.append(label + " controller class")
-    if info.get("InputMethodConnectionName") != "ChewingPlus_Connection":
+    if info.get("InputMethodConnectionName") != "im.chewing.inputmethod.ChewingPlus.Connection":
         errors.append(label + " connection name")
     icon = info.get("tsInputMethodIconFileKey")
     if not icon:

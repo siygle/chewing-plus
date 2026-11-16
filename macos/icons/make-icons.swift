@@ -88,3 +88,35 @@ writePDF("chewing-plus.pdf", size: 64) { ctx in
     ctx.fill(CGRect(x: 49.5, y: 8, width: 3, height: 10))
     ctx.fill(CGRect(x: 46, y: 11.5, width: 10, height: 3))
 }
+
+// Raster copies. Text Input Sources and the Keyboard settings list load
+// tsInputMethodIconFileKey / tsInputModeMenuIconFileKey as an image file and
+// show a gray box for a PDF, so ship a TIFF (16, 32, 64 px) and an icns.
+func run(_ args: [String]) {
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: args[0])
+    p.arguments = Array(args.dropFirst())
+    try! p.run()
+    p.waitUntilExit()
+    precondition(p.terminationStatus == 0, "\(args) failed")
+}
+let pdf = outDir.appendingPathComponent("chewing-plus.pdf").path
+let tmp = FileManager.default.temporaryDirectory
+    .appendingPathComponent("chewing-plus-icons-\(getpid())")
+let iconset = tmp.appendingPathComponent("chewing-plus.iconset")
+try! FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
+for (name, px) in [("icon_16x16", 16), ("icon_16x16@2x", 32), ("icon_32x32", 32),
+                   ("icon_32x32@2x", 64), ("icon_128x128", 128), ("icon_128x128@2x", 256),
+                   ("icon_256x256", 256), ("icon_256x256@2x", 512), ("icon_512x512", 512),
+                   ("icon_512x512@2x", 1024)] {
+    run(["/usr/bin/sips", "-s", "format", "png", "-z", "\(px)", "\(px)", pdf,
+         "--out", iconset.appendingPathComponent(name + ".png").path])
+}
+run(["/usr/bin/iconutil", "-c", "icns", iconset.path,
+     "-o", outDir.appendingPathComponent("chewing-plus.icns").path])
+run(["/usr/bin/tiffutil", "-cathidpicheck",
+     iconset.appendingPathComponent("icon_16x16.png").path,
+     iconset.appendingPathComponent("icon_16x16@2x.png").path,
+     "-out", outDir.appendingPathComponent("chewing-plus.tiff").path])
+try? FileManager.default.removeItem(at: tmp)
+print("wrote chewing-plus.icns and chewing-plus.tiff")

@@ -1,11 +1,16 @@
 import Carbon
 import Cocoa
 import InputMethodKit
+import os.log
 
-let connection = "ChewingPlus_Connection"
 guard let bundleID = Bundle.main.bundleIdentifier else {
     fatalError("missing bundle id")
 }
+/// macOS 26 InputMethodKit only accepts a third-party connection named
+/// "<bundle id>.Connection"; any other InputMethodConnectionName is refused
+/// ("unrecognized 'InputMethodConnectionName' value") and the input method
+/// never receives a key. Info.plist carries the same string.
+let connection = bundleID + ".Connection"
 
 /// `ChewingPlus --register`: register this bundle with Text Input Sources and
 /// enable it, so it shows up without logging out. The installer runs this as
@@ -45,10 +50,19 @@ func registerInputSource() -> Int32 {
     return failed ? 1 : 0
 }
 
+// The voxkit LaunchAgent listens on this path (macos/launchd and
+// pkg-scripts/agent.plist set VOXKIT_SOCKET). macOS starts the input method
+// from launchd without that variable, so without this the client falls back
+// to /tmp/voxkit-<uid>.sock and never reaches the daemon.
+setenv("VOXKIT_SOCKET", "/tmp/chewing-plus-voxkit.sock", 0)
+
 if CommandLine.arguments.contains("--register") {
     exit(registerInputSource())
 }
 
+let log = OSLog(subsystem: "im.chewing.inputmethod.ChewingPlus", category: "server")
 let server = IMKServer(name: connection, bundleIdentifier: bundleID)
+os_log("IMKServer %{public}@ for %{public}@: %{public}@", log: log, type: .default,
+       connection, bundleID, server == nil ? "nil" : "up")
 NSApplication.shared.run()
 _ = server

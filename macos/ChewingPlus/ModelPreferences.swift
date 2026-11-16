@@ -23,7 +23,7 @@ final class ModelPreferences: NSObject, NSTableViewDataSource, NSTableViewDelega
             defer: false)
         super.init()
         voxkit_client_init(voice)
-        window.title = "语音模型"
+        window.title = "語音模型"
         window.isReleasedWhenClosed = false
         build()
     }
@@ -46,8 +46,8 @@ final class ModelPreferences: NSObject, NSTableViewDataSource, NSTableViewDelega
         scroll.borderType = .bezelBorder
         table.frame = scroll.bounds
         table.headerView = NSTableHeaderView()
-        for (id, title, width) in [("id", "模型", 180.0), ("kind", "类型", 60.0),
-                                   ("state", "状态", 110.0), ("bytes", "大小", 120.0)] {
+        for (id, title, width) in [("id", "模型", 180.0), ("kind", "類型", 60.0),
+                                   ("state", "狀態", 110.0), ("bytes", "大小", 120.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
@@ -68,7 +68,7 @@ final class ModelPreferences: NSObject, NSTableViewDataSource, NSTableViewDelega
         progress.maxValue = 1
         content.addSubview(progress)
 
-        let titles = ["刷新", "下载", "取消", "删除", "使用"]
+        let titles = ["重新整理", "下載", "取消", "刪除", "使用"]
         let actions: [Selector] = [#selector(refreshClicked(_:)), #selector(installClicked(_:)),
                                    #selector(cancelClicked(_:)), #selector(removeClicked(_:)),
                                    #selector(selectClicked(_:))]
@@ -110,7 +110,7 @@ final class ModelPreferences: NSObject, NSTableViewDataSource, NSTableViewDelega
             rc = id.withCString { voxkit_client_model_select(voice, nextReq(), $0, &msg, 1000, nil, 0) }
         }
         if rc != 0 {
-            statusLabel.stringValue = "操作失败。确认 voxkit 正在运行。"
+            statusLabel.stringValue = "操作失敗。請確認 voxkit 正在執行。"
             return
         }
         apply(msg)
@@ -123,7 +123,7 @@ final class ModelPreferences: NSObject, NSTableViewDataSource, NSTableViewDelega
         guard ensure() else {
             rows = []
             table.reloadData()
-            statusLabel.stringValue = "voxkit 没有在听。先安装并启动语音服务。"
+            statusLabel.stringValue = "連不到 voxkit 語音服務。請確認它已安裝並在執行。"
             return
         }
         var storage = [voxkit_model_info](repeating: chewing_plus_mac_blank_model(), count: 8)
@@ -134,7 +134,7 @@ final class ModelPreferences: NSObject, NSTableViewDataSource, NSTableViewDelega
                                      &count, &summary, 1000, nil, 0)
         }
         if rc != 0 {
-            statusLabel.stringValue = "读不到模型列表。"
+            statusLabel.stringValue = "讀不到模型列表。"
             return
         }
         rows = Array(storage.prefix(count))
@@ -167,8 +167,8 @@ final class ModelPreferences: NSObject, NSTableViewDataSource, NSTableViewDelega
         let active = String(cString: chewing_plus_mac_active(&copy))
         let note = String(cString: chewing_plus_mac_note(&copy))
         let used = ByteCountFormatter.string(fromByteCount: Int64(copy.store_bytes), countStyle: .file)
-        var line = "服务 \(daemon.isEmpty ? "running" : daemon) · \(state.isEmpty ? "idle" : state) · 已用 \(used)"
-        if !active.isEmpty { line += " · 当前 \(active)" }
+        var line = "服務 \(daemon.isEmpty ? "執行中" : daemon) · \(state.isEmpty ? "閒置" : state) · 已用 \(used)"
+        if !active.isEmpty { line += " · 目前 \(active)" }
         if !store.isEmpty { line += "\n\(store)" }
         if !note.isEmpty { line += " · \(note)" }
         statusLabel.stringValue = line
@@ -207,7 +207,7 @@ final class ModelPreferences: NSObject, NSTableViewDataSource, NSTableViewDelega
         case "kind":
             cell.stringValue = String(cString: chewing_plus_mac_model_kind(&info))
         case "state":
-            cell.stringValue = info.installed != 0 ? (info.active != 0 ? "使用中" : "已安装") : "未安装"
+            cell.stringValue = info.installed != 0 ? (info.active != 0 ? "使用中" : "已安裝") : "未安裝"
         default:
             cell.stringValue = ByteCountFormatter.string(fromByteCount: Int64(info.bytes), countStyle: .file)
         }

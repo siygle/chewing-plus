@@ -194,6 +194,14 @@ chewing_plus_set_emoji_shortcode(chewing_plus_session *session, int enabled,
 CHEWING_PLUS_API void chewing_plus_set_english(chewing_plus_session *session,
                                                int enabled, int hint,
                                                const char *shortcut_label);
+/*
+ * When the English hint is showing, the toggle shortcut (combo or double
+ * tap) inserts the hinted word in place of the reading instead of opening
+ * the [EN] panel. Off by default.
+ */
+CHEWING_PLUS_API void
+chewing_plus_set_english_hint_commit(chewing_plus_session *session,
+                                     int enabled);
 /* Right Shift tapped twice. `window_ms` <= 0 keeps the previous window. */
 CHEWING_PLUS_API void
 chewing_plus_set_english_double_tap(chewing_plus_session *session, int enabled,

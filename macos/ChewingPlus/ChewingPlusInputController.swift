@@ -1,6 +1,9 @@
 import Carbon
 import Cocoa
 import InputMethodKit
+import os.log
+
+private let imLog = OSLog(subsystem: "im.chewing.inputmethod.ChewingPlus", category: "controller")
 
 /// Native InputMethodKit controller. Drawing is IMKCandidates (AppKit).
 /// Composition is libchewing-plus-core. Voice is a version-1 client of the
@@ -12,9 +15,21 @@ final class ChewingPlusInputController: IMKInputController {
     private var voice = UnsafeMutablePointer<voxkit_client>.allocate(capacity: 1)
     private var voiceActive = false
     private var voiceReq: UInt64 = 0
+    private var voiceSource: DispatchSourceRead?
+    private var shortcutObserver: NSObjectProtocol?
     private var panel: IMKCandidates?
     private var lastClient: IMKTextInput?
     private var commitHook: chewing_plus_callbacks?
+    private var sensitive = false
+    /// Lone Left Shift switches 中/英 (fcitx5 does this on Linux). In English
+    /// mode every key goes straight to the app.
+    private var englishMode = false
+    private var shiftDownAt: TimeInterval = 0
+    private var shiftAlone = false
+    /// Double tap of a lone-modifier English shortcut.
+    private var tapDownAt: TimeInterval = -1
+    private var lastTapUpAt: TimeInterval = -1
+    private var panelShown = false
 
     override init!(server: IMKServer!, delegate: Any!, client: Any!) {
         super.init(server: server, delegate: delegate, client: client)
@@ -22,9 +37,19 @@ final class ChewingPlusInputController: IMKInputController {
         panel = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
         panel?.setSelectionKeys(["1", "2", "3", "4", "5", "6", "7", "8", "9"])
         openSession()
+        shortcutObserver = NotificationCenter.default.addObserver(
+            forName: .chewingPlusShortcutsChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self, let session = self.session else { return }
+            self.applyFeatures(session)
+        }
+        os_log("controller init, session %{public}@", log: imLog, type: .default,
+               session == nil ? "nil" : "ok")
     }
 
     deinit {
+        if let shortcutObserver { NotificationCenter.default.removeObserver(shortcutObserver) }
+        voiceSource?.cancel()
         voxkit_client_close(voice)
         voice.deallocate()
         chewing_plus_free(session)
@@ -32,11 +57,40 @@ final class ChewingPlusInputController: IMKInputController {
 
     override func menu() -> NSMenu! {
         let menu = NSMenu(title: "新酷音 Plus")
+        for feature in PlusFeature.allCases {
+            let item = NSMenuItem(title: feature.title, action: #selector(toggleFeature(_:)),
+                                  keyEquivalent: "")
+            item.target = self
+            item.representedObject = feature.rawValue
+            item.state = feature.isOn ? .on : .off
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        let keys = NSMenuItem(title: "快速鍵…", action: #selector(openShortcuts(_:)),
+                              keyEquivalent: "")
+        keys.target = self
+        menu.addItem(keys)
         let item = NSMenuItem(title: "語音模型…", action: #selector(openModels(_:)),
                               keyEquivalent: "")
         item.target = self
         menu.addItem(item)
         return menu
+    }
+
+    @objc private func toggleFeature(_ sender: Any?) {
+        // IMK hands menu actions a dictionary whose kIMKCommandMenuItemName
+        // is the NSMenuItem.
+        let item = (sender as? [String: Any])?[kIMKCommandMenuItemName] as? NSMenuItem
+            ?? sender as? NSMenuItem
+        guard let raw = item?.representedObject as? String,
+              let feature = PlusFeature(rawValue: raw) else { return }
+        feature.isOn.toggle()
+        if let session { applyFeatures(session) }
+    }
+
+    @objc private func openShortcuts(_: Any?) {
+        if voiceActive { _ = voiceCancel() }
+        ShortcutPreferences.shared.show()
     }
 
     @objc private func openModels(_: Any?) {
@@ -52,32 +106,52 @@ final class ChewingPlusInputController: IMKInputController {
         guard let event, let session else { return false }
         lastClient = sender as? IMKTextInput
         if secure() {
-            chewing_plus_set_sensitive(session, 1)
-            if voiceActive { _ = voiceCancel() }
-            chewing_plus_reset(session)
-            publish(session)
+            if !sensitive {
+                sensitive = true
+                chewing_plus_set_sensitive(session, 1)
+                if voiceActive { _ = voiceCancel() }
+                chewing_plus_reset(session)
+                publish(session)
+            }
             return false
         }
-        chewing_plus_set_sensitive(session, 0)
-        if event.keyCode == 0x3D {
-            let released = event.type == .keyUp
-                || (event.type == .flagsChanged && !event.modifierFlags.contains(.option))
-            return released ? voiceStop() : voiceStart()
+        if sensitive {
+            sensitive = false
+            chewing_plus_set_sensitive(session, 0)
         }
+        if let consumed = voiceKey(event) { return consumed }
         if voiceActive && event.type == .keyDown {
             _ = voiceCancel()
         }
+        if englishShortcut(event) {
+            if chewing_plus_toggle_english(session) != 0 { publish(session) }
+            return true
+        }
+        // Command shortcuts belong to the app.
+        if event.modifierFlags.contains(.command) { return false }
+        if lonelyShift(event) {
+            toggleEnglishMode(session)
+            return true
+        }
+        if englishMode { return false }
         if selectDigit(event, session: session) { return true }
         var key = chewing_plus_key_event(
-            key: 0, ascii: 0, mods: 0, keycode: Int32(event.keyCode), time_ms: -1)
+            key: 0, ascii: 0, mods: 0, keycode: Self.x11Keycode(event.keyCode), time_ms: -1)
         if event.modifierFlags.contains(.shift) { key.mods |= UInt32(CHEWING_PLUS_MOD_SHIFT) }
         if event.modifierFlags.contains(.control) { key.mods |= UInt32(CHEWING_PLUS_MOD_CTRL) }
         if event.modifierFlags.contains(.option) { key.mods |= UInt32(CHEWING_PLUS_MOD_ALT) }
-        if event.type == .keyUp { key.mods |= UInt32(CHEWING_PLUS_MOD_RELEASE) }
+        let release = event.type == .keyUp || (event.type == .flagsChanged
+            && !event.modifierFlags.contains(.shift))
+        if release { key.mods |= UInt32(CHEWING_PLUS_MOD_RELEASE) }
         if !Self.fill(&key, from: event) { return false }
-        _ = chewing_plus_key(session, &key)
-        publish(session)
-        return true
+        let before = snapshot(session)
+        let consumed = chewing_plus_key(session, &key) != 0
+        // Only talk to the client when the composition actually changed:
+        // every setMarkedText is a round trip to the app.
+        if snapshot(session) != before { publish(session) }
+        // A key the core does not want (Backspace on an empty buffer, a key
+        // release, a lone Shift) goes back to the app.
+        return consumed
     }
 
     override func candidateSelected(_ candidateString: NSAttributedString!) {
@@ -130,24 +204,28 @@ final class ChewingPlusInputController: IMKInputController {
                 chewing_plus_set_data_paths(session, emojiPtr, "", englishPtr, "")
             }
         }
-        // Same tokens as the IBus engine (CHEWING_PLUS_IBUS_FEATURES).
-        let features = Self.env("CHEWING_PLUS_FEATURES") ?? Self.env("CHEWING_PLUS_IBUS_FEATURES")
-        if let features {
-            if features.contains("emoji") { chewing_plus_set_emoji(session, 1) }
-            if features.contains("calculator") { chewing_plus_set_calculator(session, 1) }
-            if features.contains("space") { chewing_plus_set_spacing(session, 1, 1) }
-            if features.contains("shortcode") {
-                chewing_plus_set_emoji_shortcode(session, 1, ";;", 300)
-            }
-            if features.contains("english") {
-                chewing_plus_set_english(session, 1, 1, "Control+Shift+Space")
-                chewing_plus_set_english_double_tap(session, 1, 300)
-            }
-        }
+        applyFeatures(session)
         let userPtr = Unmanaged.passUnretained(self).toOpaque()
         var callbacks = chewing_plus_callbacks(commit: chewCommit, updated: nil, user: userPtr)
         commitHook = callbacks
         chewing_plus_set_callbacks(session, &callbacks)
+    }
+
+    /// Plus toggles from the input menu (UserDefaults; Plus features on,
+    /// easy symbol off by default).
+    /// CHEWING_PLUS_FEATURES still overrides them for testing.
+    private func applyFeatures(_ session: OpaquePointer) {
+        let on = { (f: PlusFeature) -> Int32 in f.isOn ? 1 : 0 }
+        chewing_plus_set_easy_symbol(session, on(.easySymbol))
+        chewing_plus_set_emoji(session, on(.emoji))
+        chewing_plus_set_calculator(session, on(.calculator))
+        chewing_plus_set_spacing(session, on(.space), on(.space))
+        chewing_plus_set_emoji_shortcode(session, on(.shortcode), ";;", 300)
+        chewing_plus_set_english(session, on(.english), on(.english),
+                                 ShortcutSetting.english.hintLabel)
+        // The frontend detects the double tap itself so the key is configurable.
+        chewing_plus_set_english_double_tap(session, 0, 300)
+        chewing_plus_set_english_hint_commit(session, on(.englishHintCommit))
     }
 
     fileprivate func insertCommitted(_ text: String) {
@@ -165,16 +243,134 @@ final class ChewingPlusInputController: IMKInputController {
             : NSRange(location: cursor, length: 0)
         let replace = NSRange(location: NSNotFound, length: NSNotFound)
         lastClient?.setMarkedText(text, selectionRange: selection, replacementRange: replace)
+        let aux = chewing_plus_aux(session).map { String(cString: $0) } ?? ""
+        HintWindow.shared.show(aux, client: lastClient)
         let count = chewing_plus_candidate_count(session)
         if count > 0 {
             panel?.update()
             panel?.show(kIMKLocateCandidatesBelowHint)
-        } else {
+            panelShown = true
+        } else if panelShown {
             panel?.hide()
+            panelShown = false
         }
     }
 
+    /// Preedit, cursor and candidate count; publish() runs only when it changes.
+    private func snapshot(_ session: OpaquePointer) -> String {
+        var cursor = 0
+        var hlStart = 0
+        var hlLen = 0
+        let raw = chewing_plus_preedit(session, &cursor, &hlStart, &hlLen)
+        let text = raw.map { String(cString: $0) } ?? ""
+        let aux = chewing_plus_aux(session).map { String(cString: $0) } ?? ""
+        return "\(text)\u{1}\(cursor)\u{1}\(hlStart)\u{1}\(hlLen)\u{1}"
+            + "\(chewing_plus_candidate_count(session))\u{1}\(aux)"
+    }
+
+    /// Push-to-talk. Returns nil when the event is not the voice shortcut.
+    /// A lone modifier talks while held; a combo starts on its key press and
+    /// stops when the key or any of its modifiers is released.
+    private func voiceKey(_ event: NSEvent) -> Bool? {
+        guard let talk = ShortcutSetting.voice.value else { return nil }
+        if let down = talk.modifierDown(event) {
+            return down ? voiceStart() : voiceStop()
+        }
+        if talk.isModifierOnly { return nil }
+        if talk.matchesCombo(event) {
+            if event.isARepeat || voiceActive { return true }
+            return voiceStart()
+        }
+        guard voiceActive else { return nil }
+        let keyReleased = event.type == .keyUp && event.keyCode == talk.keyCode
+        let modifierReleased = event.type == .flagsChanged
+            && !event.modifierFlags.contains(talk.flags)
+        if keyReleased || modifierReleased {
+            _ = voiceStop()
+            return keyReleased
+        }
+        return nil
+    }
+
+    /// English mode / fill the hinted word. A lone modifier fires on its
+    /// second tap (press and release, no key in between, each within 0.3 s);
+    /// a combo fires on its key press.
+    private func englishShortcut(_ event: NSEvent) -> Bool {
+        guard PlusFeature.english.isOn, let key = ShortcutSetting.english.value,
+              key != ShortcutSetting.voice.value else { return false }
+        if !key.isModifierOnly { return key.matchesCombo(event) && !event.isARepeat }
+        guard let down = key.modifierDown(event) else {
+            if event.type == .keyDown || event.type == .flagsChanged {
+                tapDownAt = -1
+                lastTapUpAt = -1
+            }
+            return false
+        }
+        let window = 0.3
+        if down {
+            tapDownAt = event.timestamp
+            return false
+        }
+        defer { tapDownAt = -1 }
+        guard tapDownAt >= 0, event.timestamp - tapDownAt <= window else {
+            lastTapUpAt = -1
+            return false
+        }
+        if lastTapUpAt >= 0, tapDownAt - lastTapUpAt <= window {
+            lastTapUpAt = -1
+            return true
+        }
+        lastTapUpAt = event.timestamp
+        return false
+    }
+
+    /// True on the release of a Left Shift pressed and released by itself.
+    private func lonelyShift(_ event: NSEvent) -> Bool {
+        guard PlusFeature.shiftToggle.isOn else { return false }
+        if event.type != .flagsChanged {
+            if event.type == .keyDown { shiftAlone = false }
+            return false
+        }
+        guard event.keyCode == 56 else {
+            shiftAlone = false
+            return false
+        }
+        let others: NSEvent.ModifierFlags = [.command, .control, .option]
+        if event.modifierFlags.contains(.shift) {
+            shiftAlone = event.modifierFlags.intersection(others).isEmpty
+            shiftDownAt = event.timestamp
+            return false
+        }
+        let alone = shiftAlone && event.timestamp - shiftDownAt < 0.5
+        shiftAlone = false
+        return alone
+    }
+
+    private func toggleEnglishMode(_ session: OpaquePointer) {
+        if !englishMode {
+            // Keep what was typed: commit the buffer before passing keys through.
+            var cursor = 0
+            var hlStart = 0
+            var hlLen = 0
+            if let raw = chewing_plus_preedit(session, &cursor, &hlStart, &hlLen),
+               !String(cString: raw).isEmpty {
+                var enter = chewing_plus_key_event(
+                    key: UInt32(CHEWING_PLUS_KEY_RETURN), ascii: 0, mods: 0,
+                    keycode: 36, time_ms: -1)
+                _ = chewing_plus_key(session, &enter)
+            }
+            chewing_plus_reset(session)
+            publish(session)
+        }
+        englishMode.toggle()
+    }
+
     private func selectDigit(_ event: NSEvent, session: OpaquePointer) -> Bool {
+        // Plus panels (English, emoji, calculator) select with Ctrl/Shift+N
+        // inside the core; plain digits are text there.
+        guard chewing_plus_panel(session) == Int32(CHEWING_PLUS_PANEL_NONE) else {
+            return false
+        }
         guard event.type == .keyDown,
               !event.modifierFlags.contains(.control),
               !event.modifierFlags.contains(.option),
@@ -194,9 +390,13 @@ final class ChewingPlusInputController: IMKInputController {
     }
 
     private func voiceStart() -> Bool {
-        guard let session, !secure() else { return true }
-        if voxkit_client_fd(voice) < 0 && voxkit_client_connect(voice, nil) != 0 {
-            return true
+        guard session != nil, !secure() else { return true }
+        if voxkit_client_fd(voice) < 0 {
+            if voxkit_client_connect(voice, nil) != 0 {
+                HintWindow.shared.show("語音服務未啟動（voxkit）", client: lastClient)
+                return true
+            }
+            watchVoice()
         }
         voiceReq += 1
         var line = [CChar](repeating: 0, count: 512)
@@ -205,32 +405,85 @@ final class ChewingPlusInputController: IMKInputController {
                                      "zh", "s2twp", nil, nil, 0)
         }
         if wrote > 0 {
-            line.withUnsafeBufferPointer { buffer in
-                _ = voxkit_client_send(voice, buffer.baseAddress)
+            let sent = line.withUnsafeBufferPointer { buffer in
+                voxkit_client_send(voice, buffer.baseAddress)
             }
-            voiceActive = true
+            if sent == 0 {
+                voiceActive = true
+                HintWindow.shared.show("🎙 聆聽中…", client: lastClient)
+            } else {
+                closeVoice()
+            }
         }
         return true
     }
 
+    /// Key up: ask for the transcript. It arrives later on the socket and
+    /// readVoice() inserts it, as the IBus engine does with a GLib fd watch.
     private func voiceStop() -> Bool {
-        guard voiceActive, let session else { return false }
+        guard voiceActive else { return false }
         sendSimple("stop")
-        let msg = UnsafeMutablePointer<voxkit_message>.allocate(capacity: 1)
-        defer { msg.deallocate() }
-        chewing_plus_mac_zero_message(msg)
-        if voxkit_client_next(voice, msg, 200, nil, 0) == 1 && msg.pointee.type == VOXKIT_MSG_FINAL {
-            chewing_plus_insert_text(session, chewing_plus_mac_message_text(msg))
-            publish(session)
-        }
-        voiceActive = false
+        HintWindow.shared.show("辨識中…", client: lastClient)
         return true
     }
 
     private func voiceCancel() -> Bool {
         sendSimple("cancel")
         voiceActive = false
+        HintWindow.shared.show("", client: nil)
         return true
+    }
+
+    private func watchVoice() {
+        let fd = voxkit_client_fd(voice)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: .main)
+        source.setEventHandler { [weak self] in self?.readVoice() }
+        source.resume()
+        voiceSource = source
+    }
+
+    private func closeVoice() {
+        voiceSource?.cancel()
+        voiceSource = nil
+        voxkit_client_close(voice)
+        voiceActive = false
+    }
+
+    private func readVoice() {
+        let msg = UnsafeMutablePointer<voxkit_message>.allocate(capacity: 1)
+        defer { msg.deallocate() }
+        while true {
+            chewing_plus_mac_zero_message(msg)
+            let rc = voxkit_client_next(voice, msg, 0, nil, 0)
+            if rc == 0 { return }
+            if rc < 0 {
+                closeVoice()
+                HintWindow.shared.show("語音服務已斷線", client: lastClient)
+                return
+            }
+            let m = msg.pointee
+            if m.req != 0 && m.req != voiceReq { continue }
+            switch m.type {
+            case VOXKIT_MSG_FINAL:
+                voiceActive = false
+                HintWindow.shared.show("", client: nil)
+                if let session {
+                    chewing_plus_insert_text(session, chewing_plus_mac_message_text(msg))
+                    publish(session)
+                }
+            case VOXKIT_MSG_PARTIAL:
+                HintWindow.shared.show(String(cString: chewing_plus_mac_message_tentative(msg)),
+                                       client: lastClient)
+            case VOXKIT_MSG_DISCARDED, VOXKIT_MSG_ERROR:
+                voiceActive = false
+                HintWindow.shared.show(m.type == VOXKIT_MSG_ERROR
+                    ? String(cString: chewing_plus_mac_message_error(msg)) : "",
+                    client: lastClient)
+            default:
+                break
+            }
+        }
     }
 
     private func sendSimple(_ type: String) {
@@ -259,8 +512,12 @@ final class ChewingPlusInputController: IMKInputController {
         case 60: key.key = UInt32(CHEWING_PLUS_KEY_SHIFT_R)
         case 56: key.key = UInt32(CHEWING_PLUS_KEY_SHIFT_L)
         default:
+            // event.characters keeps Shift (Shift+/ is "?"); the version
+            // that ignores modifiers would hand the core "/" (ㄥ).
+            let plain = !event.modifierFlags.contains(.control)
+                && !event.modifierFlags.contains(.option)
             guard event.type == .keyDown,
-                  let chars = event.charactersIgnoringModifiers,
+                  let chars = plain ? event.characters : event.charactersIgnoringModifiers,
                   let scalar = chars.unicodeScalars.first,
                   scalar.value > 0x20, scalar.value < 0x7F else {
                 return false
@@ -268,6 +525,15 @@ final class ChewingPlusInputController: IMKInputController {
             key.ascii = scalar.value
         }
         return true
+    }
+
+    /// The core reads X11 keycodes for the digit row (10...18 = 1...9), like
+    /// fcitx5 and IBus. macOS keycodes are different numbers, so map the
+    /// digits and send 0 for everything else.
+    private static func x11Keycode(_ macKeyCode: UInt16) -> Int32 {
+        let digits: [UInt16: Int32] = [18: 10, 19: 11, 20: 12, 21: 13, 23: 14,
+                                       22: 15, 26: 16, 28: 17, 25: 18, 29: 19]
+        return digits[macKeyCode] ?? 0
     }
 
     private static func env(_ name: String) -> String? {
@@ -291,5 +557,88 @@ private extension Optional where Wrapped == String {
         case .none:
             return body(nil)
         }
+    }
+}
+
+/// Input-menu toggles. Same features as the fcitx5 "Plus:" options.
+enum PlusFeature: String, CaseIterable {
+    case shiftToggle, easySymbol, emoji, shortcode, calculator, english,
+         englishHintCommit, space
+
+    var title: String {
+        switch self {
+        case .shiftToggle: return "左 Shift 切換中／英"
+        case .easySymbol: return "簡易符號（Shift＋英文字母）"
+        case .emoji: return "候選字顯示 Emoji"
+        case .shortcode: return "Emoji 短碼（;;）"
+        case .calculator: return "計算機（=）"
+        case .english: return "英文模式"
+        case .englishHintCommit: return "出現英文提示時，英文快速鍵直接填入第一個"
+
+        case .space: return "中英文之間自動加空格"
+        }
+    }
+
+    // The app's own domain (im.chewing.inputmethod.ChewingPlus). suiteName with
+    // the bundle id returns nil, so use .standard.
+    private static let defaults = UserDefaults.standard
+
+    var isOn: Bool {
+        get {
+            if let env = getenv("CHEWING_PLUS_FEATURES") {
+                let list = String(cString: env)
+                return list.contains(envToken)
+            }
+            return Self.defaults.object(forKey: rawValue) as? Bool ?? (self != .easySymbol)
+        }
+        nonmutating set { Self.defaults.set(newValue, forKey: rawValue) }
+    }
+
+    private var envToken: String {
+        switch self {
+        case .shiftToggle: return "shift"
+        case .easySymbol: return "easysymbol"
+        case .emoji: return "emoji"
+        case .shortcode: return "shortcode"
+        case .calculator: return "calculator"
+        case .english: return "english"
+        case .englishHintCommit: return "hintcommit"
+        case .space: return "space"
+        }
+    }
+}
+
+/// Small label under the cursor for the core's aux text (the English hint
+/// "Control+Shift+Space → test"). fcitx5 shows the same string as aux.
+final class HintWindow {
+    static let shared = HintWindow()
+    private let window: NSPanel
+    private let label = NSTextField(labelWithString: "")
+
+    private init() {
+        window = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
+                         backing: .buffered, defer: true)
+        window.level = .popUpMenu
+        window.hasShadow = true
+        window.isOpaque = false
+        window.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95)
+        label.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        label.textColor = .secondaryLabelColor
+        window.contentView = label
+    }
+
+    func show(_ text: String, client: IMKTextInput?) {
+        guard !text.isEmpty, let client else {
+            window.orderOut(nil)
+            return
+        }
+        label.stringValue = " \(text) "
+        label.sizeToFit()
+        var rect = NSRect.zero
+        _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
+        let size = label.fittingSize
+        window.setFrame(NSRect(x: rect.minX, y: rect.minY - size.height - 4,
+                               width: size.width, height: size.height), display: true)
+        window.orderFront(nil)
     }
 }
