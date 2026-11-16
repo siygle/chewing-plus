@@ -25,6 +25,9 @@ jobs:
     needs: clang-format
     runs-on: ubuntu-latest
     container: archlinux:latest
+    permissions:
+      contents: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -71,6 +74,7 @@ jobs:
           path: fcitx5-chewing
           submodules: true
       - name: Init CodeQL
+        if: matrix.compiler == 'gcc'
         uses: github/codeql-action/init@v3
         with:
           languages: cpp
@@ -97,5 +101,6 @@ jobs:
         env:
           CHEWING_TEST_DATA: /usr/share/libchewing
       - name: CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        if: matrix.compiler == 'gcc'
+        uses: github/codeql-action/analyze@v3
 
