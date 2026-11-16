@@ -6,6 +6,7 @@
 #   macos/build-pkg.sh
 #
 # Output: macos/build/ChewingPlus.pkg
+# CHEWING_PLUS_VERSION sets the package and bundle version (default 5.1.13).
 set -euo pipefail
 export COPYFILE_DISABLE=1
 if [[ "$(uname)" != Darwin ]]; then
@@ -50,6 +51,14 @@ if [[ "$apps" != 1 ]]; then
     echo "payload has $apps ChewingPlus.app bundles; expected 1" >&2
     exit 1
 fi
+ver=${CHEWING_PLUS_VERSION:-}
+if [[ -n "$ver" ]]; then
+    # CFBundleShortVersionString allows at most three components.
+    short=$(printf '%s' "$ver" | cut -d. -f1-3)
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $short" \
+        "$dest/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $ver" "$dest/Contents/Info.plist"
+fi
 if command -v codesign >/dev/null 2>&1; then
     codesign --force --sign - "$dest" || true
 fi
@@ -74,7 +83,7 @@ component="$root/macos/build/ChewingPlus-component.pkg"
 pkgbuild --root "$stage" \
     --component-plist "$plist" \
     --identifier im.chewing.plus.inputmethod \
-    --version 5.1.13 \
+    --version "${CHEWING_PLUS_VERSION:-5.1.13}" \
     --scripts "$root/macos/pkg-scripts" \
     --install-location / \
     "$component"

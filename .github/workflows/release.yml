@@ -1,0 +1,105 @@
+name: Release
+# Push a tag like 5.1.13-plus.1 to build every platform package and publish a
+# GitHub release. workflow_dispatch builds the packages as artifacts only,
+# unless "tag" names an existing tag to (re)publish.
+on:
+  push:
+    tags:
+      - '*-plus.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish. Empty: build master, no release'
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  arch:
+    name: Arch Linux packages
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install git
+        run: pacman -Syu --noconfirm git
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - name: Build packages
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash packaging/release/build-arch.sh dist
+        env:
+          CHEWING_PLUS_VERSION: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: arch
+          path: dist/*.pkg.tar.zst
+          if-no-files-found: error
+
+  macos:
+    name: macOS package
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - name: Build ChewingPlus.app
+        run: bash macos/build-app.sh
+      - name: Version
+        run: |
+          v=${TAG:-$(git describe --tags --always)}
+          echo "TAG=$v" >> "$GITHUB_ENV"
+          # CFBundleVersion and pkgbuild want dotted numbers.
+          echo "CHEWING_PLUS_VERSION=$(printf '%s' "$v" | sed 's/-plus\./.900./; s/-.*//; s/[^0-9.]//g')" >> "$GITHUB_ENV"
+        env:
+          TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+      - name: Build package
+        run: bash macos/build-pkg.sh
+      - name: Check bundle and package
+        run: >-
+          python3 macos/check-bundle.py
+          --source .
+          --app macos/build/ChewingPlus.app
+          --pkg macos/build/ChewingPlus.pkg
+          --component-plist macos/build/component.plist
+      - name: Name the package
+        run: |
+          mkdir dist
+          cp macos/build/ChewingPlus.pkg "dist/ChewingPlus-${TAG}-macos-$(uname -m).pkg"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: dist/*.pkg
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: [arch, macos]
+    if: github.event_name == 'push' || inputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: Create or update the release
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --verify-tag \
+              --title "新酷音 Plus $TAG" --notes-file packaging/release/notes.md
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}

@@ -2,6 +2,10 @@
 # Build the pinned libchewing and install it into a prefix.
 #
 #   scripts/bundle-libchewing.sh [--shared|--static] [PREFIX]
+#   scripts/bundle-libchewing.sh --fetch-only
+#
+# --fetch-only clones and verifies the checkout (with dictionary data) and
+#   stops before building. Release packaging builds it with makepkg.
 #
 # --shared (default) installs a normal libchewing.so. Point pkg-config at
 #   PREFIX/lib/pkgconfig, or pass the prefix to CMake:
@@ -28,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --static) mode=static; shift ;;
         --shared) mode=shared; shift ;;
+        --fetch-only) mode=fetch; shift ;;
         -h|--help)
             sed -n '2,20p' "$0"
             exit 0
@@ -70,6 +75,10 @@ if [[ "$got" != "$COMMIT" ]]; then
     echo "libchewing checkout $src is $got, expected $COMMIT ($TAG)" >&2
     echo "Delete it or set CHEWING_PLUS_LIBCHEWING_SRC to a checkout of that commit." >&2
     exit 1
+fi
+if [[ "$mode" == fetch ]]; then
+    echo "libchewing ${TAG} (${COMMIT}) checked out at ${src}"
+    exit 0
 fi
 
 if command -v ninja >/dev/null 2>&1; then

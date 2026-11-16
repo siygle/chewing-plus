@@ -1,0 +1,46 @@
+# Release build of 新酷音 Plus: the fcitx5 addon and the native IBus engine.
+# Driven by packaging/release/build-arch.sh (CI).
+pkgbase=chewing-plus
+pkgname=(fcitx5-chewing-plus ibus-chewing-plus)
+pkgver=${CHEWING_PLUS_PKGVER:-5.1.13}
+pkgrel=1
+arch=(x86_64)
+url="https://github.com/siygle/fcitx5-chewing-plus"
+license=(LGPL-2.1-or-later)
+makedepends=(cmake extra-cmake-modules ninja git fcitx5 fcitx5-voxkit ibus libadwaita libchewing-plus)
+options=(!debug)
+_src=${CHEWING_PLUS_SRC:?set by build-arch.sh}
+build() {
+  cmake -S "$_src" -B build-fcitx5 -G Ninja -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_BUILD_TYPE=Release -DENABLE_TEST=OFF -DENABLE_VOXKIT=ON
+  cmake --build build-fcitx5
+  cmake -S "$_src" -B build-ibus -G Ninja -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_BUILD_TYPE=Release -DENABLE_TEST=OFF -DCHEWING_PLUS_CORE_ONLY=ON \
+    -DENABLE_IBUS=ON -DENABLE_IBUS_SETUP=ON
+  cmake --build build-ibus
+}
+# Headers and static archives are build-time only; neither package ships them.
+_strip_dev() {
+  rm -rf "$pkgdir/usr/include"
+  rm -f "$pkgdir"/usr/lib/*.a
+}
+package_fcitx5-chewing-plus() {
+  pkgdesc="新酷音 Plus for Fcitx5: emoji, calculator, English mode, dictation (libchewing 0.14)"
+  depends=(fcitx5 'libchewing-plus>=0.14.0rc1')
+  optdepends=('fcitx5-voxkit: push-to-talk dictation (hold Right Alt)')
+  provides=("fcitx5-chewing=${pkgver}")
+  conflicts=(fcitx5-chewing)
+  DESTDIR="$pkgdir" cmake --install build-fcitx5
+  _strip_dev
+}
+package_ibus-chewing-plus() {
+  pkgdesc="新酷音 Plus for IBus: native engine on libchewing-plus-core (libchewing 0.14)"
+  depends=(ibus libadwaita 'libchewing-plus>=0.14.0rc1')
+  optdepends=('fcitx5-voxkit: voxkit daemon for push-to-talk dictation')
+  DESTDIR="$pkgdir" cmake --install build-ibus
+  _strip_dev
+  # The model CLI ships with fcitx5-chewing-plus; IBus has the setup window.
+  rm -f "$pkgdir/usr/libexec/chewing-plus-models"
+  install -Dm644 -t "$pkgdir/usr/share/licenses/$pkgname" \
+    "$_src/data/LICENSE.gemoji" "$_src/data/LICENSE.scowl"
+}

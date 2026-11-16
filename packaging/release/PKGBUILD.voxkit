@@ -1,0 +1,30 @@
+# Release build of fcitx5-voxkit (fcitx5 module + voxkit daemon).
+# Driven by packaging/release/build-arch.sh (CI).
+pkgname=fcitx5-voxkit
+pkgver=${CHEWING_PLUS_VK_PKGVER:-0.1.0}
+pkgrel=1
+pkgdesc="Push-to-talk local dictation for fcitx5 and 新酷音 Plus (voxkit daemon + module)"
+arch=(x86_64)
+url="https://github.com/siygle/fcitx5-voxkit"
+license=(MIT)
+# opencc: Traditional Chinese conversion (s2twp), on by default.
+depends=(fcitx5 json-c alsa-lib openblas opencc gcc-libs glibc)
+makedepends=(cmake extra-cmake-modules ninja rust git)
+options=(!debug !lto)
+_src=${CHEWING_PLUS_VOXKIT_SRC:?set by build-arch.sh}
+build() {
+  cmake -S "$_src" -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_BUILD_TYPE=Release -DENABLE_TEST=OFF
+  cmake --build build
+  # Portable CPU floor (x86-64-v3) instead of tuning ggml to the CI host.
+  TRANSCRIBE_CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_BMI2=ON -DGGML_AVX512=OFF" \
+    cargo build --release --locked --manifest-path "$_src/daemon/Cargo.toml" \
+      --target-dir "$srcdir/cargo-target"
+}
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+  install -Dm755 "$srcdir/cargo-target/release/voxkit" "$pkgdir/usr/bin/voxkit"
+  install -Dm644 "$_src/daemon/systemd/voxkit.service" "$pkgdir/usr/lib/systemd/user/voxkit.service"
+  install -Dm644 "$_src/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "$_src/daemon/NOTICE" "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
+}
