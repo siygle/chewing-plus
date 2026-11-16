@@ -44,7 +44,10 @@ uid=$(id -u)
 domain="gui/$uid"
 launchctl bootout "$domain/im.chewing.plus.voxkit" 2>/dev/null || true
 launchctl bootstrap "$domain" "$agent" || launchctl load -w "$agent"
+pkill -x ChewingPlus 2>/dev/null || true
+"$dest/Contents/MacOS/ChewingPlus" --register || true
 echo "installed $dest"
-echo "enable 新酷音 Plus in System Settings → Keyboard → Input Sources"
+echo "if 新酷音 Plus is not in the input menu, log out and back in, then add it in"
+echo "System Settings → Keyboard → Text Input → Edit → + → 繁體中文"
 echo "models: $home/Library/Application Support/ChewingPlus/models"
 echo "  \"$helper_dest\" model install qwen3-asr-0.6b"

@@ -41,4 +41,10 @@ chown "$user" "$support/voxkit-launch.sh" \
 launchctl bootout "gui/$uid/im.chewing.plus.voxkit" 2>/dev/null || true
 launchctl bootstrap "gui/$uid" \
     "$home/Library/LaunchAgents/im.chewing.plus.voxkit.plist" || true
+# Register and enable the input source in the user's session, so it is in
+# the input menu without logging out. A stale copy is stopped first.
+app="/Library/Input Methods/ChewingPlus.app"
+pkill -u "$uid" -x ChewingPlus 2>/dev/null || true
+launchctl asuser "$uid" sudo -u "$user" \
+    "$app/Contents/MacOS/ChewingPlus" --register || true
 exit 0

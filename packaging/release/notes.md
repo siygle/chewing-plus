@@ -29,13 +29,20 @@ Plus 功能預設關閉，在 fcitx5 設定 → 新酷音 → 設定中開啟 `P
 
 ## 安裝：macOS
 
-套件**沒有經過 Apple 簽章與公證**，Gatekeeper 會擋下來：
+需要 macOS 13 以上、Apple Silicon。套件**沒有經過 Apple 簽章與公證**，Gatekeeper 會擋下來。
 
-1. 對 `.pkg` 按右鍵 → 打開，或在「系統設定 → 隱私權與安全性」按「強制打開」。
-2. 安裝後登出再登入。
-3. 「系統設定 → 鍵盤 → 輸入方式」加入「新酷音 Plus」（繁體中文）。
+1. 對 `.pkg` 按右鍵 → 打開；若仍被擋，到「系統設定 → 隱私權與安全性」按「強制打開」。
+2. 安裝程式會自動註冊並啟用輸入法。輸入法選單（選單列右上角）應該會出現「新酷音 Plus」。
+3. 如果沒有出現：**登出再登入**，然後到「系統設定 → 鍵盤 → 文字輸入 → 輸入方式 → 編輯… → ＋」，選左側「繁體中文」，右側找到「新酷音 Plus」加入。
+4. 還是找不到時，在終端機執行：
 
-語音輸入需要 Homebrew 的 OpenCC（`brew install opencc`）做繁體轉換，第一次錄音時要允許麥克風權限。只支援 Apple Silicon。
+   ```bash
+   "/Library/Input Methods/ChewingPlus.app/Contents/MacOS/ChewingPlus" --register
+   ```
+
+   輸出 `enable im.chewing.plus.inputmethod.Bopomofo: ok` 代表已註冊。
+
+語音輸入需要 Homebrew 的 OpenCC（`brew install opencc`）做繁體轉換，第一次錄音時要允許麥克風權限。
 
 ## 已知限制
 

@@ -139,8 +139,11 @@ Do these in order. Stop at the first failure and note the exact message.
 5. `macos/install.sh` copies the app into `~/Library/Input Methods` and
    `launchctl print gui/$UID/im.chewing.plus.voxkit` shows the service.
    The plist on disk does not contain the text `__HOME__`.
-6. Log out and back in, or reboot. System Settings → Keyboard → Input
-   Sources → add 新酷音 Plus (Traditional Chinese). Switch to it in a
+6. The installer (and `install.sh`) runs `ChewingPlus --register`, which
+   calls `TISRegisterInputSource` and enables the mode, so 新酷音 Plus
+   should already be in the input menu. If not, log out and back in, then
+   System Settings → Keyboard → Text Input → Edit → + → Traditional
+   Chinese → 新酷音 Plus. Switch to it in a
    TextEdit window.
 7. Type `su3cl3` (standard bopomofo). The marked text becomes `你好`.
    Return commits `你好` and clears the marked text.
