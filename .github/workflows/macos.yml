@@ -5,8 +5,8 @@ on:
   pull_request:
   push:
     branches:
+      - master
       - plus
-      - cursor/macos-imk-8b76
 jobs:
   typecheck:
     name: typecheck (${{ matrix.os }})
