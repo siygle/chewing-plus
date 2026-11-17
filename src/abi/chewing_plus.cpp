@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "ChewingPlus.h"
+#include "PlusPhrases.h"
 
 namespace {
 
@@ -101,6 +102,14 @@ struct Session {
     std::string emojiUser;
     std::string englishBuiltin;
     std::string englishUser;
+    std::string phrasesPath;
+    bool suggestions = false;
+    chewing_plus::PhraseIndex phrases;
+    // Current suggestions and what they replace: the last `replaceChars`
+    // code points before the cursor in the buffer, or the whole reading.
+    std::vector<std::string> sugg;
+    size_t replaceChars = 0;
+    bool replaceReading = false;
     chewing_plus_callbacks cb{};
 
     std::string preedit;
@@ -224,9 +233,85 @@ struct Session {
             }
             fillChewingCandidates(c);
         }
+        fillSuggestions(c);
         if (cb.updated) {
             cb.updated(cb.user);
         }
+    }
+
+    // Longest phrase prefix ending at the cursor that has completions, or
+    // the reading expanded as initials. Nothing while a candidate list or
+    // panel is open, or in a password field.
+    void fillSuggestions(ChewingContext *c) {
+        sugg.clear();
+        replaceChars = 0;
+        replaceReading = false;
+        if (!suggestions || sensitive || phrases.size() == 0 ||
+            panelKind != CHEWING_PLUS_PANEL_NONE ||
+            chewing_cand_TotalPage(c) > 0) {
+            return;
+        }
+        std::string buffer = BufferOf(c);
+        std::string zuin = ZuinOf(c);
+        if (!zuin.empty()) {
+            // Initials only: each syllable typed as its first symbol, so the
+            // reading holds one symbol per key (libchewing overwrites the
+            // initial slot, which the frontends see as a growing reading
+            // only on layouts that queue them, e.g. Hsu). Use the raw keys
+            // recorded for the English hint when the reading does not grow.
+            std::string initials = plus.typedInitials(c);
+            sugg = phrases.expand(initials);
+            replaceReading = !sugg.empty();
+            if (replaceReading && initials != zuin) {
+                // libchewing shows only the last initial; show them all.
+                size_t at = preedit.find(zuin, hlStart);
+                if (at != std::string::npos) {
+                    preedit.replace(at, zuin.size(), initials);
+                    hlLen = initials.size();
+                }
+            }
+            return;
+        }
+        size_t len = CodePoints(buffer);
+        int cur = chewing_cursor_Current(c);
+        size_t end = (cur >= 0 && static_cast<size_t>(cur) < len)
+                         ? static_cast<size_t>(cur)
+                         : len;
+        // Try the longest tail first (up to 6 characters) so 中華 wins over 華.
+        for (size_t n = std::min<size_t>(end, 6); n >= 2; --n) {
+            size_t from = ByteOffset(buffer, end - n);
+            std::string tail =
+                buffer.substr(from, ByteOffset(buffer, end) - from);
+            auto found = phrases.complete(tail);
+            if (!found.empty()) {
+                sugg = std::move(found);
+                replaceChars = n;
+                return;
+            }
+        }
+    }
+
+    void selectSuggestion(ChewingContext *c, int index) {
+        if (index < 0 || index >= static_cast<int>(sugg.size())) {
+            return;
+        }
+        std::string pick = sugg[index];
+        if (replaceReading) {
+            chewing_clean_bopomofo_buf(c);
+            plus.reset();
+        } else {
+            for (size_t i = 0; i < replaceChars; ++i) {
+                chewing_handle_Backspace(c);
+            }
+        }
+        insertText(c, pick);
+    }
+
+    // Same path as dictation: ASCII stays in the buffer, anything else is
+    // committed with the composition around it.
+    void insertText(ChewingContext *c, const std::string &text) {
+        plus.insertDictation(c, text,
+                             [this](const std::string &t) { commitText(t); });
     }
 
     void fillChewingCandidates(ChewingContext *c) {
@@ -586,6 +671,51 @@ void chewing_plus_set_data_paths(chewing_plus_session *session,
         s->englishUser = english_user;
     }
     s->reloadData();
+}
+
+void chewing_plus_set_suggestions(chewing_plus_session *session, int enabled,
+                                  const char *path) {
+    if (!session) {
+        return;
+    }
+    auto *s = S(session);
+    bool reload = path && s->phrasesPath != path;
+    if (path) {
+        s->phrasesPath = path;
+    }
+    s->suggestions = enabled != 0;
+    if (!s->suggestions) {
+        s->phrases.clear();
+    } else if (reload || s->phrases.size() == 0) {
+        s->phrases.clear();
+        if (!s->phrasesPath.empty()) {
+            s->phrases.load(s->phrasesPath);
+        }
+    }
+    s->refresh();
+}
+
+int chewing_plus_suggestion_count(const chewing_plus_session *session) {
+    return session ? static_cast<int>(S(session)->sugg.size()) : 0;
+}
+
+const char *chewing_plus_suggestion(const chewing_plus_session *session,
+                                    int index) {
+    if (!session || index < 0 ||
+        index >= static_cast<int>(S(session)->sugg.size())) {
+        return nullptr;
+    }
+    return S(session)->sugg[index].c_str();
+}
+
+void chewing_plus_select_suggestion(chewing_plus_session *session,
+                                    int index) {
+    if (!session) {
+        return;
+    }
+    auto *s = S(session);
+    s->selectSuggestion(s->raw(), index);
+    s->refresh();
 }
 
 void chewing_plus_set_emoji(chewing_plus_session *session, int enabled) {

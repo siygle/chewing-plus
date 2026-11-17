@@ -31,6 +31,7 @@ add_library(chewing-plus-core ${_core_type}
     plus/PlusEmoji.cpp
     plus/PlusEnglish.cpp
     plus/PlusFeatures.cpp
+    plus/PlusPhrases.cpp
     abi/chewing_plus.cpp
 )
 target_link_libraries(chewing-plus-core PUBLIC ${CHEWING_TARGET})

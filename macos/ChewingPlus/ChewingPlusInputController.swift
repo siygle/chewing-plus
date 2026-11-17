@@ -13,7 +13,24 @@ private let imLog = OSLog(subsystem: "im.chewing.inputmethod.ChewingPlus", categ
 final class ChewingPlusInputController: IMKInputController {
     private var session: OpaquePointer?
     private var voice = UnsafeMutablePointer<voxkit_client>.allocate(capacity: 1)
-    private var voiceActive = false
+    private enum VoiceState { case idle, recording, transcribing }
+    private var voiceState = VoiceState.idle {
+        didSet {
+            transcribeTimeout?.cancel()
+            if voiceState == .transcribing {
+                // A reply that never comes must not leave 「辨識中…」 up.
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self, self.voiceState == .transcribing else { return }
+                    self.voiceState = .idle
+                    HintWindow.shared.flash("語音辨識逾時", client: self.lastClient)
+                }
+                transcribeTimeout = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: work)
+            }
+        }
+    }
+    private var transcribeTimeout: DispatchWorkItem?
+    private var voiceActive: Bool { voiceState != .idle }
     private var voiceReq: UInt64 = 0
     private var voiceSource: DispatchSourceRead?
     private var shortcutObserver: NSObjectProtocol?
@@ -22,8 +39,12 @@ final class ChewingPlusInputController: IMKInputController {
     private var commitHook: chewing_plus_callbacks?
     private var sensitive = false
     /// Lone Left Shift switches 中/英 (fcitx5 does this on Linux). In English
-    /// mode every key goes straight to the app.
-    private var englishMode = false
+    /// mode every key goes straight to the app. One mode for all apps, shown
+    /// in the menu bar by ModeIndicator.
+    private var englishMode: Bool {
+        get { ModeIndicator.shared.english }
+        set { ModeIndicator.shared.english = newValue }
+    }
     private var shiftDownAt: TimeInterval = 0
     private var shiftAlone = false
     /// Double tap of a lone-modifier English shortcut.
@@ -86,6 +107,8 @@ final class ChewingPlusInputController: IMKInputController {
               let feature = PlusFeature(rawValue: raw) else { return }
         feature.isOn.toggle()
         if let session { applyFeatures(session) }
+        if feature == .modeIndicator { ModeIndicator.shared.setVisible(true) }
+        if feature == .shiftToggle && !feature.isOn { englishMode = false }
     }
 
     @objc private func openShortcuts(_: Any?) {
@@ -134,6 +157,7 @@ final class ChewingPlusInputController: IMKInputController {
             return true
         }
         if englishMode { return false }
+        if pickSuggestion(event, session: session) { return true }
         if selectDigit(event, session: session) { return true }
         var key = chewing_plus_key_event(
             key: 0, ascii: 0, mods: 0, keycode: Self.x11Keycode(event.keyCode), time_ms: -1)
@@ -226,6 +250,9 @@ final class ChewingPlusInputController: IMKInputController {
         // The frontend detects the double tap itself so the key is configurable.
         chewing_plus_set_english_double_tap(session, 0, 300)
         chewing_plus_set_english_hint_commit(session, on(.englishHintCommit))
+        let phrases = Bundle.main.resourceURL?
+            .appendingPathComponent("plus-phrases.txt").path
+        chewing_plus_set_suggestions(session, on(.suggestions), phrases)
     }
 
     fileprivate func insertCommitted(_ text: String) {
@@ -244,7 +271,8 @@ final class ChewingPlusInputController: IMKInputController {
         let replace = NSRange(location: NSNotFound, length: NSNotFound)
         lastClient?.setMarkedText(text, selectionRange: selection, replacementRange: replace)
         let aux = chewing_plus_aux(session).map { String(cString: $0) } ?? ""
-        HintWindow.shared.show(aux, client: lastClient)
+        if voiceState == .idle { HintWindow.shared.show(aux, client: lastClient) }
+        HintWindow.shared.showSuggestions(Self.suggestions(session), client: lastClient)
         let count = chewing_plus_candidate_count(session)
         if count > 0 {
             panel?.update()
@@ -256,6 +284,31 @@ final class ChewingPlusInputController: IMKInputController {
         }
     }
 
+    private static func suggestions(_ session: OpaquePointer) -> [String] {
+        (0..<Int(chewing_plus_suggestion_count(session))).compactMap { i in
+            chewing_plus_suggestion(session, Int32(i)).map { String(cString: $0) }
+        }
+    }
+
+    /// ⇧1…⇧9 picks a phrase suggestion while the list is showing. Plus panels
+    /// and the candidate window keep their own digit keys.
+    private func pickSuggestion(_ event: NSEvent, session: OpaquePointer) -> Bool {
+        guard event.type == .keyDown,
+              event.modifierFlags.intersection([.shift, .control, .option, .command]) == .shift,
+              chewing_plus_suggestion_count(session) > 0,
+              chewing_plus_candidate_count(session) == 0,
+              chewing_plus_panel(session) == Int32(CHEWING_PLUS_PANEL_NONE),
+              let digit = Self.digitRow[event.keyCode],
+              digit <= Int(chewing_plus_suggestion_count(session)) else { return false }
+        chewing_plus_select_suggestion(session, Int32(digit - 1))
+        publish(session)
+        return true
+    }
+
+    /// Mac keycodes of the digit row (by position, any layout).
+    private static let digitRow: [UInt16: Int] = [18: 1, 19: 2, 20: 3, 21: 4, 23: 5,
+                                                  22: 6, 26: 7, 28: 8, 25: 9]
+
     /// Preedit, cursor and candidate count; publish() runs only when it changes.
     private func snapshot(_ session: OpaquePointer) -> String {
         var cursor = 0
@@ -265,7 +318,8 @@ final class ChewingPlusInputController: IMKInputController {
         let text = raw.map { String(cString: $0) } ?? ""
         let aux = chewing_plus_aux(session).map { String(cString: $0) } ?? ""
         return "\(text)\u{1}\(cursor)\u{1}\(hlStart)\u{1}\(hlLen)\u{1}"
-            + "\(chewing_plus_candidate_count(session))\u{1}\(aux)"
+            + "\(chewing_plus_candidate_count(session))\u{1}\(aux)\u{1}"
+            + Self.suggestions(session).joined(separator: "\u{2}")
     }
 
     /// Push-to-talk. Returns nil when the event is not the voice shortcut.
@@ -281,7 +335,12 @@ final class ChewingPlusInputController: IMKInputController {
             if event.isARepeat || voiceActive { return true }
             return voiceStart()
         }
-        guard voiceActive else { return nil }
+        // Only the first release of a combo stops; the other keys of the
+        // combo come up later and must not send a second stop.
+        guard voiceState == .recording else {
+            return event.type == .keyUp && event.keyCode == talk.keyCode && voiceActive
+                ? true : nil
+        }
         let keyReleased = event.type == .keyUp && event.keyCode == talk.keyCode
         let modifierReleased = event.type == .flagsChanged
             && !event.modifierFlags.contains(talk.flags)
@@ -409,7 +468,7 @@ final class ChewingPlusInputController: IMKInputController {
                 voxkit_client_send(voice, buffer.baseAddress)
             }
             if sent == 0 {
-                voiceActive = true
+                voiceState = .recording
                 HintWindow.shared.show("🎙 聆聽中…", client: lastClient)
             } else {
                 closeVoice()
@@ -421,7 +480,8 @@ final class ChewingPlusInputController: IMKInputController {
     /// Key up: ask for the transcript. It arrives later on the socket and
     /// readVoice() inserts it, as the IBus engine does with a GLib fd watch.
     private func voiceStop() -> Bool {
-        guard voiceActive else { return false }
+        guard voiceState == .recording else { return voiceActive }
+        voiceState = .transcribing
         sendSimple("stop")
         HintWindow.shared.show("辨識中…", client: lastClient)
         return true
@@ -429,7 +489,7 @@ final class ChewingPlusInputController: IMKInputController {
 
     private func voiceCancel() -> Bool {
         sendSimple("cancel")
-        voiceActive = false
+        voiceState = .idle
         HintWindow.shared.show("", client: nil)
         return true
     }
@@ -447,7 +507,7 @@ final class ChewingPlusInputController: IMKInputController {
         voiceSource?.cancel()
         voiceSource = nil
         voxkit_client_close(voice)
-        voiceActive = false
+        voiceState = .idle
     }
 
     private func readVoice() {
@@ -466,7 +526,7 @@ final class ChewingPlusInputController: IMKInputController {
             if m.req != 0 && m.req != voiceReq { continue }
             switch m.type {
             case VOXKIT_MSG_FINAL:
-                voiceActive = false
+                voiceState = .idle
                 HintWindow.shared.show("", client: nil)
                 if let session {
                     chewing_plus_insert_text(session, chewing_plus_mac_message_text(msg))
@@ -475,15 +535,45 @@ final class ChewingPlusInputController: IMKInputController {
             case VOXKIT_MSG_PARTIAL:
                 HintWindow.shared.show(String(cString: chewing_plus_mac_message_tentative(msg)),
                                        client: lastClient)
-            case VOXKIT_MSG_DISCARDED, VOXKIT_MSG_ERROR:
-                voiceActive = false
-                HintWindow.shared.show(m.type == VOXKIT_MSG_ERROR
-                    ? String(cString: chewing_plus_mac_message_error(msg)) : "",
-                    client: lastClient)
+            case VOXKIT_MSG_DISCARDED:
+                voiceState = .idle
+                HintWindow.shared.flash("沒有聽到聲音", client: lastClient)
+            case VOXKIT_MSG_ERROR:
+                // A stray stop (not-recording) is harmless; the real session
+                // is still on its way.
+                let code = withUnsafeBytes(of: m.code) { raw in
+                    String(cString: raw.bindMemory(to: CChar.self).baseAddress!)
+                }
+                if code == "not-recording" { continue }
+                voiceState = .idle
+                HintWindow.shared.flash(Self.voiceErrorText(code,
+                    String(cString: chewing_plus_mac_message_error(msg))), client: lastClient)
             default:
                 break
             }
         }
+    }
+
+    private static func voiceErrorText(_ code: String, _ message: String) -> String {
+        switch code {
+        case "no-input": return "找不到麥克風，或沒有麥克風權限"
+        case "model-not-ready", "bad-model": return "語音模型尚未就緒（輸入法選單 → 語音模型…）"
+        default: return "語音錯誤：\(message.isEmpty ? code : message)"
+        }
+    }
+
+    override func activateServer(_ sender: Any!) {
+        super.activateServer(sender)
+        ModeIndicator.shared.setVisible(true)
+    }
+
+    /// Switching apps or input methods: drop a recording and the hint.
+    /// The 中/英 item hides once no app is using this input method.
+    override func deactivateServer(_ sender: Any!) {
+        if voiceState == .recording { _ = voiceCancel() }
+        HintWindow.shared.show("", client: nil)
+        ModeIndicator.shared.setVisible(false)
+        super.deactivateServer(sender)
     }
 
     private func sendSimple(_ type: String) {
@@ -562,18 +652,20 @@ private extension Optional where Wrapped == String {
 
 /// Input-menu toggles. Same features as the fcitx5 "Plus:" options.
 enum PlusFeature: String, CaseIterable {
-    case shiftToggle, easySymbol, emoji, shortcode, calculator, english,
-         englishHintCommit, space
+    case shiftToggle, modeIndicator, easySymbol, emoji, shortcode, calculator, english,
+         englishHintCommit, suggestions, space
 
     var title: String {
         switch self {
         case .shiftToggle: return "左 Shift 切換中／英"
+        case .modeIndicator: return "選單列顯示「中／英」"
         case .easySymbol: return "簡易符號（Shift＋英文字母）"
         case .emoji: return "候選字顯示 Emoji"
         case .shortcode: return "Emoji 短碼（;;）"
         case .calculator: return "計算機（=）"
         case .english: return "英文模式"
         case .englishHintCommit: return "出現英文提示時，英文快速鍵直接填入第一個"
+        case .suggestions: return "詞語建議（自動完成、字首注音，⇧1–9 選取）"
 
         case .space: return "中英文之間自動加空格"
         }
@@ -597,12 +689,14 @@ enum PlusFeature: String, CaseIterable {
     private var envToken: String {
         switch self {
         case .shiftToggle: return "shift"
+        case .modeIndicator: return "indicator"
         case .easySymbol: return "easysymbol"
         case .emoji: return "emoji"
         case .shortcode: return "shortcode"
         case .calculator: return "calculator"
         case .english: return "english"
         case .englishHintCommit: return "hintcommit"
+        case .suggestions: return "suggest"
         case .space: return "space"
         }
     }
@@ -613,7 +707,12 @@ enum PlusFeature: String, CaseIterable {
 final class HintWindow {
     static let shared = HintWindow()
     private let window: NSPanel
+    private let stack = NSStackView()
     private let label = NSTextField(labelWithString: "")
+    private var rows: [NSTextField] = []
+    private var status = ""
+    private var suggestions: [String] = []
+    private var flashID = 0
 
     private init() {
         window = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
@@ -621,24 +720,128 @@ final class HintWindow {
         window.level = .popUpMenu
         window.hasShadow = true
         window.isOpaque = false
-        window.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95)
+        window.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.97)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 2
+        stack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 8)
         label.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
         label.textColor = .secondaryLabelColor
-        window.contentView = label
+        stack.addArrangedSubview(label)
+        window.contentView = stack
     }
 
+    /// Show a status line that hides itself after `seconds`.
+    func flash(_ text: String, client: IMKTextInput?, seconds: Double = 3) {
+        show(text, client: client)
+        flashID += 1
+        let id = flashID
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            guard let self, self.flashID == id else { return }
+            self.status = ""
+            self.layout(client: client)
+        }
+    }
+
+    /// Status line (English hint, voice state). "" clears it.
     func show(_ text: String, client: IMKTextInput?) {
-        guard !text.isEmpty, let client else {
+        flashID += 1
+        status = text
+        layout(client: client)
+    }
+
+    /// Phrase suggestions, picked with ⇧1…⇧9. [] clears them.
+    func showSuggestions(_ list: [String], client: IMKTextInput?) {
+        suggestions = list
+        layout(client: client)
+    }
+
+    private func layout(client: IMKTextInput?) {
+        guard let client, !(status.isEmpty && suggestions.isEmpty) else {
             window.orderOut(nil)
             return
         }
-        label.stringValue = " \(text) "
-        label.sizeToFit()
+        label.stringValue = status
+        label.isHidden = status.isEmpty
+        while rows.count < suggestions.count {
+            let row = NSTextField(labelWithString: "")
+            row.font = NSFont.systemFont(ofSize: NSFont.systemFontSize + 1)
+            stack.addArrangedSubview(row)
+            rows.append(row)
+        }
+        for (i, row) in rows.enumerated() {
+            if i < suggestions.count {
+                let text = NSMutableAttributedString(
+                    string: "⇧\(i + 1) ",
+                    attributes: [.foregroundColor: NSColor.secondaryLabelColor,
+                                 .font: NSFont.monospacedDigitSystemFont(
+                                    ofSize: NSFont.smallSystemFontSize, weight: .regular)])
+                text.append(NSAttributedString(string: suggestions[i]))
+                row.attributedStringValue = text
+                row.isHidden = false
+            } else {
+                row.isHidden = true
+            }
+        }
         var rect = NSRect.zero
         _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
-        let size = label.fittingSize
+        let size = stack.fittingSize
         window.setFrame(NSRect(x: rect.minX, y: rect.minY - size.height - 4,
                                width: size.width, height: size.height), display: true)
         window.orderFront(nil)
+    }
+}
+
+/// 「中」/「英」 in the menu bar, like 超注音. Clicking it switches the mode.
+/// Shown while this input method is active (IMK deactivates the old client
+/// before activating the next, so the item does not flicker between apps).
+final class ModeIndicator: NSObject {
+    static let shared = ModeIndicator()
+    private var item: NSStatusItem?
+    private var hideWork: DispatchWorkItem?
+
+    var english = false {
+        didSet { refresh() }
+    }
+
+    func setVisible(_ visible: Bool) {
+        hideWork?.cancel()
+        if visible {
+            guard PlusFeature.modeIndicator.isOn else {
+                remove()
+                return
+            }
+            if item == nil {
+                let created = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                created.autosaveName = "im.chewing.inputmethod.ChewingPlus.mode"
+                created.button?.target = self
+                created.button?.action = #selector(clicked)
+                item = created
+            }
+            refresh()
+        } else {
+            // Switching between apps deactivates then activates again;
+            // only remove the item if nothing came back.
+            let work = DispatchWorkItem { [weak self] in self?.remove() }
+            hideWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+        }
+    }
+
+    private func remove() {
+        if let item { NSStatusBar.system.removeStatusItem(item) }
+        item = nil
+    }
+
+    private func refresh() {
+        guard let button = item?.button else { return }
+        button.title = english ? "英" : "中"
+        button.font = NSFont.systemFont(ofSize: 15, weight: .semibold)
+        button.toolTip = english ? "新酷音 Plus：英文（按左 Shift 切回中文）"
+                                 : "新酷音 Plus：中文（按左 Shift 切換英文）"
+    }
+
+    @objc private func clicked() {
+        english.toggle()
     }
 }

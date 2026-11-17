@@ -98,6 +98,13 @@ public:
     // Text shown under the preedit while typing Zhuyin, or "".
     std::string englishHint(ChewingContext *ctx) const;
 
+    // Initials typed one per syllable (ㄍㄒㄈㄘ): libchewing keeps only the
+    // last initial in its reading, so the sequence is tracked here. Empty
+    // once the reading holds anything but a lone initial.
+    const std::string &typedInitials(ChewingContext *) const {
+        return initials_;
+    }
+
     // Raw-key tracking for the hint: call after Chewing handled a key.
     void afterChewingKey(ChewingContext *ctx, char ascii, bool isBackspace);
 
@@ -110,6 +117,7 @@ public:
         overwrites_ = 0;
         overwriteFlags_.clear();
         lastZuinLen_ = 0;
+        initials_.clear();
         prefixPendingMs_ = -1;
     }
 
@@ -133,6 +141,7 @@ private:
     int overwrites_ = 0;
     std::vector<bool> overwriteFlags_; // per key, for Backspace
     size_t lastZuinLen_ = 0;
+    std::string initials_;
     // Emoji double tap.
     int64_t prefixPendingMs_ = -1;
     std::string prefixPendingBuffer_;

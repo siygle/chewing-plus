@@ -277,6 +277,62 @@ static void test_hint_commit(void) {
     chewing_plus_set_english_hint_commit(session, 0);
 }
 
+static void test_suggestions(void) {
+    const char *got;
+    int i, found;
+    chewing_plus_set_suggestions(session, 1, PLUS_PHRASES_PATH);
+    reset();
+    /* 中華 (ㄓㄨㄥ ㄏㄨㄚˊ: 5j/ cj86) -> 中華民國 among the suggestions */
+    type_text("5j/ cj86");
+    found = 0;
+    for (i = 0; i < chewing_plus_suggestion_count(session); i++) {
+        if (strcmp(chewing_plus_suggestion(session, i), "中華民國") == 0) {
+            found = 1;
+            chewing_plus_select_suggestion(session, i);
+        }
+    }
+    check(found, "中華 suggests 中華民國");
+    got = chewing_plus_take_commit(session);
+    check(strcmp(got, "中華民國") == 0, "picking 中華民國 commits it");
+    if (strcmp(got, "中華民國") != 0) {
+        fprintf(stderr, "  commit=[%s] preedit=[%s]\n", got, preedit());
+    }
+
+    reset();
+    /* ㄍㄒㄈㄘ: e v z h, one initial per syllable */
+    type_text("evzh");
+    check(chewing_plus_suggestion_count(session) >= 1 &&
+              strcmp(chewing_plus_suggestion(session, 0), "恭喜發財") == 0,
+          "ㄍㄒㄈㄘ suggests 恭喜發財");
+    check(strstr(preedit(), "ㄍㄒㄈㄘ") != NULL, "preedit shows ㄍㄒㄈㄘ");
+    chewing_plus_select_suggestion(session, 0);
+    got = chewing_plus_take_commit(session);
+    check(strcmp(got, "恭喜發財") == 0, "picking 恭喜發財 commits it");
+    check(preedit()[0] == '\0', "reading cleared after the pick");
+
+    reset();
+    type_text("ev");
+    check(chewing_plus_suggestion_count(session) == 0,
+          "two initials are not expanded");
+    reset();
+    type_text("su3");
+    check(chewing_plus_suggestion_count(session) == 0,
+          "one character is not completed");
+
+    chewing_plus_set_sensitive(session, 1);
+    reset();
+    type_text("evzh");
+    check(chewing_plus_suggestion_count(session) == 0,
+          "no suggestions while sensitive");
+    chewing_plus_set_sensitive(session, 0);
+
+    chewing_plus_set_suggestions(session, 0, NULL);
+    reset();
+    type_text("evzh");
+    check(chewing_plus_suggestion_count(session) == 0,
+          "suggestions off: nothing listed");
+}
+
 static void test_emoji_candidate(void) {
     int found;
     reset();
@@ -372,6 +428,7 @@ int main(void) {
     test_english();
     test_double_shift();
     test_hint_commit();
+    test_suggestions();
     test_emoji_candidate();
     test_sensitive();
 

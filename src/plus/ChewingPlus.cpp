@@ -391,9 +391,31 @@ void ChewingPlus::afterChewingKey(ChewingContext *ctx, char ascii,
         overwrites_ = 0;
         overwriteFlags_.clear();
         lastZuinLen_ = 0;
+        initials_.clear();
         return;
     }
     size_t len = CodePoints(zuin);
+    // ㄅ..ㄙ (U+3105..U+3119): E3 84 85..99. A lone initial that replaced
+    // another lone initial extends the abbreviation.
+    const bool loneInitial =
+        zuin.size() == 3 && static_cast<unsigned char>(zuin[0]) == 0xE3 &&
+        static_cast<unsigned char>(zuin[1]) == 0x84 &&
+        static_cast<unsigned char>(zuin[2]) >= 0x85 &&
+        static_cast<unsigned char>(zuin[2]) <= 0x99;
+    if (!loneInitial) {
+        initials_.clear();
+    } else if (isBackspace) {
+        if (initials_.size() >= 3) {
+            initials_.resize(initials_.size() - 3);
+        }
+        if (initials_.empty()) {
+            initials_ = zuin;
+        }
+    } else if (lastZuinLen_ == 1 && !initials_.empty()) {
+        initials_ += zuin;
+    } else {
+        initials_ = zuin;
+    }
     if (isBackspace) {
         if (!keys_.empty()) {
             keys_.pop_back();

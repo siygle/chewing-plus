@@ -172,6 +172,26 @@ CHEWING_PLUS_API void chewing_plus_set_data_paths(chewing_plus_session *session,
                                                   const char *english_builtin,
                                                   const char *english_user);
 
+/*
+ * Phrase suggestions (data/plus-phrases.txt). While typing, the core lists
+ * longer phrases that start with the composed text (中華 -> 中華民國) and
+ * phrases whose syllables start with the typed Bopomofo (ㄍㄒㄈㄘ ->
+ * 恭喜發財). The list is separate from the candidate window: frontends show
+ * it as they like and pick with chewing_plus_select_suggestion().
+ * `path` NULL keeps the previous file. Off by default.
+ */
+CHEWING_PLUS_API void chewing_plus_set_suggestions(chewing_plus_session *session,
+                                                   int enabled,
+                                                   const char *path);
+CHEWING_PLUS_API int
+chewing_plus_suggestion_count(const chewing_plus_session *session);
+CHEWING_PLUS_API const char *
+chewing_plus_suggestion(const chewing_plus_session *session, int index);
+/* Put suggestion `index` in place of the matched text (the buffer tail or
+ * the typed initials) and commit the composition, like an emoji pick. */
+CHEWING_PLUS_API void
+chewing_plus_select_suggestion(chewing_plus_session *session, int index);
+
 /* All Plus features default off, matching the fcitx5 addon. */
 CHEWING_PLUS_API void chewing_plus_set_emoji(chewing_plus_session *session,
                                              int enabled);
