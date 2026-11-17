@@ -260,7 +260,8 @@ static void test_hint_commit(void) {
     tap(CHEWING_PLUS_KEY_SHIFT_R, 0, 0);
     check(chewing_plus_panel(session) == CHEWING_PLUS_PANEL_NONE,
           "hint commit on: no [EN] panel");
-    check(strstr(preedit(), "GitHub") != NULL && strstr(preedit(), "你") != NULL,
+    check(strstr(preedit(), "GitHub") != NULL &&
+              strstr(preedit(), "你") != NULL,
           "hint commit on: GitHub replaces the reading, 你 kept");
     tap(CHEWING_PLUS_KEY_RETURN, 0, 0);
     got = chewing_plus_take_commit(session);

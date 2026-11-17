@@ -28,17 +28,15 @@ bool StartsWith(const std::string &s, const std::string &prefix) {
 // keep the `limit` most frequent (ties: shorter, then text order).
 template <typename KeyOf>
 std::vector<std::string>
-Collect(const std::vector<uint32_t> &index, const std::string &key,
-        KeyOf keyOf, size_t limit,
-        const std::function<bool(uint32_t)> &accept,
-        const std::function<std::pair<uint32_t, const std::string *>(
-            uint32_t)> &rank) {
+Collect(const std::vector<uint32_t> &index, const std::string &key, KeyOf keyOf,
+        size_t limit, const std::function<bool(uint32_t)> &accept,
+        const std::function<std::pair<uint32_t, const std::string *>(uint32_t)>
+            &rank) {
     auto lo = std::lower_bound(
         index.begin(), index.end(), key,
         [&](uint32_t i, const std::string &k) { return keyOf(i) < k; });
     std::vector<uint32_t> hits;
-    for (auto it = lo; it != index.end() && StartsWith(keyOf(*it), key);
-         ++it) {
+    for (auto it = lo; it != index.end() && StartsWith(keyOf(*it), key); ++it) {
         if (accept(*it)) {
             hits.push_back(*it);
         }
@@ -143,10 +141,10 @@ std::vector<std::string> PhraseIndex::complete(const std::string &typed,
         return {};
     sortIfNeeded();
     return Collect(
-        byText_, typed, [this](uint32_t i) -> const std::string & {
-            return phrases_[i].text;
-        },
-        limit, [&](uint32_t i) { return phrases_[i].text.size() > typed.size(); },
+        byText_, typed,
+        [this](uint32_t i) -> const std::string & { return phrases_[i].text; },
+        limit,
+        [&](uint32_t i) { return phrases_[i].text.size() > typed.size(); },
         [this](uint32_t i) {
             return std::make_pair(phrases_[i].freq, &phrases_[i].text);
         });
@@ -155,15 +153,14 @@ std::vector<std::string> PhraseIndex::complete(const std::string &typed,
 std::vector<std::string> PhraseIndex::expand(const std::string &initials,
                                              size_t limit,
                                              size_t minSyllables) const {
-    if (!AllBopomofo(initials) ||
-        CodePointCount(initials) < minSyllables || phrases_.empty())
+    if (!AllBopomofo(initials) || CodePointCount(initials) < minSyllables ||
+        phrases_.empty())
         return {};
     sortIfNeeded();
     // Exact abbreviation only: ㄍㄒㄈㄘ is four syllables, not a prefix.
     return Collect(
-        byAbbr_, initials, [this](uint32_t i) -> const std::string & {
-            return phrases_[i].abbr;
-        },
+        byAbbr_, initials,
+        [this](uint32_t i) -> const std::string & { return phrases_[i].abbr; },
         limit, [&](uint32_t i) { return phrases_[i].abbr == initials; },
         [this](uint32_t i) {
             return std::make_pair(phrases_[i].freq, &phrases_[i].text);

@@ -180,9 +180,9 @@ CHEWING_PLUS_API void chewing_plus_set_data_paths(chewing_plus_session *session,
  * it as they like and pick with chewing_plus_select_suggestion().
  * `path` NULL keeps the previous file. Off by default.
  */
-CHEWING_PLUS_API void chewing_plus_set_suggestions(chewing_plus_session *session,
-                                                   int enabled,
-                                                   const char *path);
+CHEWING_PLUS_API void
+chewing_plus_set_suggestions(chewing_plus_session *session, int enabled,
+                             const char *path);
 CHEWING_PLUS_API int
 chewing_plus_suggestion_count(const chewing_plus_session *session);
 CHEWING_PLUS_API const char *

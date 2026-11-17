@@ -708,8 +708,7 @@ const char *chewing_plus_suggestion(const chewing_plus_session *session,
     return S(session)->sugg[index].c_str();
 }
 
-void chewing_plus_select_suggestion(chewing_plus_session *session,
-                                    int index) {
+void chewing_plus_select_suggestion(chewing_plus_session *session, int index) {
     if (!session) {
         return;
     }
