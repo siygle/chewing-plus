@@ -5,6 +5,7 @@
  * Model commands go through the shared voxkit C client. Plus toggles are
  * the same file the engine reads on focus.
  */
+#include "chewing_plus.h"
 #include "prefs.h"
 #include "voxkit_client.h"
 
@@ -16,20 +17,15 @@ typedef struct {
     GtkWidget *status;
     GtkWidget *progress;
     GtkWidget *list;
-    GtkWidget *emoji;
-    GtkWidget *calculator;
-    GtkWidget *space;
-    GtkWidget *shortcode;
-    GtkWidget *english;
-    GtkWidget *suggestions;
-    GtkWidget *hint_commit;
-    GtkWidget *easy_symbol;
-    GtkWidget *shift_toggle;
     voxkit_client voice;
     guint timer;
     uint64_t req;
     int loading;
     char last_state[32];
+    /* One switch per boolean setting from the core's table. */
+    GtkWidget *switches[CHEWING_PLUS_IBUS_MAX_PREFS];
+    const char *switch_keys[CHEWING_PLUS_IBUS_MAX_PREFS];
+    int switch_count;
 } Setup;
 
 static Setup *UI;
@@ -259,21 +255,20 @@ static gboolean poll_progress(gpointer user) {
     return G_SOURCE_CONTINUE;
 }
 
+/* Keep values for keys this window does not show (e.g. hand-edited
+ * strings) and rewrite the switches it does. */
 static void save_switches(void) {
     chewing_plus_ibus_prefs prefs;
+    int i;
     if (UI->loading) {
         return;
     }
-    memset(&prefs, 0, sizeof(prefs));
-    prefs.emoji = gtk_switch_get_active(GTK_SWITCH(UI->emoji));
-    prefs.calculator = gtk_switch_get_active(GTK_SWITCH(UI->calculator));
-    prefs.space = gtk_switch_get_active(GTK_SWITCH(UI->space));
-    prefs.shortcode = gtk_switch_get_active(GTK_SWITCH(UI->shortcode));
-    prefs.english = gtk_switch_get_active(GTK_SWITCH(UI->english));
-    prefs.suggestions = gtk_switch_get_active(GTK_SWITCH(UI->suggestions));
-    prefs.hint_commit = gtk_switch_get_active(GTK_SWITCH(UI->hint_commit));
-    prefs.easy_symbol = gtk_switch_get_active(GTK_SWITCH(UI->easy_symbol));
-    prefs.shift_toggle = gtk_switch_get_active(GTK_SWITCH(UI->shift_toggle));
+    chewing_plus_ibus_prefs_load(&prefs);
+    for (i = 0; i < UI->switch_count; i++) {
+        chewing_plus_ibus_prefs_set(
+            &prefs, UI->switch_keys[i],
+            gtk_switch_get_active(GTK_SWITCH(UI->switches[i])) ? "1" : "0");
+    }
     chewing_plus_ibus_prefs_save(&prefs);
 }
 
@@ -305,17 +300,26 @@ static GtkWidget *button(const char *label, GCallback callback) {
 
 static void load_switches(void) {
     chewing_plus_ibus_prefs prefs;
+    int i;
     chewing_plus_ibus_prefs_load(&prefs);
     UI->loading = 1;
-    gtk_switch_set_active(GTK_SWITCH(UI->emoji), prefs.emoji);
-    gtk_switch_set_active(GTK_SWITCH(UI->calculator), prefs.calculator);
-    gtk_switch_set_active(GTK_SWITCH(UI->space), prefs.space);
-    gtk_switch_set_active(GTK_SWITCH(UI->shortcode), prefs.shortcode);
-    gtk_switch_set_active(GTK_SWITCH(UI->english), prefs.english);
-    gtk_switch_set_active(GTK_SWITCH(UI->suggestions), prefs.suggestions);
-    gtk_switch_set_active(GTK_SWITCH(UI->hint_commit), prefs.hint_commit);
-    gtk_switch_set_active(GTK_SWITCH(UI->easy_symbol), prefs.easy_symbol);
-    gtk_switch_set_active(GTK_SWITCH(UI->shift_toggle), prefs.shift_toggle);
+    for (i = 0; i < UI->switch_count; i++) {
+        const char *value =
+            chewing_plus_ibus_prefs_get(&prefs, UI->switch_keys[i]);
+        chewing_plus_setting_info info;
+        int j;
+        if (!value) {
+            /* Not in the file yet: show the core's default. */
+            for (j = 0; chewing_plus_setting_info_at(j, &info); j++) {
+                if (strcmp(info.key, UI->switch_keys[i]) == 0) {
+                    value = info.default_value;
+                    break;
+                }
+            }
+        }
+        gtk_switch_set_active(GTK_SWITCH(UI->switches[i]),
+                              value && strcmp(value, "1") == 0);
+    }
     UI->loading = 0;
 }
 
@@ -365,19 +369,36 @@ static void activate(GtkApplication *app, gpointer user) {
     plus = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     gtk_box_append(GTK_BOX(plus),
                    gtk_label_new("Plus（下次聚焦輸入框時生效）"));
-    gtk_box_append(GTK_BOX(plus), switch_row("表情符號", &UI->emoji));
-    gtk_box_append(GTK_BOX(plus), switch_row("計算機", &UI->calculator));
-    gtk_box_append(GTK_BOX(plus), switch_row("中英間距", &UI->space));
-    gtk_box_append(GTK_BOX(plus), switch_row("表情短碼", &UI->shortcode));
-    gtk_box_append(GTK_BOX(plus), switch_row("英文模式", &UI->english));
-    gtk_box_append(GTK_BOX(plus),
-                   switch_row("英文提示時快速鍵直接填入", &UI->hint_commit));
-    gtk_box_append(GTK_BOX(plus),
-                   switch_row("詞語建議（Shift+1–9 選取）", &UI->suggestions));
-    gtk_box_append(GTK_BOX(plus),
-                   switch_row("簡易符號（Shift+英文字母）", &UI->easy_symbol));
-    gtk_box_append(GTK_BOX(plus),
-                   switch_row("左 Shift 切換中／英", &UI->shift_toggle));
+    {
+        /* Every boolean setting in the core's table gets a switch, so new
+         * settings show up here without touching this file. Layout and
+         * selection-key options are left to the file. */
+        static const char *const skip[] = {
+            "space_as_selection", "add_phrase_forward", "choice_backward",
+            "auto_shift_cursor", NULL};
+        chewing_plus_setting_info info;
+        int i;
+        for (i = 0; chewing_plus_setting_info_at(i, &info) &&
+                    UI->switch_count < CHEWING_PLUS_IBUS_MAX_PREFS;
+             i++) {
+            int k;
+            int hidden = 0;
+            if (info.type != CHEWING_PLUS_SETTING_BOOL) {
+                continue;
+            }
+            for (k = 0; skip[k]; k++) {
+                hidden |= strcmp(skip[k], info.key) == 0;
+            }
+            if (hidden) {
+                continue;
+            }
+            UI->switch_keys[UI->switch_count] = info.key;
+            gtk_box_append(
+                GTK_BOX(plus),
+                switch_row(info.label_zh, &UI->switches[UI->switch_count]));
+            UI->switch_count++;
+        }
+    }
     gtk_box_append(GTK_BOX(page), plus);
 
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), page);

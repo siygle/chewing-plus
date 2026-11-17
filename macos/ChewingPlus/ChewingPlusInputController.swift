@@ -85,14 +85,19 @@ final class ChewingPlusInputController: IMKInputController {
 
     override func menu() -> NSMenu! {
         let menu = NSMenu(title: "新酷音 Plus")
-        for feature in PlusFeature.allCases {
-            let item = NSMenuItem(title: feature.title, action: #selector(toggleFeature(_:)),
+        for row in Settings.menuRows {
+            let item = NSMenuItem(title: row.label, action: #selector(toggleFeature(_:)),
                                   keyEquivalent: "")
             item.target = self
-            item.representedObject = feature.rawValue
-            item.state = feature.isOn ? .on : .off
+            item.representedObject = row.key
+            item.state = Settings.isOn(row.key) ? .on : .off
             menu.addItem(item)
         }
+        let indicator = NSMenuItem(title: "選單列顯示「中／英」",
+                                   action: #selector(toggleIndicator(_:)), keyEquivalent: "")
+        indicator.target = self
+        indicator.state = Settings.modeIndicator ? .on : .off
+        menu.addItem(indicator)
         menu.addItem(.separator())
         let keys = NSMenuItem(title: "快速鍵…", action: #selector(openShortcuts(_:)),
                               keyEquivalent: "")
@@ -110,12 +115,15 @@ final class ChewingPlusInputController: IMKInputController {
         // is the NSMenuItem.
         let item = (sender as? [String: Any])?[kIMKCommandMenuItemName] as? NSMenuItem
             ?? sender as? NSMenuItem
-        guard let raw = item?.representedObject as? String,
-              let feature = PlusFeature(rawValue: raw) else { return }
-        feature.isOn.toggle()
+        guard let key = item?.representedObject as? String else { return }
+        Settings.set(key, Settings.isOn(key) ? "0" : "1")
         if let session { applyFeatures(session) }
-        if feature == .modeIndicator { ModeIndicator.shared.setVisible(true) }
-        if feature == .shiftToggle && !feature.isOn { englishMode = false }
+        if key == "shift_toggle" && !Settings.isOn(key) { englishMode = false }
+    }
+
+    @objc private func toggleIndicator(_: Any?) {
+        Settings.modeIndicator.toggle()
+        ModeIndicator.shared.setVisible(true)
     }
 
     @objc private func openShortcuts(_: Any?) {
@@ -256,21 +264,22 @@ final class ChewingPlusInputController: IMKInputController {
     /// Plus toggles from the input menu (UserDefaults; Plus features on,
     /// easy symbol off by default).
     /// CHEWING_PLUS_FEATURES still overrides them for testing.
+    /// Settings from the core's table, then the macOS-only pieces: phrase
+    /// path, and English shortcuts detected here (configurable keys).
     private func applyFeatures(_ session: OpaquePointer) {
-        let on = { (f: PlusFeature) -> Int32 in f.isOn ? 1 : 0 }
-        chewing_plus_set_easy_symbol(session, on(.easySymbol))
-        chewing_plus_set_emoji(session, on(.emoji))
-        chewing_plus_set_calculator(session, on(.calculator))
-        chewing_plus_set_spacing(session, on(.space), on(.space))
-        chewing_plus_set_emoji_shortcode(session, on(.shortcode), ";;", 300)
-        chewing_plus_set_english(session, on(.english), on(.english),
+        if let phrases = Bundle.main.resourceURL?
+            .appendingPathComponent("plus-phrases.bin").path {
+            chewing_plus_set_phrases_path(session, phrases)
+        }
+        Settings.apply(to: session)
+        chewing_plus_set_english(session, Settings.isOn("english") ? 1 : 0,
+                                 Settings.isOn("english") ? 1 : 0,
                                  ShortcutSetting.english.hintLabel)
-        // The frontend detects the double tap itself so the key is configurable.
+        chewing_plus_set_english_combo(session, 0)
         chewing_plus_set_english_double_tap(session, 0, 300)
-        chewing_plus_set_english_hint_commit(session, on(.englishHintCommit))
-        let phrases = Bundle.main.resourceURL?
-            .appendingPathComponent("plus-phrases.txt").path
-        chewing_plus_set_suggestions(session, on(.suggestions), phrases)
+        // Lone Left Shift is handled here (menu-bar indicator, one mode for
+        // all apps), not by the core's ASCII mode.
+        chewing_plus_set_shift_toggle(session, 0)
     }
 
     fileprivate func insertCommitted(_ text: String) {
@@ -373,7 +382,7 @@ final class ChewingPlusInputController: IMKInputController {
     /// second tap (press and release, no key in between, each within 0.3 s);
     /// a combo fires on its key press.
     private func englishShortcut(_ event: NSEvent) -> Bool {
-        guard PlusFeature.english.isOn, let key = ShortcutSetting.english.value,
+        guard Settings.isOn("english"), let key = ShortcutSetting.english.value,
               key != ShortcutSetting.voice.value else { return false }
         if !key.isModifierOnly { return key.matchesCombo(event) && !event.isARepeat }
         guard let down = key.modifierDown(event) else {
@@ -403,7 +412,7 @@ final class ChewingPlusInputController: IMKInputController {
 
     /// True on the release of a Left Shift pressed and released by itself.
     private func lonelyShift(_ event: NSEvent) -> Bool {
-        guard PlusFeature.shiftToggle.isOn else { return false }
+        guard Settings.isOn("shift_toggle") else { return false }
         if event.type != .flagsChanged {
             if event.type == .keyDown { shiftAlone = false }
             return false
@@ -672,54 +681,103 @@ private extension Optional where Wrapped == String {
     }
 }
 
-/// Input-menu toggles. Same features as the fcitx5 "Plus:" options.
-enum PlusFeature: String, CaseIterable {
-    case shiftToggle, modeIndicator, easySymbol, emoji, shortcode, calculator, english,
-         englishHintCommit, suggestions, space
-
-    var title: String {
-        switch self {
-        case .shiftToggle: return "左 Shift 切換中／英"
-        case .modeIndicator: return "選單列顯示「中／英」"
-        case .easySymbol: return "簡易符號（Shift＋英文字母）"
-        case .emoji: return "候選字顯示 Emoji"
-        case .shortcode: return "Emoji 短碼（;;）"
-        case .calculator: return "計算機（=）"
-        case .english: return "英文模式"
-        case .englishHintCommit: return "出現英文提示時，英文快速鍵直接填入第一個"
-        case .suggestions: return "詞語建議（自動完成、字首注音，⇧1–9 選取）"
-
-        case .space: return "中英文之間自動加空格"
-        }
+/// Settings come from the core's table (chewing_plus_setting_info), so a
+/// setting added there shows up in the input menu. Values live in this
+/// input method's UserDefaults under the table's keys.
+///
+/// macOS turns the Plus features on by default (Linux leaves them off).
+/// Keys from 5.1.13-plus.3 and earlier are read once and migrated.
+enum Settings {
+    struct Row {
+        let key: String
+        let label: String
+        let isBool: Bool
     }
 
-    // The app's own domain (im.chewing.inputmethod.ChewingPlus). suiteName with
-    // the bundle id returns nil, so use .standard.
-    private static let defaults = UserDefaults.standard
-
-    var isOn: Bool {
-        get {
-            if let env = getenv("CHEWING_PLUS_FEATURES") {
-                let list = String(cString: env)
-                return list.contains(envToken)
+    /// Settings shown as input-menu toggles, in table order. Engine options
+    /// (layout, selection keys...) stay at the core's defaults here.
+    static let menuRows: [Row] = {
+        let hidden: Set<String> = ["space_digits", "english_hint",
+                                   "space_as_selection", "add_phrase_forward",
+                                   "choice_backward", "auto_shift_cursor"]
+        var rows: [Row] = []
+        var info = chewing_plus_setting_info()
+        var i: Int32 = 0
+        while chewing_plus_setting_info_at(i, &info) == 1 {
+            let key = String(cString: info.key)
+            if info.type == Int32(CHEWING_PLUS_SETTING_BOOL) && !hidden.contains(key) {
+                rows.append(Row(key: key, label: String(cString: info.label_zh), isBool: true))
             }
-            return Self.defaults.object(forKey: rawValue) as? Bool ?? (self != .easySymbol)
+            i += 1
         }
-        nonmutating set { Self.defaults.set(newValue, forKey: rawValue) }
+        return rows
+    }()
+
+    /// macOS defaults that differ from the core's.
+    private static let macDefaults: [String: String] = [
+        "emoji": "1", "calculator": "1", "space_letters": "1", "space_digits": "1",
+        "shortcode": "1", "english": "1", "english_hint_commit": "1",
+        "suggestions": "1", "shift_toggle": "1",
+    ]
+
+    private static let store = UserDefaults.standard
+    private static let prefix = "setting."
+
+    static func value(_ key: String) -> String? {
+        migrate()
+        if let env = getenv("CHEWING_PLUS_FEATURES") {
+            return String(cString: env).split(separator: ",")
+                .contains(Substring(key)) ? "1" : "0"
+        }
+        return store.string(forKey: prefix + key) ?? macDefaults[key]
     }
 
-    private var envToken: String {
-        switch self {
-        case .shiftToggle: return "shift"
-        case .modeIndicator: return "indicator"
-        case .easySymbol: return "easysymbol"
-        case .emoji: return "emoji"
-        case .shortcode: return "shortcode"
-        case .calculator: return "calculator"
-        case .english: return "english"
-        case .englishHintCommit: return "hintcommit"
-        case .suggestions: return "suggest"
-        case .space: return "space"
+    static func isOn(_ key: String) -> Bool { value(key) == "1" }
+
+    static func set(_ key: String, _ value: String) {
+        store.set(value, forKey: prefix + key)
+        if key == "space_letters" { store.set(value, forKey: prefix + "space_digits") }
+    }
+
+    /// Push every stored or default value into a session.
+    static func apply(to session: OpaquePointer) {
+        var info = chewing_plus_setting_info()
+        var i: Int32 = 0
+        while chewing_plus_setting_info_at(i, &info) == 1 {
+            let key = String(cString: info.key)
+            if let v = value(key) { chewing_plus_set_setting(session, key, v) }
+            i += 1
+        }
+    }
+
+    /// The menu-bar 中/英 item is macOS-only, not a core setting.
+    static var modeIndicator: Bool {
+        get { store.object(forKey: prefix + "mode_indicator") as? Bool ?? true }
+        set { store.set(newValue, forKey: prefix + "mode_indicator") }
+    }
+
+    private static var migrated = false
+    private static func migrate() {
+        guard !migrated else { return }
+        migrated = true
+        let old: [(String, [String])] = [
+            ("emoji", ["emoji"]), ("calculator", ["calculator"]),
+            ("space", ["space_letters", "space_digits"]),
+            ("shortcode", ["shortcode"]), ("english", ["english"]),
+            ("englishHintCommit", ["english_hint_commit"]),
+            ("suggestions", ["suggestions"]), ("shiftToggle", ["shift_toggle"]),
+            ("easySymbol", ["easy_symbol"]),
+        ]
+        for (oldKey, newKeys) in old {
+            guard let on = store.object(forKey: oldKey) as? Bool else { continue }
+            for k in newKeys where store.string(forKey: prefix + k) == nil {
+                store.set(on ? "1" : "0", forKey: prefix + k)
+            }
+            store.removeObject(forKey: oldKey)
+        }
+        if let on = store.object(forKey: "modeIndicator") as? Bool {
+            store.set(on, forKey: prefix + "mode_indicator")
+            store.removeObject(forKey: "modeIndicator")
         }
     }
 }
@@ -829,7 +887,7 @@ final class ModeIndicator: NSObject {
     func setVisible(_ visible: Bool) {
         hideWork?.cancel()
         if visible {
-            guard PlusFeature.modeIndicator.isOn else {
+            guard Settings.modeIndicator else {
                 remove()
                 return
             }

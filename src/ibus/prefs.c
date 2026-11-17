@@ -11,10 +11,6 @@
 #include <string.h>
 #include <sys/stat.h>
 
-static int has_token(const char *list, const char *token) {
-    return list && strstr(list, token) != NULL;
-}
-
 static int config_path(char *buf, size_t n) {
     const char *env = getenv("CHEWING_PLUS_IBUS_CONFIG");
     const char *xdg;
@@ -40,50 +36,100 @@ static int config_path(char *buf, size_t n) {
     return wrote > 0 && (size_t)wrote < n ? 0 : -1;
 }
 
+const char *chewing_plus_ibus_prefs_get(const chewing_plus_ibus_prefs *prefs,
+                                        const char *key) {
+    size_t i;
+    if (!prefs || !key) {
+        return NULL;
+    }
+    for (i = 0; i < prefs->count; i++) {
+        if (strcmp(prefs->items[i].key, key) == 0) {
+            return prefs->items[i].value;
+        }
+    }
+    return NULL;
+}
+
+int chewing_plus_ibus_prefs_set(chewing_plus_ibus_prefs *prefs, const char *key,
+                                const char *value) {
+    size_t i;
+    chewing_plus_ibus_pref *slot = NULL;
+    if (!prefs || !key || !value || !key[0] ||
+        strlen(key) >= sizeof(prefs->items[0].key) ||
+        strlen(value) >= sizeof(prefs->items[0].value)) {
+        return -1;
+    }
+    for (i = 0; i < prefs->count; i++) {
+        if (strcmp(prefs->items[i].key, key) == 0) {
+            slot = &prefs->items[i];
+            break;
+        }
+    }
+    if (!slot) {
+        if (prefs->count >= CHEWING_PLUS_IBUS_MAX_PREFS) {
+            return -1;
+        }
+        slot = &prefs->items[prefs->count++];
+        strcpy(slot->key, key);
+    }
+    strcpy(slot->value, value);
+    return 0;
+}
+
+/* Keys from before the shared settings table. */
+static void set_migrated(chewing_plus_ibus_prefs *out, const char *key,
+                         const char *value) {
+    if (strcmp(key, "space") == 0) {
+        chewing_plus_ibus_prefs_set(out, "space_letters", value);
+        chewing_plus_ibus_prefs_set(out, "space_digits", value);
+    } else if (strcmp(key, "hint_commit") == 0) {
+        chewing_plus_ibus_prefs_set(out, "english_hint_commit", value);
+    } else {
+        chewing_plus_ibus_prefs_set(out, key, value);
+    }
+}
+
+/* CHEWING_PLUS_IBUS_FEATURES: comma-separated boolean keys, all on. Older
+ * short tokens (space, suggest, hintcommit, easysymbol, shift) still work. */
 static void from_list(chewing_plus_ibus_prefs *out, const char *list) {
-    out->emoji = has_token(list, "emoji");
-    out->calculator = has_token(list, "calculator");
-    out->space = has_token(list, "space");
-    out->shortcode = has_token(list, "shortcode");
-    out->english = has_token(list, "english");
-    out->suggestions = has_token(list, "suggest");
-    out->hint_commit = has_token(list, "hintcommit");
-    out->easy_symbol = has_token(list, "easysymbol");
-    out->shift_toggle = has_token(list, "shift");
+    char copy[512];
+    char *token;
+    char *save = NULL;
+    snprintf(copy, sizeof(copy), "%s", list);
+    for (token = strtok_r(copy, ", ", &save); token;
+         token = strtok_r(NULL, ", ", &save)) {
+        const char *key = token;
+        if (strcmp(token, "suggest") == 0) {
+            key = "suggestions";
+        } else if (strcmp(token, "hintcommit") == 0) {
+            key = "english_hint_commit";
+        } else if (strcmp(token, "easysymbol") == 0) {
+            key = "easy_symbol";
+        } else if (strcmp(token, "shift") == 0) {
+            key = "shift_toggle";
+        }
+        set_migrated(out, key, "1");
+    }
 }
 
 static void read_file(chewing_plus_ibus_prefs *out, const char *path) {
     FILE *file = fopen(path, "r");
-    char line[128];
+    char line[256];
     if (!file) {
         return;
     }
     while (fgets(line, sizeof(line), file)) {
-        char key[32];
-        int value = 0;
-        if (sscanf(line, "%31[^=]=%d", key, &value) != 2) {
+        char *eq;
+        if (line[0] == '#' || line[0] == '\n') {
             continue;
         }
-        value = value ? 1 : 0;
-        if (strcmp(key, "emoji") == 0) {
-            out->emoji = value;
-        } else if (strcmp(key, "calculator") == 0) {
-            out->calculator = value;
-        } else if (strcmp(key, "space") == 0) {
-            out->space = value;
-        } else if (strcmp(key, "shortcode") == 0) {
-            out->shortcode = value;
-        } else if (strcmp(key, "english") == 0) {
-            out->english = value;
-        } else if (strcmp(key, "suggestions") == 0) {
-            out->suggestions = value;
-        } else if (strcmp(key, "hint_commit") == 0) {
-            out->hint_commit = value;
-        } else if (strcmp(key, "easy_symbol") == 0) {
-            out->easy_symbol = value;
-        } else if (strcmp(key, "shift_toggle") == 0) {
-            out->shift_toggle = value;
+        eq = strchr(line, '=');
+        if (!eq) {
+            continue;
         }
+        *eq = '\0';
+        eq[1 + strcspn(eq + 1, "\r\n")] = '\0';
+        set_migrated(out, line, eq + 1);
     }
     fclose(file);
 }
@@ -139,6 +185,7 @@ static int mkdir_parent(const char *file) {
 int chewing_plus_ibus_prefs_save(const chewing_plus_ibus_prefs *in) {
     char path[512];
     FILE *file;
+    size_t i;
     if (!in || config_path(path, sizeof(path)) != 0) {
         return -1;
     }
@@ -149,15 +196,10 @@ int chewing_plus_ibus_prefs_save(const chewing_plus_ibus_prefs *in) {
     if (!file) {
         return -1;
     }
-    fprintf(file, "emoji=%d\n", in->emoji ? 1 : 0);
-    fprintf(file, "calculator=%d\n", in->calculator ? 1 : 0);
-    fprintf(file, "space=%d\n", in->space ? 1 : 0);
-    fprintf(file, "shortcode=%d\n", in->shortcode ? 1 : 0);
-    fprintf(file, "english=%d\n", in->english ? 1 : 0);
-    fprintf(file, "suggestions=%d\n", in->suggestions ? 1 : 0);
-    fprintf(file, "hint_commit=%d\n", in->hint_commit ? 1 : 0);
-    fprintf(file, "easy_symbol=%d\n", in->easy_symbol ? 1 : 0);
-    fprintf(file, "shift_toggle=%d\n", in->shift_toggle ? 1 : 0);
+    fprintf(file, "# 新酷音 Plus (IBus). Keys: chewing_plus_setting_info.\n");
+    for (i = 0; i < in->count; i++) {
+        fprintf(file, "%s=%s\n", in->items[i].key, in->items[i].value);
+    }
     if (fclose(file) != 0) {
         return -1;
     }

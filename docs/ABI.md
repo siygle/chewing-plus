@@ -6,10 +6,28 @@ addon uses. The header is `include/chewing_plus.h`. ABI version is
 `CHEWING_PLUS_ABI_VERSION` (currently 1). Add functions to extend it. Do not
 reorder or resize `chewing_plus_key_event` or `chewing_plus_callbacks`.
 
-The fcitx5 addon does **not** call this ABI. It links the same static library
-and calls the C++ `chewing_plus::ChewingPlus` class, which is what it did
-before the split. The ABI is the contract for the frontends that do not exist
-yet, and it is what `test_plus_abi` exercises.
+All three frontends call this ABI: the fcitx5 addon (`src/eim.cpp`), the
+IBus engine (`src/ibus/engine.c`) and the macOS input method. Each one only
+maps its key events in and draws `chewing_plus_get_view()` out.
+
+## Settings
+
+One table, `src/abi/settings.inc`, lists every setting with its key, type,
+default and labels. Frontends enumerate it with
+`chewing_plus_setting_count()` / `chewing_plus_setting_info_at()` (the IBus
+setup window and the macOS input menu build their switches from it) and
+apply stored values with `chewing_plus_set_setting(session, key, value)`.
+Unknown keys and bad values are ignored, so a newer config file never breaks
+an older build. fcitx5 keeps its own option names in `chewing.conf` and
+maps them onto these keys.
+
+## Data files
+
+Dictionaries are shared by every session in a process (`DataCache`). The
+phrase index ships compiled: `chewing-plus-compile-phrases` turns
+`data/plus-phrases.txt` into `plus-phrases.bin` at build time, and the core
+memory-maps it (no parsing at load, pages shared between processes). The
+text file still loads if passed instead.
 
 ## Session
 

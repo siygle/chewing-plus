@@ -39,29 +39,25 @@ static void refresh(ChewingPlusEngine *self);
 
 static int last_shift_toggle = 0;
 
+/* Apply every stored setting through the core's table. Absent keys keep the
+ * core's defaults. */
 static void apply_features(chewing_plus_session *session) {
     chewing_plus_ibus_prefs prefs;
-    chewing_plus_ibus_prefs_load(&prefs);
-    last_shift_toggle = prefs.shift_toggle;
-    chewing_plus_set_shift_toggle(session, prefs.shift_toggle);
-    chewing_plus_set_emoji(session, prefs.emoji);
-    chewing_plus_set_calculator(session, prefs.calculator);
-    chewing_plus_set_spacing(session, prefs.space, prefs.space);
-    chewing_plus_set_emoji_shortcode(session, prefs.shortcode, ";;", 300);
-    chewing_plus_set_english(session, prefs.english, prefs.english,
-                             "Control+Shift+Space");
-    chewing_plus_set_english_double_tap(session, prefs.english, 300);
-    chewing_plus_set_english_hint_commit(session, prefs.hint_commit);
-    chewing_plus_set_easy_symbol(session, prefs.easy_symbol);
+    const char *shift;
+    size_t i;
 #ifndef CHEWING_PLUS_IBUS_PHRASES
 #define CHEWING_PLUS_IBUS_PHRASES ""
 #endif
-    {
-        const char *phrases = getenv("CHEWING_PLUS_PHRASES");
-        chewing_plus_set_suggestions(
-            session, prefs.suggestions,
-            phrases && phrases[0] ? phrases : CHEWING_PLUS_IBUS_PHRASES);
+    const char *phrases = getenv("CHEWING_PLUS_PHRASES");
+    chewing_plus_set_phrases_path(
+        session, phrases && phrases[0] ? phrases : CHEWING_PLUS_IBUS_PHRASES);
+    chewing_plus_ibus_prefs_load(&prefs);
+    for (i = 0; i < prefs.count; i++) {
+        chewing_plus_set_setting(session, prefs.items[i].key,
+                                 prefs.items[i].value);
     }
+    shift = chewing_plus_get_setting(session, "shift_toggle");
+    last_shift_toggle = shift && strcmp(shift, "1") == 0;
 }
 
 static int sensitive(IBusEngine *engine) {

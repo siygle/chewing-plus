@@ -475,6 +475,63 @@ static void test_flush_and_page(void) {
     reset();
 }
 
+static void test_settings(void) {
+    chewing_plus_setting_info info;
+    int i, n = chewing_plus_setting_count();
+    int seen_emoji = 0;
+    const char *got;
+    check(n >= 15, "settings table has entries");
+    for (i = 0; i < n; i++) {
+        check(chewing_plus_setting_info_at(i, &info) == 1 && info.key &&
+                  info.key[0] && info.default_value && info.label_zh &&
+                  info.label_zh[0],
+              "setting row is complete");
+        if (strcmp(info.key, "emoji") == 0) {
+            seen_emoji = info.type == CHEWING_PLUS_SETTING_BOOL &&
+                         strcmp(info.default_value, "0") == 0;
+        }
+    }
+    check(seen_emoji, "emoji is a bool, off by default");
+    check(chewing_plus_setting_info_at(n, &info) == 0, "row past the end");
+
+    check(chewing_plus_set_setting(session, "no_such_key", "1") == 0,
+          "unknown key ignored");
+    check(chewing_plus_set_setting(session, "emoji", "maybe") == 0,
+          "bad bool ignored");
+    check(chewing_plus_set_setting(session, "page_size", "x") == 0,
+          "bad int ignored");
+    check(chewing_plus_set_setting(session, "calculator", "On") == 1,
+          "bool accepts On");
+    got = chewing_plus_get_setting(session, "calculator");
+    check(got && strcmp(got, "1") == 0, "stored as 1");
+    reset();
+    type_text("=");
+    check(chewing_plus_panel(session) == CHEWING_PLUS_PANEL_CALCULATOR,
+          "calculator on through the table");
+    chewing_plus_set_setting(session, "calculator", "false");
+    reset();
+    type_text("=");
+    check(chewing_plus_panel(session) != CHEWING_PLUS_PANEL_CALCULATOR,
+          "calculator off through the table");
+    check(chewing_plus_set_setting(session, "page_size", "5") == 1 &&
+              strcmp(chewing_plus_get_setting(session, "page_size"), "5") == 0,
+          "int setting");
+    chewing_plus_set_setting(session, "page_size", "10");
+    check(chewing_plus_get_setting(session, "nope") == NULL,
+          "get unknown key is NULL");
+
+    /* suggestions through the table + phrase path */
+    chewing_plus_set_phrases_path(session, PLUS_PHRASES_PATH);
+    chewing_plus_set_setting(session, "suggestions", "1");
+    reset();
+    type_text("evzh");
+    check(chewing_plus_suggestion_count(session) >= 1,
+          "suggestions on through the table");
+    chewing_plus_set_setting(session, "suggestions", "0");
+    chewing_plus_set_setting(session, "calculator", "1");
+    reset();
+}
+
 static void test_emoji_candidate(void) {
     int found;
     reset();
@@ -574,6 +631,7 @@ int main(void) {
     test_view();
     test_ascii_mode();
     test_flush_and_page();
+    test_settings();
     test_emoji_candidate();
     test_sensitive();
 

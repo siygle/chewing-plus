@@ -415,20 +415,25 @@ void ChewingEngine::populateConfig() {
     if (!s) {
         return;
     }
+    // fcitx5 keeps its own option names (users' chewing.conf), applied
+    // through the core's settings table so every frontend shares one meaning
+    // per key.
+    auto set = [s](const char *key, const std::string &value) {
+        chewing_plus_set_setting(s, key, value.c_str());
+    };
+    auto flag = [](bool on) { return std::string(on ? "1" : "0"); };
     CHEWING_DEBUG() << "Set layout to: "
                     << builtin_keymaps[static_cast<int>(*config_.Layout)];
-    chewing_plus_set_keyboard_layout(
-        s, builtin_keymaps[static_cast<int>(*config_.Layout)]);
-    chewing_plus_set_selection_keys(
-        s,
-        std::string(builtin_selectkeys[static_cast<int>(*config_.SelectionKey)])
-            .c_str());
-    chewing_plus_set_page_size(s, *config_.PageSize);
-    chewing_plus_set_phrase_options(s, *config_.AddPhraseForward ? 1 : 0,
-                                    *config_.ChoiceBackward ? 1 : 0,
-                                    *config_.AutoShiftCursor ? 1 : 0);
-    chewing_plus_set_space_as_selection(s, *config_.SpaceAsSelection ? 1 : 0);
-    chewing_plus_set_easy_symbol(s, *config_.EasySymbolInput ? 1 : 0);
+    set("keyboard_layout", builtin_keymaps[static_cast<int>(*config_.Layout)]);
+    set("selection_keys",
+        std::string(
+            builtin_selectkeys[static_cast<int>(*config_.SelectionKey)]));
+    set("page_size", std::to_string(*config_.PageSize));
+    set("add_phrase_forward", flag(*config_.AddPhraseForward));
+    set("choice_backward", flag(*config_.ChoiceBackward));
+    set("auto_shift_cursor", flag(*config_.AutoShiftCursor));
+    set("space_as_selection", flag(*config_.SpaceAsSelection));
+    set("easy_symbol", flag(*config_.EasySymbolInput));
 
     // Plus data: built-in files from the fcitx5 data dir, user files from
     // ~/.local/share/fcitx5-chewing. The core shares them between sessions.
@@ -445,13 +450,13 @@ void ChewingEngine::populateConfig() {
         emojiUser.c_str(), builtIn("data/chewing-plus-english.txt").c_str(),
         englishUser.c_str());
 
-    chewing_plus_set_emoji(s, *config_.PlusEmoji ? 1 : 0);
-    chewing_plus_set_calculator(s, *config_.PlusCalculator ? 1 : 0);
-    chewing_plus_set_spacing(s, *config_.PlusSpaceLetters ? 1 : 0,
-                             *config_.PlusSpaceDigits ? 1 : 0);
-    chewing_plus_set_emoji_shortcode(s, *config_.PlusEmojiShortcode ? 1 : 0,
-                                     config_.PlusEmojiShortcodePrefix->c_str(),
-                                     *config_.PlusEmojiDoubleTapMs);
+    set("emoji", flag(*config_.PlusEmoji));
+    set("calculator", flag(*config_.PlusCalculator));
+    set("space_letters", flag(*config_.PlusSpaceLetters));
+    set("space_digits", flag(*config_.PlusSpaceDigits));
+    set("shortcode_prefix", *config_.PlusEmojiShortcodePrefix);
+    set("shortcode_tap_ms", std::to_string(*config_.PlusEmojiDoubleTapMs));
+    set("shortcode", flag(*config_.PlusEmojiShortcode));
 
     // English shortcuts are configurable here, so this frontend detects them
     // and calls chewing_plus_toggle_english(); the core's fixed
@@ -482,16 +487,17 @@ void ChewingEngine::populateConfig() {
     std::string label = !combo.empty() && !tapLabel.empty()
                             ? combo + " / " + tapLabel
                             : (combo.empty() ? tapLabel : combo);
+    set("english", flag(*config_.PlusEnglish));
+    set("english_hint", flag(*config_.PlusEnglishHint));
+    // The hint label names fcitx5's own configurable keys.
     chewing_plus_set_english(s, *config_.PlusEnglish ? 1 : 0,
                              *config_.PlusEnglishHint ? 1 : 0, label.c_str());
     chewing_plus_set_english_combo(s, 0);
     chewing_plus_set_english_double_tap(s, 0, *config_.PlusEnglishDoubleTapMs);
-    chewing_plus_set_english_hint_commit(s, *config_.PlusEnglishHintCommit ? 1
-                                                                           : 0);
-
-    chewing_plus_set_suggestions(
-        s, *config_.PlusSuggestions ? 1 : 0,
-        builtIn("data/chewing-plus-phrases.txt").c_str());
+    set("english_hint_commit", flag(*config_.PlusEnglishHintCommit));
+    chewing_plus_set_phrases_path(
+        s, builtIn("data/chewing-plus-phrases.bin").c_str());
+    set("suggestions", flag(*config_.PlusSuggestions));
     chewing_plus_reset(s);
 }
 

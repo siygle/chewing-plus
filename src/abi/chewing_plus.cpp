@@ -8,9 +8,11 @@
 #include <chewing.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -130,6 +132,9 @@ struct Session {
     std::vector<Candidate> cands;
     std::string pendingCommit;
     std::string takenCommit;
+    // Current value of every setting, by key (settings.inc).
+    std::map<std::string, std::string> settings;
+    std::string settingOut;
     // Bumped by refresh() when anything a frontend draws changed.
     uint64_t revision = 1;
     std::string lastDrawn;
@@ -746,6 +751,13 @@ chewing_plus_session *chewing_plus_new(const char *chewing_sys_path,
     chewing_set_phraseChoiceRearward(raw, 1);
     chewing_set_autoShiftCur(raw, 0);
     chewing_set_spaceAsSelection(raw, 1);
+    // Record the defaults (they match the engine state set above) without
+    // re-applying them.
+    for (int i = 0; i < chewing_plus_setting_count(); i++) {
+        chewing_plus_setting_info info;
+        chewing_plus_setting_info_at(i, &info);
+        session->settings[info.key] = info.default_value;
+    }
     session->refresh();
     return reinterpret_cast<chewing_plus_session *>(session);
 }
@@ -801,6 +813,15 @@ void chewing_plus_set_suggestions(chewing_plus_session *session, int enabled,
         s->phrases = chewing_plus::DataCache::phrases(s->phrasesPath);
     }
     s->refresh();
+}
+
+void chewing_plus_set_phrases_path(chewing_plus_session *session,
+                                   const char *path) {
+    if (!session || !path) {
+        return;
+    }
+    auto *s = S(session);
+    chewing_plus_set_suggestions(session, s->suggestions ? 1 : 0, path);
 }
 
 int chewing_plus_suggestion_count(const chewing_plus_session *session) {
@@ -1156,6 +1177,174 @@ void chewing_plus_select(chewing_plus_session *session, int index) {
         s->selectChewing(c, cand.index);
     }
     s->refresh();
+}
+
+namespace {
+
+struct SettingRow {
+    const char *key;
+    int type;
+    const char *defaultValue;
+    const char *labelEn;
+    const char *labelZh;
+};
+
+constexpr SettingRow kSettings[] = {
+#define BOOL CHEWING_PLUS_SETTING_BOOL
+#define INT CHEWING_PLUS_SETTING_INT
+#define STRING CHEWING_PLUS_SETTING_STRING
+#define SETTING(key, type, def, en, zh) {#key, type, def, en, zh},
+#include "settings.inc"
+#undef SETTING
+#undef BOOL
+#undef INT
+#undef STRING
+};
+
+const SettingRow *FindSetting(const char *key) {
+    if (!key) {
+        return nullptr;
+    }
+    for (const auto &row : kSettings) {
+        if (std::strcmp(row.key, key) == 0) {
+            return &row;
+        }
+    }
+    return nullptr;
+}
+
+// "1"/"0" for a boolean, or "" if it does not parse.
+std::string ParseBool(const char *value) {
+    std::string v = value ? value : "";
+    std::transform(v.begin(), v.end(), v.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    if (v == "1" || v == "true" || v == "on" || v == "yes") {
+        return "1";
+    }
+    if (v == "0" || v == "false" || v == "off" || v == "no") {
+        return "0";
+    }
+    return "";
+}
+
+bool ParseInt(const char *value, int &out) {
+    if (!value || !*value) {
+        return false;
+    }
+    char *end = nullptr;
+    long n = std::strtol(value, &end, 10);
+    if (*end != '\0' || n < -100000 || n > 100000) {
+        return false;
+    }
+    out = static_cast<int>(n);
+    return true;
+}
+
+// Push the stored values into the engine. Grouped settings (spacing,
+// shortcode, English) are applied together from their stored keys.
+void ApplySetting(chewing_plus_session *session, const std::string &key) {
+    auto &st = S(session)->settings;
+    auto on = [&st](const char *k) { return st[k] == "1" ? 1 : 0; };
+    auto num = [&st](const char *k) {
+        int n = 0;
+        ParseInt(st[k].c_str(), n);
+        return n;
+    };
+    if (key == "emoji") {
+        chewing_plus_set_emoji(session, on("emoji"));
+    } else if (key == "calculator") {
+        chewing_plus_set_calculator(session, on("calculator"));
+    } else if (key == "space_letters" || key == "space_digits") {
+        chewing_plus_set_spacing(session, on("space_letters"),
+                                 on("space_digits"));
+    } else if (key == "shortcode" || key == "shortcode_prefix" ||
+               key == "shortcode_tap_ms") {
+        chewing_plus_set_emoji_shortcode(session, on("shortcode"),
+                                         st["shortcode_prefix"].c_str(),
+                                         num("shortcode_tap_ms"));
+    } else if (key == "english" || key == "english_hint") {
+        chewing_plus_set_english(session, on("english"), on("english_hint"),
+                                 nullptr);
+    } else if (key == "english_hint_commit") {
+        chewing_plus_set_english_hint_commit(session,
+                                             on("english_hint_commit"));
+    } else if (key == "suggestions") {
+        chewing_plus_set_suggestions(session, on("suggestions"), nullptr);
+    } else if (key == "shift_toggle") {
+        chewing_plus_set_shift_toggle(session, on("shift_toggle"));
+    } else if (key == "easy_symbol") {
+        chewing_plus_set_easy_symbol(session, on("easy_symbol"));
+    } else if (key == "keyboard_layout") {
+        chewing_plus_set_keyboard_layout(session,
+                                         st["keyboard_layout"].c_str());
+    } else if (key == "selection_keys") {
+        chewing_plus_set_selection_keys(session, st["selection_keys"].c_str());
+    } else if (key == "page_size") {
+        chewing_plus_set_page_size(session, num("page_size"));
+    } else if (key == "space_as_selection") {
+        chewing_plus_set_space_as_selection(session, on("space_as_selection"));
+    } else if (key == "add_phrase_forward" || key == "choice_backward" ||
+               key == "auto_shift_cursor") {
+        chewing_plus_set_phrase_options(session, on("add_phrase_forward"),
+                                        on("choice_backward"),
+                                        on("auto_shift_cursor"));
+    }
+}
+
+} // namespace
+
+int chewing_plus_setting_count(void) {
+    return static_cast<int>(sizeof(kSettings) / sizeof(kSettings[0]));
+}
+
+int chewing_plus_setting_info_at(int index, chewing_plus_setting_info *out) {
+    if (!out || index < 0 || index >= chewing_plus_setting_count()) {
+        return 0;
+    }
+    const auto &row = kSettings[index];
+    out->key = row.key;
+    out->type = row.type;
+    out->default_value = row.defaultValue;
+    out->label_en = row.labelEn;
+    out->label_zh = row.labelZh;
+    return 1;
+}
+
+int chewing_plus_set_setting(chewing_plus_session *session, const char *key,
+                             const char *value) {
+    const SettingRow *row = FindSetting(key);
+    if (!session || !row || !value) {
+        return 0;
+    }
+    std::string normalized;
+    if (row->type == CHEWING_PLUS_SETTING_BOOL) {
+        normalized = ParseBool(value);
+        if (normalized.empty()) {
+            return 0;
+        }
+    } else if (row->type == CHEWING_PLUS_SETTING_INT) {
+        int n = 0;
+        if (!ParseInt(value, n)) {
+            return 0;
+        }
+        normalized = std::to_string(n);
+    } else {
+        normalized = value;
+    }
+    S(session)->settings[row->key] = normalized;
+    ApplySetting(session, row->key);
+    return 1;
+}
+
+const char *chewing_plus_get_setting(chewing_plus_session *session,
+                                     const char *key) {
+    const SettingRow *row = FindSetting(key);
+    if (!session || !row) {
+        return nullptr;
+    }
+    auto *s = S(session);
+    s->settingOut = s->settings[row->key];
+    return s->settingOut.c_str();
 }
 
 int chewing_plus_get_view(chewing_plus_session *session,

@@ -20,9 +20,16 @@ static void check(int ok, const char *what) {
     }
 }
 
+static int is(const chewing_plus_ibus_prefs *p, const char *key,
+              const char *want) {
+    const char *got = chewing_plus_ibus_prefs_get(p, key);
+    return want ? got && strcmp(got, want) == 0 : got == NULL;
+}
+
 int main(void) {
     char dir[] = "/tmp/ibus-prefs-XXXXXX";
     char path[256];
+    FILE *old;
     chewing_plus_ibus_prefs saved;
     chewing_plus_ibus_prefs loaded;
     if (!mkdtemp(dir)) {
@@ -33,26 +40,40 @@ int main(void) {
     setenv("CHEWING_PLUS_IBUS_CONFIG", path, 1);
     unsetenv("CHEWING_PLUS_IBUS_FEATURES");
 
+    chewing_plus_ibus_prefs_load(&loaded);
+    check(loaded.count == 0, "missing file loads empty");
+
     memset(&saved, 0, sizeof(saved));
-    saved.emoji = 1;
-    saved.english = 1;
-    saved.suggestions = 1;
-    saved.shift_toggle = 1;
+    chewing_plus_ibus_prefs_set(&saved, "emoji", "1");
+    chewing_plus_ibus_prefs_set(&saved, "shortcode_prefix", "``");
+    chewing_plus_ibus_prefs_set(&saved, "emoji", "0");
+    check(saved.count == 2 && is(&saved, "emoji", "0"), "set replaces");
     check(chewing_plus_ibus_prefs_save(&saved) == 0, "save");
     chewing_plus_ibus_prefs_load(&loaded);
-    check(loaded.emoji && !loaded.calculator && !loaded.space &&
-              !loaded.shortcode && loaded.english && loaded.suggestions &&
-              !loaded.hint_commit && !loaded.easy_symbol && loaded.shift_toggle,
-          "file round trip");
+    check(is(&loaded, "emoji", "0") && is(&loaded, "shortcode_prefix", "``") &&
+              is(&loaded, "calculator", NULL),
+          "file round trip, strings kept, absent stays absent");
 
-    setenv("CHEWING_PLUS_IBUS_FEATURES", "calculator,shortcode,hintcommit", 1);
+    /* A file written by 5.1.13-plus.3 and earlier. */
+    old = fopen(path, "w");
+    fputs("emoji=1\nspace=1\nhint_commit=1\nshift_toggle=1\n", old);
+    fclose(old);
     chewing_plus_ibus_prefs_load(&loaded);
-    check(!loaded.emoji && loaded.calculator && loaded.shortcode &&
-              !loaded.english && loaded.hint_commit && !loaded.suggestions,
-          "env overrides the file");
+    check(is(&loaded, "emoji", "1") && is(&loaded, "space_letters", "1") &&
+              is(&loaded, "space_digits", "1") &&
+              is(&loaded, "english_hint_commit", "1") &&
+              is(&loaded, "shift_toggle", "1") && is(&loaded, "space", NULL),
+          "old keys migrate");
+
+    setenv("CHEWING_PLUS_IBUS_FEATURES", "calculator,suggest,hintcommit", 1);
+    chewing_plus_ibus_prefs_load(&loaded);
+    check(is(&loaded, "calculator", "1") && is(&loaded, "suggestions", "1") &&
+              is(&loaded, "english_hint_commit", "1") &&
+              is(&loaded, "emoji", NULL),
+          "env overrides the file, old tokens work");
     unsetenv("CHEWING_PLUS_IBUS_FEATURES");
     chewing_plus_ibus_prefs_load(&loaded);
-    check(loaded.emoji && loaded.english, "file returns when env is unset");
+    check(is(&loaded, "emoji", "1"), "file returns when env is unset");
 
     if (failures) {
         fprintf(stderr, "%d failures\n", failures);

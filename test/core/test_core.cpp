@@ -170,6 +170,36 @@ void testDoubleTap() {
     check(!tap.onKey(true, true, 320), "outside the window does not fire");
 }
 
+void testCompiledPhrases() {
+    chewing_plus::PhraseIndex text;
+    text.load(PLUS_PHRASES_PATH);
+    text.finalize();
+    char path[] = "/tmp/chewing-plus-phrases-XXXXXX";
+    int fd = mkstemp(path);
+    check(fd >= 0, "temp file");
+    close(fd);
+    check(text.writeCompiled(path), "write compiled phrases");
+    chewing_plus::PhraseIndex bin;
+    check(bin.load(path) == text.size() && bin.compiled(),
+          "compiled file loads with the same count");
+    bool same = true;
+    for (const char *q : {"中華", "台灣", "電腦", "新酷", "學生", "謝謝"}) {
+        same &= bin.complete(q) == text.complete(q);
+    }
+    for (const char *q : {"ㄍㄒㄈㄘ", "ㄓㄏㄇㄍ", "ㄊㄑㄩ", "ㄒㄒㄒ"}) {
+        same &= bin.expand(q) == text.expand(q);
+    }
+    check(same, "compiled and text give identical results");
+    // A truncated file must be rejected, not read past its end.
+    {
+        std::ofstream cut(path, std::ios::binary | std::ios::trunc);
+        cut.write("CPPHRS01\xff\xff\x00\x00", 12);
+    }
+    chewing_plus::PhraseIndex bad;
+    check(!bad.compiled() && bad.load(path) == 0, "truncated file rejected");
+    std::remove(path);
+}
+
 void testDataCache() {
     namespace dc = chewing_plus::DataCache;
     std::string user = TempFile("Zzzcachetest\n");
@@ -227,6 +257,7 @@ int main() {
     testEnglish();
     testDoubleTap();
     testPhrases();
+    testCompiledPhrases();
     testDataCache();
     std::printf(failures ? "CORE TESTS FAILED (%d)\n" : "CORE TESTS OK\n",
                 failures);

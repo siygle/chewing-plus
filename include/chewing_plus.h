@@ -183,6 +183,10 @@ CHEWING_PLUS_API void chewing_plus_set_data_paths(chewing_plus_session *session,
 CHEWING_PLUS_API void
 chewing_plus_set_suggestions(chewing_plus_session *session, int enabled,
                              const char *path);
+/* Phrase file for suggestions (plain text or the compiled .bin), used by the
+ * "suggestions" setting. Reloads if suggestions are on. */
+CHEWING_PLUS_API void
+chewing_plus_set_phrases_path(chewing_plus_session *session, const char *path);
 CHEWING_PLUS_API int
 chewing_plus_suggestion_count(const chewing_plus_session *session);
 CHEWING_PLUS_API const char *
@@ -348,6 +352,40 @@ typedef struct chewing_plus_view {
 
 CHEWING_PLUS_API int chewing_plus_get_view(chewing_plus_session *session,
                                            chewing_plus_view *out);
+
+/*
+ * Settings, one table for every frontend (src/abi/settings.inc). A frontend
+ * enumerates them to build its settings UI and storage, and applies stored
+ * values by key. Unknown keys and unparsable values are ignored (returns 0),
+ * so a newer config file never breaks an older build.
+ */
+enum {
+    CHEWING_PLUS_SETTING_BOOL = 0,
+    CHEWING_PLUS_SETTING_INT = 1,
+    CHEWING_PLUS_SETTING_STRING = 2
+};
+
+typedef struct chewing_plus_setting_info {
+    const char *key;           /* "emoji" */
+    int type;                  /* CHEWING_PLUS_SETTING_* */
+    const char *default_value; /* "0", "300", ";;" */
+    const char *label_en;
+    const char *label_zh; /* Traditional Chinese */
+} chewing_plus_setting_info;
+
+CHEWING_PLUS_API int chewing_plus_setting_count(void);
+/* Returns 0 if `index` is out of range. Strings are static. */
+CHEWING_PLUS_API int
+chewing_plus_setting_info_at(int index, chewing_plus_setting_info *out);
+/* Booleans accept 1/0, true/false, on/off, yes/no (any case). */
+CHEWING_PLUS_API int chewing_plus_set_setting(chewing_plus_session *session,
+                                              const char *key,
+                                              const char *value);
+/* Value last set through chewing_plus_set_setting(), or the default; the
+ * older per-feature setters do not update it. NULL for an unknown key.
+ * Valid until the next call on this session. */
+CHEWING_PLUS_API const char *
+chewing_plus_get_setting(chewing_plus_session *session, const char *key);
 
 /*
  * Text committed since the previous take, concatenated. Empty string if
