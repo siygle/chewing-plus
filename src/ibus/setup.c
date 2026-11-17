@@ -21,6 +21,9 @@ typedef struct {
     GtkWidget *space;
     GtkWidget *shortcode;
     GtkWidget *english;
+    GtkWidget *suggestions;
+    GtkWidget *hint_commit;
+    GtkWidget *easy_symbol;
     voxkit_client voice;
     guint timer;
     uint64_t req;
@@ -266,6 +269,9 @@ static void save_switches(void) {
     prefs.space = gtk_switch_get_active(GTK_SWITCH(UI->space));
     prefs.shortcode = gtk_switch_get_active(GTK_SWITCH(UI->shortcode));
     prefs.english = gtk_switch_get_active(GTK_SWITCH(UI->english));
+    prefs.suggestions = gtk_switch_get_active(GTK_SWITCH(UI->suggestions));
+    prefs.hint_commit = gtk_switch_get_active(GTK_SWITCH(UI->hint_commit));
+    prefs.easy_symbol = gtk_switch_get_active(GTK_SWITCH(UI->easy_symbol));
     chewing_plus_ibus_prefs_save(&prefs);
 }
 
@@ -304,6 +310,9 @@ static void load_switches(void) {
     gtk_switch_set_active(GTK_SWITCH(UI->space), prefs.space);
     gtk_switch_set_active(GTK_SWITCH(UI->shortcode), prefs.shortcode);
     gtk_switch_set_active(GTK_SWITCH(UI->english), prefs.english);
+    gtk_switch_set_active(GTK_SWITCH(UI->suggestions), prefs.suggestions);
+    gtk_switch_set_active(GTK_SWITCH(UI->hint_commit), prefs.hint_commit);
+    gtk_switch_set_active(GTK_SWITCH(UI->easy_symbol), prefs.easy_symbol);
     UI->loading = 0;
 }
 
@@ -358,6 +367,12 @@ static void activate(GtkApplication *app, gpointer user) {
     gtk_box_append(GTK_BOX(plus), switch_row("中英間距", &UI->space));
     gtk_box_append(GTK_BOX(plus), switch_row("表情短碼", &UI->shortcode));
     gtk_box_append(GTK_BOX(plus), switch_row("英文模式", &UI->english));
+    gtk_box_append(GTK_BOX(plus),
+                   switch_row("英文提示時快速鍵直接填入", &UI->hint_commit));
+    gtk_box_append(GTK_BOX(plus),
+                   switch_row("詞語建議（Shift+1–9 選取）", &UI->suggestions));
+    gtk_box_append(GTK_BOX(plus),
+                   switch_row("簡易符號（Shift+英文字母）", &UI->easy_symbol));
     gtk_box_append(GTK_BOX(page), plus);
 
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), page);

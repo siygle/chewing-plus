@@ -19,6 +19,7 @@ typedef struct {
     uint64_t voice_req;
     int voice_active;
     int voice_failed;
+    uint64_t drawn; /* chewing_plus_view revision last drawn */
 } ChewingPlusEngine;
 
 typedef struct {
@@ -43,6 +44,17 @@ static void apply_features(chewing_plus_session *session) {
     chewing_plus_set_english(session, prefs.english, prefs.english,
                              "Control+Shift+Space");
     chewing_plus_set_english_double_tap(session, prefs.english, 300);
+    chewing_plus_set_english_hint_commit(session, prefs.hint_commit);
+    chewing_plus_set_easy_symbol(session, prefs.easy_symbol);
+#ifndef CHEWING_PLUS_IBUS_PHRASES
+#define CHEWING_PLUS_IBUS_PHRASES ""
+#endif
+    {
+        const char *phrases = getenv("CHEWING_PLUS_PHRASES");
+        chewing_plus_set_suggestions(
+            session, prefs.suggestions,
+            phrases && phrases[0] ? phrases : CHEWING_PLUS_IBUS_PHRASES);
+    }
 }
 
 static int sensitive(IBusEngine *engine) {
@@ -104,42 +116,68 @@ static void show_aux(IBusEngine *engine, const char *text) {
     g_object_unref(aux);
 }
 
+/* Phrase suggestions on the aux line under the preedit: "⇧1 中華民國 ⇧2 …".
+ * The core's own aux text (English hint) comes first. */
+static void show_suggestions(IBusEngine *engine, chewing_plus_session *session,
+                             const char *aux, int count) {
+    GString *line = g_string_new(aux ? aux : "");
+    int i;
+    for (i = 0; i < count && i < 9; i++) {
+        const char *s = chewing_plus_suggestion(session, i);
+        if (!s) {
+            continue;
+        }
+        if (line->len) {
+            g_string_append(line, "  ");
+        }
+        g_string_append_printf(line, "⇧%d %s", i + 1, s);
+    }
+    show_aux(engine, line->str);
+    g_string_free(line, TRUE);
+}
+
+/* Draw the core's view. Skipped when nothing visible changed. */
 static void refresh(ChewingPlusEngine *self) {
     IBusEngine *engine = IBUS_ENGINE(self);
-    size_t cursor = 0;
-    size_t hl_start = 0;
-    size_t hl_len = 0;
-    const char *preedit;
-    const char *aux;
+    chewing_plus_view view;
     int i;
-    int n;
     IBusLookupTable *table;
-    if (!self->session) {
+    if (!self->session || !chewing_plus_get_view(self->session, &view)) {
         return;
     }
-    preedit = chewing_plus_preedit(self->session, &cursor, &hl_start, &hl_len);
-    aux = chewing_plus_aux(self->session);
-    if (preedit && preedit[0]) {
-        IBusText *text = ibus_text_new_from_string(preedit);
+    if (view.revision == self->drawn) {
+        return;
+    }
+    self->drawn = view.revision;
+    if (view.preedit[0]) {
+        IBusText *text = ibus_text_new_from_string(view.preedit);
+        guint chars = (guint)g_utf8_strlen(view.preedit, -1);
         ibus_text_append_attribute(text, IBUS_ATTR_TYPE_UNDERLINE,
-                                   IBUS_ATTR_UNDERLINE_SINGLE, 0,
-                                   (guint)strlen(preedit));
-        if (hl_len) {
+                                   IBUS_ATTR_UNDERLINE_SINGLE, 0, chars);
+        if (view.highlight_length) {
+            /* IBus attributes and cursor count characters, not bytes. */
+            glong from = g_utf8_pointer_to_offset(
+                view.preedit, view.preedit + view.highlight_start);
+            glong to = g_utf8_pointer_to_offset(
+                view.preedit,
+                view.preedit + view.highlight_start + view.highlight_length);
             ibus_text_append_attribute(text, IBUS_ATTR_TYPE_BACKGROUND,
-                                       0x808080, (guint)hl_start,
-                                       (guint)(hl_start + hl_len));
+                                       0x808080, (guint)from, (guint)to);
         }
-        ibus_engine_update_preedit_text(engine, text, (guint)cursor, TRUE);
+        ibus_engine_update_preedit_text(
+            engine, text,
+            (guint)g_utf8_pointer_to_offset(view.preedit,
+                                            view.preedit + view.cursor),
+            TRUE);
         g_object_unref(text);
     } else {
         IBusText *text = ibus_text_new_from_string("");
         ibus_engine_update_preedit_text(engine, text, 0, FALSE);
         g_object_unref(text);
     }
-    show_aux(engine, aux);
-    n = chewing_plus_candidate_count(self->session);
+    show_suggestions(engine, self->session, view.aux, view.suggestion_count);
     table = ibus_lookup_table_new(10, 0, TRUE, TRUE);
-    for (i = 0; i < n; i++) {
+    for (i = 0; i < view.candidate_count; i++) {
         const char *label = chewing_plus_candidate_label(self->session, i);
         const char *cand = chewing_plus_candidate(self->session, i);
         IBusText *cand_text = ibus_text_new_from_string(cand ? cand : "");
@@ -151,7 +189,7 @@ static void refresh(ChewingPlusEngine *self) {
             g_object_unref(label_text);
         }
     }
-    ibus_engine_update_lookup_table(engine, table, n > 0);
+    ibus_engine_update_lookup_table(engine, table, view.candidate_count > 0);
     g_object_unref(table);
 }
 
@@ -307,9 +345,31 @@ static gboolean process_key(IBusEngine *engine, guint keyval, guint keycode,
     if (decision.action != CHEWING_IBUS_KEY_TO_CORE) {
         return FALSE;
     }
-    chewing_plus_key(self->session, &decision.event);
-    refresh(self);
-    return TRUE;
+    {
+        /* Shift+1..9 (X11 keycodes 10..18) picks a phrase suggestion while
+         * no candidate list or Plus panel is open. */
+        chewing_plus_view view;
+        int digit = (int)keycode - 9;
+        if (!(state & CHEWING_IBUS_RELEASE) &&
+            (state & (CHEWING_IBUS_SHIFT | CHEWING_IBUS_CONTROL |
+                      CHEWING_IBUS_MOD1)) == CHEWING_IBUS_SHIFT &&
+            digit >= 1 && digit <= 9 &&
+            chewing_plus_get_view(self->session, &view) &&
+            view.candidate_count == 0 &&
+            view.panel == CHEWING_PLUS_PANEL_NONE &&
+            digit <= view.suggestion_count) {
+            chewing_plus_select_suggestion(self->session, digit - 1);
+            refresh(self);
+            return TRUE;
+        }
+    }
+    {
+        int consumed = chewing_plus_key(self->session, &decision.event);
+        refresh(self);
+        /* A key the core does not want (Backspace on an empty buffer, a
+         * release, a lone modifier) goes back to the application. */
+        return consumed ? TRUE : FALSE;
+    }
 }
 
 static void focus_in(IBusEngine *engine) {

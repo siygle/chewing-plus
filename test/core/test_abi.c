@@ -334,6 +334,34 @@ static void test_suggestions(void) {
           "suggestions off: nothing listed");
 }
 
+static void test_view(void) {
+    chewing_plus_view v, w;
+    reset();
+    check(chewing_plus_get_view(NULL, &v) == 0, "get_view NULL session");
+    check(chewing_plus_get_view(session, &v) == 1 && v.preedit[0] == '\0',
+          "empty view");
+    type_text("s");
+    chewing_plus_get_view(session, &w);
+    check(w.revision != v.revision && strcmp(w.preedit, "ㄋ") == 0 &&
+              w.highlight_length > 0,
+          "typing changes the view and its revision");
+    /* A key release changes nothing on screen: same revision. */
+    {
+        chewing_plus_key_event ev;
+        memset(&ev, 0, sizeof(ev));
+        ev.ascii = 's';
+        ev.mods = CHEWING_PLUS_MOD_RELEASE;
+        ev.time_ms = -1;
+        chewing_plus_key(session, &ev);
+    }
+    chewing_plus_get_view(session, &v);
+    check(v.revision == w.revision, "nothing visible changed: same revision");
+    type_text("u3");
+    chewing_plus_get_view(session, &v);
+    check(strcmp(v.preedit, "你") == 0 && v.revision != w.revision,
+          "view after 你");
+}
+
 static void test_emoji_candidate(void) {
     int found;
     reset();
@@ -430,6 +458,7 @@ int main(void) {
     test_double_shift();
     test_hint_commit();
     test_suggestions();
+    test_view();
     test_emoji_candidate();
     test_sensitive();
 

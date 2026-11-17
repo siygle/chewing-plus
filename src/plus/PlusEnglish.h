@@ -33,6 +33,10 @@ public:
     // dictionary casing when the user typed all-lowercase, else as typed.
     std::string canonical(const std::string &typed) const;
 
+    // Sort the completion index. Call after the last load(); a finalized
+    // lexicon is safe to share between sessions (lookups do not write).
+    void finalize();
+
 private:
     struct Word {
         std::string text;

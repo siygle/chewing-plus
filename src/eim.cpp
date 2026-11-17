@@ -7,6 +7,7 @@
  */
 #include "eim.h"
 
+#include "PlusData.h"
 #include "voxkit_client.h"
 #include <algorithm>
 #include <array>
@@ -551,24 +552,20 @@ void ChewingEngine::populateConfig() {
 void ChewingEngine::loadPlusData() {
     const auto &sp = StandardPaths::global();
     auto userDir = sp.userDirectory(StandardPathsType::Data) / "fcitx5-chewing";
-    plus_.shortcodes().clear();
+    plus_.setShortcodes(nullptr);
     if (*config_.PlusEmojiShortcode) {
         auto builtIn = sp.locate(StandardPathsType::PkgData,
                                  "data/chewing-plus-emoji-shortcodes.txt");
-        if (!builtIn.empty()) {
-            plus_.shortcodes().load(builtIn.string());
-        }
-        plus_.shortcodes().load(
-            (userDir / "plus-emoji-shortcodes.txt").string(), true);
+        plus_.setShortcodes(chewing_plus::DataCache::emoji(
+            builtIn.string(),
+            (userDir / "plus-emoji-shortcodes.txt").string()));
     }
-    plus_.lexicon().clear();
+    plus_.setLexicon(nullptr);
     if (*config_.PlusEnglish) {
         auto builtIn = sp.locate(StandardPathsType::PkgData,
                                  "data/chewing-plus-english.txt");
-        if (!builtIn.empty()) {
-            plus_.lexicon().load(builtIn.string());
-        }
-        plus_.lexicon().load((userDir / "plus-english.txt").string(), true);
+        plus_.setLexicon(chewing_plus::DataCache::english(
+            builtIn.string(), (userDir / "plus-english.txt").string()));
     }
 }
 

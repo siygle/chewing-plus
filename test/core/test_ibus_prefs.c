@@ -36,16 +36,18 @@ int main(void) {
     memset(&saved, 0, sizeof(saved));
     saved.emoji = 1;
     saved.english = 1;
+    saved.suggestions = 1;
     check(chewing_plus_ibus_prefs_save(&saved) == 0, "save");
     chewing_plus_ibus_prefs_load(&loaded);
     check(loaded.emoji && !loaded.calculator && !loaded.space &&
-              !loaded.shortcode && loaded.english,
+              !loaded.shortcode && loaded.english && loaded.suggestions &&
+              !loaded.hint_commit && !loaded.easy_symbol,
           "file round trip");
 
-    setenv("CHEWING_PLUS_IBUS_FEATURES", "calculator,shortcode", 1);
+    setenv("CHEWING_PLUS_IBUS_FEATURES", "calculator,shortcode,hintcommit", 1);
     chewing_plus_ibus_prefs_load(&loaded);
     check(!loaded.emoji && loaded.calculator && loaded.shortcode &&
-              !loaded.english,
+              !loaded.english && loaded.hint_commit && !loaded.suggestions,
           "env overrides the file");
     unsetenv("CHEWING_PLUS_IBUS_FEATURES");
     chewing_plus_ibus_prefs_load(&loaded);

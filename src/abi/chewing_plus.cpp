@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "ChewingPlus.h"
+#include "PlusData.h"
 #include "PlusPhrases.h"
 
 namespace {
@@ -104,7 +105,8 @@ struct Session {
     std::string englishUser;
     std::string phrasesPath;
     bool suggestions = false;
-    chewing_plus::PhraseIndex phrases;
+    std::shared_ptr<const chewing_plus::PhraseIndex> phrases =
+        std::make_shared<chewing_plus::PhraseIndex>();
     // Current suggestions and what they replace: the last `replaceChars`
     // code points before the cursor in the buffer, or the whole reading.
     std::vector<std::string> sugg;
@@ -122,6 +124,9 @@ struct Session {
     std::vector<Candidate> cands;
     std::string pendingCommit;
     std::string takenCommit;
+    // Bumped by refresh() when anything a frontend draws changed.
+    uint64_t revision = 1;
+    std::string lastDrawn;
 
     ChewingContext *raw() { return ctx.get(); }
 
@@ -137,24 +142,13 @@ struct Session {
     }
 
     void reloadData() {
-        plus.shortcodes().clear();
-        if (opt.emojiShortcode) {
-            if (!emojiBuiltin.empty()) {
-                plus.shortcodes().load(emojiBuiltin);
-            }
-            if (!emojiUser.empty()) {
-                plus.shortcodes().load(emojiUser, true);
-            }
-        }
-        plus.lexicon().clear();
-        if (opt.english) {
-            if (!englishBuiltin.empty()) {
-                plus.lexicon().load(englishBuiltin);
-            }
-            if (!englishUser.empty()) {
-                plus.lexicon().load(englishUser, true);
-            }
-        }
+        // Shared with every other session using the same files.
+        plus.setShortcodes(opt.emojiShortcode ? chewing_plus::DataCache::emoji(
+                                                    emojiBuiltin, emojiUser)
+                                              : nullptr);
+        plus.setLexicon(opt.english ? chewing_plus::DataCache::english(
+                                          englishBuiltin, englishUser)
+                                    : nullptr);
     }
 
     void applyOptions() { plus.setOptions(opt); }
@@ -234,8 +228,34 @@ struct Session {
             fillChewingCandidates(c);
         }
         fillSuggestions(c);
+        bumpRevision();
         if (cb.updated) {
             cb.updated(cb.user);
+        }
+    }
+
+    // One string that changes whenever anything visible changes.
+    void bumpRevision() {
+        std::string key;
+        key.reserve(preedit.size() + aux.size() + 64);
+        auto add = [&key](const std::string &s) {
+            key += s;
+            key += '\x1f';
+        };
+        add(preedit);
+        add(std::to_string(cursor) + "," + std::to_string(hlStart) + "," +
+            std::to_string(hlLen) + "," + std::to_string(panelKind));
+        add(aux);
+        for (const auto &c : cands) {
+            add(c.label + c.text);
+        }
+        key += '\x1e';
+        for (const auto &s : sugg) {
+            add(s);
+        }
+        if (key != lastDrawn) {
+            lastDrawn = std::move(key);
+            ++revision;
         }
     }
 
@@ -246,7 +266,7 @@ struct Session {
         sugg.clear();
         replaceChars = 0;
         replaceReading = false;
-        if (!suggestions || sensitive || phrases.size() == 0 ||
+        if (!suggestions || sensitive || phrases->size() == 0 ||
             panelKind != CHEWING_PLUS_PANEL_NONE ||
             chewing_cand_TotalPage(c) > 0) {
             return;
@@ -260,7 +280,7 @@ struct Session {
             // only on layouts that queue them, e.g. Hsu). Use the raw keys
             // recorded for the English hint when the reading does not grow.
             std::string initials = plus.typedInitials(c);
-            sugg = phrases.expand(initials);
+            sugg = phrases->expand(initials);
             replaceReading = !sugg.empty();
             if (replaceReading && initials != zuin) {
                 // libchewing shows only the last initial; show them all.
@@ -282,7 +302,7 @@ struct Session {
             size_t from = ByteOffset(buffer, end - n);
             std::string tail =
                 buffer.substr(from, ByteOffset(buffer, end) - from);
-            auto found = phrases.complete(tail);
+            auto found = phrases->complete(tail);
             if (!found.empty()) {
                 sugg = std::move(found);
                 replaceChars = n;
@@ -684,13 +704,10 @@ void chewing_plus_set_suggestions(chewing_plus_session *session, int enabled,
         s->phrasesPath = path;
     }
     s->suggestions = enabled != 0;
-    if (!s->suggestions) {
-        s->phrases.clear();
-    } else if (reload || s->phrases.size() == 0) {
-        s->phrases.clear();
-        if (!s->phrasesPath.empty()) {
-            s->phrases.load(s->phrasesPath);
-        }
+    if (!s->suggestions || s->phrasesPath.empty()) {
+        s->phrases = std::make_shared<chewing_plus::PhraseIndex>();
+    } else if (reload || s->phrases->size() == 0) {
+        s->phrases = chewing_plus::DataCache::phrases(s->phrasesPath);
     }
     s->refresh();
 }
@@ -1009,6 +1026,24 @@ void chewing_plus_select(chewing_plus_session *session, int index) {
         s->selectChewing(c, cand.index);
     }
     s->refresh();
+}
+
+int chewing_plus_get_view(chewing_plus_session *session,
+                          chewing_plus_view *out) {
+    if (!session || !out) {
+        return 0;
+    }
+    auto *s = S(session);
+    out->revision = s->revision;
+    out->preedit = s->preedit.c_str();
+    out->cursor = s->cursor;
+    out->highlight_start = s->hlStart;
+    out->highlight_length = s->hlLen;
+    out->aux = s->aux.c_str();
+    out->panel = s->panelKind;
+    out->candidate_count = static_cast<int>(s->cands.size());
+    out->suggestion_count = static_cast<int>(s->sugg.size());
+    return 1;
 }
 
 const char *chewing_plus_take_commit(chewing_plus_session *session) {

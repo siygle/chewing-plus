@@ -32,6 +32,7 @@ add_library(chewing-plus-core ${_core_type}
     plus/PlusEnglish.cpp
     plus/PlusFeatures.cpp
     plus/PlusPhrases.cpp
+    plus/PlusData.cpp
     abi/chewing_plus.cpp
 )
 target_link_libraries(chewing-plus-core PUBLIC ${CHEWING_TARGET})
@@ -123,7 +124,8 @@ if(ENABLE_IBUS)
         ${IBus_LIBRARIES})
     target_compile_definitions(ibus-chewing-plus PRIVATE
         CHEWING_PLUS_IBUS_EMOJI="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-emoji-shortcodes.txt"
-        CHEWING_PLUS_IBUS_ENGLISH="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-english.txt")
+        CHEWING_PLUS_IBUS_ENGLISH="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-english.txt"
+        CHEWING_PLUS_IBUS_PHRASES="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-phrases.txt")
     set_target_properties(ibus-chewing-plus PROPERTIES
         C_STANDARD 99 C_STANDARD_REQUIRED ON
         RUNTIME_OUTPUT_NAME ibus-chewing-plus)
@@ -132,6 +134,7 @@ if(ENABLE_IBUS)
             DESTINATION "${CMAKE_INSTALL_DATADIR}/ibus/component")
     install(FILES "${CMAKE_SOURCE_DIR}/data/plus-emoji-shortcodes.txt"
                   "${CMAKE_SOURCE_DIR}/data/plus-english.txt"
+                  "${CMAKE_SOURCE_DIR}/data/plus-phrases.txt"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/chewing-plus")
     if(ENABLE_IBUS_SETUP)
         pkg_check_modules(Adw REQUIRED libadwaita-1)

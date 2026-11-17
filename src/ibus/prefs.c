@@ -46,6 +46,9 @@ static void from_list(chewing_plus_ibus_prefs *out, const char *list) {
     out->space = has_token(list, "space");
     out->shortcode = has_token(list, "shortcode");
     out->english = has_token(list, "english");
+    out->suggestions = has_token(list, "suggest");
+    out->hint_commit = has_token(list, "hintcommit");
+    out->easy_symbol = has_token(list, "easysymbol");
 }
 
 static void read_file(chewing_plus_ibus_prefs *out, const char *path) {
@@ -71,6 +74,12 @@ static void read_file(chewing_plus_ibus_prefs *out, const char *path) {
             out->shortcode = value;
         } else if (strcmp(key, "english") == 0) {
             out->english = value;
+        } else if (strcmp(key, "suggestions") == 0) {
+            out->suggestions = value;
+        } else if (strcmp(key, "hint_commit") == 0) {
+            out->hint_commit = value;
+        } else if (strcmp(key, "easy_symbol") == 0) {
+            out->easy_symbol = value;
         }
     }
     fclose(file);
@@ -142,6 +151,9 @@ int chewing_plus_ibus_prefs_save(const chewing_plus_ibus_prefs *in) {
     fprintf(file, "space=%d\n", in->space ? 1 : 0);
     fprintf(file, "shortcode=%d\n", in->shortcode ? 1 : 0);
     fprintf(file, "english=%d\n", in->english ? 1 : 0);
+    fprintf(file, "suggestions=%d\n", in->suggestions ? 1 : 0);
+    fprintf(file, "hint_commit=%d\n", in->hint_commit ? 1 : 0);
+    fprintf(file, "easy_symbol=%d\n", in->easy_symbol ? 1 : 0);
     if (fclose(file) != 0) {
         return -1;
     }

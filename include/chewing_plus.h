@@ -294,6 +294,29 @@ CHEWING_PLUS_API void chewing_plus_select(chewing_plus_session *session,
                                           int index);
 
 /*
+ * Screen state in one call. Every field a frontend draws: preedit and its
+ * highlight, aux line, open panel, candidate list and phrase suggestions.
+ * `revision` changes whenever any of them changes, so a frontend redraws
+ * only when it differs from the last one it drew (each redraw is a round
+ * trip to the app on macOS and IBus). Pointers stay valid until the next
+ * call on this session. Returns 0 if `session` or `out` is NULL.
+ */
+typedef struct chewing_plus_view {
+    uint64_t revision;
+    const char *preedit;
+    size_t cursor;          /* byte offset in preedit */
+    size_t highlight_start; /* byte range of the reading being typed */
+    size_t highlight_length;
+    const char *aux; /* hint line ("" when none) */
+    int panel;       /* CHEWING_PLUS_PANEL_* */
+    int candidate_count;
+    int suggestion_count;
+} chewing_plus_view;
+
+CHEWING_PLUS_API int chewing_plus_get_view(chewing_plus_session *session,
+                                           chewing_plus_view *out);
+
+/*
  * Text committed since the previous take, concatenated. Empty string if
  * nothing was committed. Also delivered live through the commit callback.
  */

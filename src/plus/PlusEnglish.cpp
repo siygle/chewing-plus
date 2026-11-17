@@ -31,6 +31,13 @@ bool AllLower(const std::string &s) {
 }
 } // namespace
 
+void EnglishLexicon::finalize() {
+    if (!sorted_) {
+        std::sort(sortedKeys_.begin(), sortedKeys_.end());
+        sorted_ = true;
+    }
+}
+
 void EnglishLexicon::clear() {
     byLower_.clear();
     sortedKeys_.clear();
@@ -125,6 +132,7 @@ std::vector<std::string> EnglishLexicon::candidates(const std::string &typed,
         return out;
 
     if (!sorted_) {
+        // Not finalized (a lexicon built and queried by one session only).
         std::sort(sortedKeys_.begin(), sortedKeys_.end());
         sorted_ = true;
     }

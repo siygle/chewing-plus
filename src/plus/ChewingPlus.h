@@ -22,6 +22,8 @@
 #include "PlusEmoji.h"
 #include "PlusEnglish.h"
 
+#include <memory>
+
 namespace chewing_plus {
 
 struct Options {
@@ -64,8 +66,16 @@ public:
 
     void setOptions(const Options &o) { options_ = o; }
     const Options &options() const { return options_; }
-    EmojiShortcodes &shortcodes() { return shortcodes_; }
-    EnglishLexicon &lexicon() { return lexicon_; }
+    // Read-only dictionaries, usually shared with other sessions
+    // (DataCache). Never null.
+    const EmojiShortcodes &shortcodes() const { return *shortcodes_; }
+    const EnglishLexicon &lexicon() const { return *lexicon_; }
+    void setShortcodes(std::shared_ptr<const EmojiShortcodes> s) {
+        shortcodes_ = s ? std::move(s) : std::make_shared<EmojiShortcodes>();
+    }
+    void setLexicon(std::shared_ptr<const EnglishLexicon> l) {
+        lexicon_ = l ? std::move(l) : std::make_shared<EnglishLexicon>();
+    }
     const Panel &panel() const { return panel_; }
 
     // Wall clock for double taps (ms). Tests drive it directly.
@@ -132,8 +142,10 @@ private:
                       const Commit &commit);
 
     Options options_;
-    EmojiShortcodes shortcodes_;
-    EnglishLexicon lexicon_;
+    std::shared_ptr<const EmojiShortcodes> shortcodes_ =
+        std::make_shared<EmojiShortcodes>();
+    std::shared_ptr<const EnglishLexicon> lexicon_ =
+        std::make_shared<EnglishLexicon>();
     Panel panel_;
     int64_t nowMs_ = 0;
     // Hint tracking: raw keys of the current reading.

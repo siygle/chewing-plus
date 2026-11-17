@@ -107,7 +107,7 @@ void ChewingPlus::refreshPanel(ChewingContext *ctx) {
         if (options_.emojiPrefix.doubleTap) {
             marker += marker;
         }
-        for (const auto &m : shortcodes_.search(panel_.input)) {
+        for (const auto &m : shortcodes_->search(panel_.input)) {
             panel_.labels.push_back(m.emoji + " :" + m.code);
             panel_.values.push_back(m.emoji);
         }
@@ -115,7 +115,7 @@ void ChewingPlus::refreshPanel(ChewingContext *ctx) {
     case Panel::Kind::English:
         marker = "[EN] ";
         if (!panel_.input.empty()) {
-            for (const auto &w : lexicon_.candidates(panel_.input)) {
+            for (const auto &w : lexicon_->candidates(panel_.input)) {
                 panel_.labels.push_back(w);
                 panel_.values.push_back(w);
             }
@@ -152,7 +152,7 @@ static void InsertAscii(ChewingContext *ctx, const std::string &text,
 
 bool ChewingPlus::toggleEnglish(ChewingContext *ctx, const Commit &commit) {
     if (panel_.kind == Panel::Kind::English) {
-        std::string word = lexicon_.canonical(panel_.input);
+        std::string word = lexicon_->canonical(panel_.input);
         closePanel();
         InsertAscii(ctx, word, commit);
         return true;
@@ -166,7 +166,7 @@ bool ChewingPlus::toggleEnglish(ChewingContext *ctx, const Commit &commit) {
         // The reading spells a known word (the hint is showing): put that
         // word in place of the unfinished syllable, keeping the rest of the
         // buffer, as Space would after typing it in the [EN] panel.
-        std::string word = lexicon_.canonical(keys_);
+        std::string word = lexicon_->canonical(keys_);
         chewing_clean_bopomofo_buf(ctx);
         keys_.clear();
         overwrites_ = 0;
@@ -208,7 +208,7 @@ Handled ChewingPlus::onKey(ChewingContext *ctx, char ascii, bool ctrl,
                 closePanel();
                 InsertAscii(ctx, word, commit);
             } else if (isSpace) {
-                std::string word = lexicon_.canonical(in);
+                std::string word = lexicon_->canonical(in);
                 closePanel();
                 InsertAscii(ctx, word.empty() ? word : word + " ", commit);
             } else if (isBackspace) {
@@ -444,10 +444,10 @@ std::string ChewingPlus::englishHint(ChewingContext *ctx) const {
                      [](char c) { return c >= 'a' && c <= 'z'; })) {
         return {};
     }
-    if (!lexicon_.contains(keys_)) {
+    if (!lexicon_->contains(keys_)) {
         return {};
     }
-    return options_.englishShortcutLabel + " → " + lexicon_.canonical(keys_);
+    return options_.englishShortcutLabel + " → " + lexicon_->canonical(keys_);
 }
 
 std::string ChewingPlus::postProcessCommit(const std::string &text) const {

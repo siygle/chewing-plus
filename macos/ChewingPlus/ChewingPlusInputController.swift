@@ -34,7 +34,12 @@ final class ChewingPlusInputController: IMKInputController {
     private var voiceReq: UInt64 = 0
     private var voiceSource: DispatchSourceRead?
     private var shortcutObserver: NSObjectProtocol?
-    private var panel: IMKCandidates?
+    /// One candidate panel for the process. IMKServer keeps a raw pointer
+    /// to the panel it last showed; a per-controller panel is freed with its
+    /// controller and the server then messages a dead object (crashes in
+    /// _serverGetsFirstShotAtWindowEvents and deactivateServer).
+    private static var sharedPanel: IMKCandidates?
+    private var panel: IMKCandidates? { Self.sharedPanel }
     private var lastClient: IMKTextInput?
     private var commitHook: chewing_plus_callbacks?
     private var sensitive = false
@@ -51,21 +56,23 @@ final class ChewingPlusInputController: IMKInputController {
     private var tapDownAt: TimeInterval = -1
     private var lastTapUpAt: TimeInterval = -1
     private var panelShown = false
+    private var drawnRevision: UInt64 = 0
 
     override init!(server: IMKServer!, delegate: Any!, client: Any!) {
         super.init(server: server, delegate: delegate, client: client)
         voxkit_client_init(voice)
-        panel = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
-        panel?.setSelectionKeys(["1", "2", "3", "4", "5", "6", "7", "8", "9"])
-        openSession()
+        if Self.sharedPanel == nil {
+            let made = IMKCandidates(server: server,
+                                     panelType: kIMKSingleColumnScrollingCandidatePanel)
+            made?.setSelectionKeys(["1", "2", "3", "4", "5", "6", "7", "8", "9"])
+            Self.sharedPanel = made
+        }
         shortcutObserver = NotificationCenter.default.addObserver(
             forName: .chewingPlusShortcutsChanged, object: nil, queue: .main
         ) { [weak self] _ in
             guard let self, let session = self.session else { return }
             self.applyFeatures(session)
         }
-        os_log("controller init, session %{public}@", log: imLog, type: .default,
-               session == nil ? "nil" : "ok")
     }
 
     deinit {
@@ -73,7 +80,7 @@ final class ChewingPlusInputController: IMKInputController {
         voiceSource?.cancel()
         voxkit_client_close(voice)
         voice.deallocate()
-        chewing_plus_free(session)
+        if let session { SessionPool.shared.checkIn(session) }
     }
 
     override func menu() -> NSMenu! {
@@ -126,6 +133,7 @@ final class ChewingPlusInputController: IMKInputController {
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        if session == nil { attachSession() }
         guard let event, let session else { return false }
         lastClient = sender as? IMKTextInput
         if secure() {
@@ -168,11 +176,10 @@ final class ChewingPlusInputController: IMKInputController {
             && !event.modifierFlags.contains(.shift))
         if release { key.mods |= UInt32(CHEWING_PLUS_MOD_RELEASE) }
         if !Self.fill(&key, from: event) { return false }
-        let before = snapshot(session)
         let consumed = chewing_plus_key(session, &key) != 0
-        // Only talk to the client when the composition actually changed:
-        // every setMarkedText is a round trip to the app.
-        if snapshot(session) != before { publish(session) }
+        // Only talk to the client when something visible changed: every
+        // setMarkedText is a round trip to the app.
+        if Self.revision(session) != drawnRevision { publish(session) }
         // A key the core does not want (Backspace on an empty buffer, a key
         // release, a lone Shift) goes back to the app.
         return consumed
@@ -206,33 +213,44 @@ final class ChewingPlusInputController: IMKInputController {
         return list
     }
 
-    private func openSession() {
-        let bundled = Bundle.main.resourceURL?
-            .appendingPathComponent("libchewing", isDirectory: true).path
-        let sys = Self.env("CHEWING_PATH") ?? bundled
-        let user = Self.env("CHEWING_USER_PATH")
-        session = sys.withOptionalCString { sysPtr in
-            user.withOptionalCString { userPtr in
-                chewing_plus_new(sysPtr, userPtr)
-            }
-        }
-        guard let session else { return }
-        let bundledEmoji = Bundle.main.resourceURL?
-            .appendingPathComponent("plus-emoji-shortcodes.txt").path
-        let bundledEnglish = Bundle.main.resourceURL?
-            .appendingPathComponent("plus-english.txt").path
-        let emoji = Self.env("CHEWING_PLUS_EMOJI") ?? bundledEmoji
-        let english = Self.env("CHEWING_PLUS_ENGLISH") ?? bundledEnglish
-        emoji.withOptionalCString { emojiPtr in
-            english.withOptionalCString { englishPtr in
-                chewing_plus_set_data_paths(session, emojiPtr, "", englishPtr, "")
-            }
-        }
-        applyFeatures(session)
+    /// Take a session from the pool for this client. IMK creates a
+    /// controller per text field and keeps it around, so sessions are lent
+    /// only while the field is active (activateServer..deactivateServer):
+    /// memory follows the number of fields in use, not ever opened.
+    private func attachSession() {
+        guard session == nil, let taken = SessionPool.shared.checkOut() else { return }
+        session = taken
+        sensitive = false   // checkIn cleared the core's flag
+        applyFeatures(taken)
         let userPtr = Unmanaged.passUnretained(self).toOpaque()
         var callbacks = chewing_plus_callbacks(commit: chewCommit, updated: nil, user: userPtr)
         commitHook = callbacks
-        chewing_plus_set_callbacks(session, &callbacks)
+        chewing_plus_set_callbacks(taken, &callbacks)
+    }
+
+    /// Commit what is being typed and hand the session back.
+    private func detachSession() {
+        guard let session else { return }
+        var cursor = 0
+        var hlStart = 0
+        var hlLen = 0
+        if let raw = chewing_plus_preedit(session, &cursor, &hlStart, &hlLen),
+           !String(cString: raw).isEmpty {
+            var enter = chewing_plus_key_event(
+                key: UInt32(CHEWING_PLUS_KEY_RETURN), ascii: 0, mods: 0,
+                keycode: 36, time_ms: -1)
+            _ = chewing_plus_key(session, &enter)
+        }
+        lastClient?.setMarkedText("", selectionRange: NSRange(location: 0, length: 0),
+                                  replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+        if panelShown {
+            panel?.hide()
+            panelShown = false
+        }
+        var empty = chewing_plus_callbacks(commit: nil, updated: nil, user: nil)
+        chewing_plus_set_callbacks(session, &empty)
+        self.session = nil
+        SessionPool.shared.checkIn(session)
     }
 
     /// Plus toggles from the input menu (UserDefaults; Plus features on,
@@ -259,22 +277,30 @@ final class ChewingPlusInputController: IMKInputController {
         lastClient?.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
     }
 
+    /// Draw the core's view: marked text, hint line, suggestions, candidates.
     private func publish(_ session: OpaquePointer) {
-        var cursor = 0
-        var hlStart = 0
-        var hlLen = 0
-        let raw = chewing_plus_preedit(session, &cursor, &hlStart, &hlLen)
-        let text = raw.map { String(cString: $0) } ?? ""
-        let selection = hlLen > 0
-            ? NSRange(location: hlStart, length: hlLen)
-            : NSRange(location: cursor, length: 0)
+        var view = chewing_plus_view()
+        guard chewing_plus_get_view(session, &view) == 1 else { return }
+        drawnRevision = view.revision
+        let text = String(cString: view.preedit)
+        // The core reports byte offsets; NSRange counts UTF-16 units.
+        let utf8 = Array(text.utf8)
+        func utf16(_ byte: Int) -> Int {
+            let clamped = min(max(byte, 0), utf8.count)
+            return String(decoding: utf8[0..<clamped], as: UTF8.self).utf16.count
+        }
+        let selection = view.highlight_length > 0
+            ? NSRange(location: utf16(view.highlight_start),
+                      length: utf16(view.highlight_start + view.highlight_length)
+                          - utf16(view.highlight_start))
+            : NSRange(location: utf16(view.cursor), length: 0)
         let replace = NSRange(location: NSNotFound, length: NSNotFound)
         lastClient?.setMarkedText(text, selectionRange: selection, replacementRange: replace)
-        let aux = chewing_plus_aux(session).map { String(cString: $0) } ?? ""
-        if voiceState == .idle { HintWindow.shared.show(aux, client: lastClient) }
+        if voiceState == .idle {
+            HintWindow.shared.show(String(cString: view.aux), client: lastClient)
+        }
         HintWindow.shared.showSuggestions(Self.suggestions(session), client: lastClient)
-        let count = chewing_plus_candidate_count(session)
-        if count > 0 {
+        if view.candidate_count > 0 {
             panel?.update()
             panel?.show(kIMKLocateCandidatesBelowHint)
             panelShown = true
@@ -309,17 +335,9 @@ final class ChewingPlusInputController: IMKInputController {
     private static let digitRow: [UInt16: Int] = [18: 1, 19: 2, 20: 3, 21: 4, 23: 5,
                                                   22: 6, 26: 7, 28: 8, 25: 9]
 
-    /// Preedit, cursor and candidate count; publish() runs only when it changes.
-    private func snapshot(_ session: OpaquePointer) -> String {
-        var cursor = 0
-        var hlStart = 0
-        var hlLen = 0
-        let raw = chewing_plus_preedit(session, &cursor, &hlStart, &hlLen)
-        let text = raw.map { String(cString: $0) } ?? ""
-        let aux = chewing_plus_aux(session).map { String(cString: $0) } ?? ""
-        return "\(text)\u{1}\(cursor)\u{1}\(hlStart)\u{1}\(hlLen)\u{1}"
-            + "\(chewing_plus_candidate_count(session))\u{1}\(aux)\u{1}"
-            + Self.suggestions(session).joined(separator: "\u{2}")
+    private static func revision(_ session: OpaquePointer) -> UInt64 {
+        var view = chewing_plus_view()
+        return chewing_plus_get_view(session, &view) == 1 ? view.revision : 0
     }
 
     /// Push-to-talk. Returns nil when the event is not the voice shortcut.
@@ -564,6 +582,8 @@ final class ChewingPlusInputController: IMKInputController {
 
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
+        lastClient = sender as? IMKTextInput ?? lastClient
+        attachSession()
         ModeIndicator.shared.setVisible(true)
     }
 
@@ -572,7 +592,9 @@ final class ChewingPlusInputController: IMKInputController {
     override func deactivateServer(_ sender: Any!) {
         if voiceState == .recording { _ = voiceCancel() }
         HintWindow.shared.show("", client: nil)
+        HintWindow.shared.showSuggestions([], client: nil)
         ModeIndicator.shared.setVisible(false)
+        detachSession()
         super.deactivateServer(sender)
     }
 
@@ -843,5 +865,60 @@ final class ModeIndicator: NSObject {
 
     @objc private func clicked() {
         english.toggle()
+    }
+}
+
+/// libchewing sessions shared by all controllers. Each costs about 10 MB
+/// (libchewing's own tables); the Plus dictionaries are already shared
+/// (DataCache). A few idle sessions are kept for quick reuse.
+final class SessionPool {
+    static let shared = SessionPool()
+    private var idle: [OpaquePointer] = []
+    private let keepIdle = 2
+    private var paths: (sys: String?, user: String?, emoji: String?, english: String?)?
+
+    func checkOut() -> OpaquePointer? {
+        if let reused = idle.popLast() {
+            chewing_plus_reset(reused)
+            return reused
+        }
+        let p = resolvedPaths()
+        let made: OpaquePointer? = p.sys.withOptionalCString { sysPtr in
+            p.user.withOptionalCString { userPtr in chewing_plus_new(sysPtr, userPtr) }
+        }
+        guard let made else { return nil }
+        p.emoji.withOptionalCString { emojiPtr in
+            p.english.withOptionalCString { englishPtr in
+                chewing_plus_set_data_paths(made, emojiPtr, "", englishPtr, "")
+            }
+        }
+        return made
+    }
+
+    func checkIn(_ session: OpaquePointer) {
+        chewing_plus_reset(session)
+        chewing_plus_set_sensitive(session, 0)
+        if idle.count < keepIdle {
+            idle.append(session)
+        } else {
+            chewing_plus_free(session)
+        }
+    }
+
+    private func resolvedPaths() -> (sys: String?, user: String?, emoji: String?, english: String?) {
+        if let paths { return paths }
+        let res = Bundle.main.resourceURL
+        let env = { (name: String) -> String? in
+            guard let raw = getenv(name) else { return nil }
+            let value = String(cString: raw)
+            return value.isEmpty ? nil : value
+        }
+        let resolved = (
+            sys: env("CHEWING_PATH") ?? res?.appendingPathComponent("libchewing", isDirectory: true).path,
+            user: env("CHEWING_USER_PATH"),
+            emoji: env("CHEWING_PLUS_EMOJI") ?? res?.appendingPathComponent("plus-emoji-shortcodes.txt").path,
+            english: env("CHEWING_PLUS_ENGLISH") ?? res?.appendingPathComponent("plus-english.txt").path)
+        paths = resolved
+        return resolved
     }
 }

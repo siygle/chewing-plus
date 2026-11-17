@@ -23,6 +23,9 @@ public:
     size_t load(const std::string &path);
     void clear();
     size_t size() const { return phrases_.size(); }
+    // Build both sorted indexes. Call after the last load(); a finalized
+    // index is safe to share between sessions (lookups do not write).
+    void finalize() { sortIfNeeded(); }
 
     // Phrases that start with `typed` and are longer, most frequent first.
     // `typed` must be at least `minChars` characters (UTF-8 code points).

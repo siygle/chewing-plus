@@ -5,10 +5,12 @@
  *
  * Framework-free tests for the Plus core. No fcitx, no Chewing context.
  */
+#include "PlusData.h"
 #include "PlusDoubleTap.h"
 #include "PlusEmoji.h"
 #include "PlusEnglish.h"
 #include "PlusFeatures.h"
+#include "PlusPhrases.h"
 
 #include <cstdio>
 #include <fstream>
@@ -168,6 +170,53 @@ void testDoubleTap() {
     check(!tap.onKey(true, true, 320), "outside the window does not fire");
 }
 
+void testDataCache() {
+    namespace dc = chewing_plus::DataCache;
+    std::string user = TempFile("Zzzcachetest\n");
+    {
+        auto a = dc::english(PLUS_ENGLISH_PATH, user);
+        auto b = dc::english(PLUS_ENGLISH_PATH, user);
+        check(a.get() == b.get(), "two sessions share one English lexicon");
+        check(a->contains("zzzcachetest"), "shared lexicon has the user word");
+        auto c = dc::english(PLUS_ENGLISH_PATH, "");
+        check(c.get() != a.get(), "different files get their own lexicon");
+        // Edit the user file: the next lookup must see the change.
+        sleep(1);
+        {
+            std::ofstream out(user);
+            out << "Zzzcachetest\nYyycachetest\n";
+        }
+        auto d = dc::english(PLUS_ENGLISH_PATH, user);
+        check(d.get() != a.get() && d->contains("yyycachetest"),
+              "an edited user file is reloaded");
+        auto p1 = dc::phrases(PLUS_PHRASES_PATH);
+        auto p2 = dc::phrases(PLUS_PHRASES_PATH);
+        check(p1.get() == p2.get() && p1->size() > 100000,
+              "two sessions share one phrase index");
+        auto e1 = dc::emoji(PLUS_EMOJI_PATH, "");
+        auto e2 = dc::emoji(PLUS_EMOJI_PATH, "");
+        check(e1.get() == e2.get() && e1->size() > 1000,
+              "two sessions share one emoji table");
+    }
+    check(dc::liveCount() == 0, "dictionaries are freed with their last user");
+    std::remove(user.c_str());
+}
+
+void testPhrases() {
+    chewing_plus::PhraseIndex index;
+    check(index.load(PLUS_PHRASES_PATH) > 100000, "phrase index loads");
+    index.finalize();
+    auto c = index.complete("中華");
+    check(!c.empty() && c[0] == "中華民國", "中華 completes to 中華民國 first");
+    auto e = index.expand("ㄍㄒㄈㄘ");
+    check(e.size() == 1 && e[0] == "恭喜發財", "ㄍㄒㄈㄘ expands to 恭喜發財");
+    check(index.expand("ㄍㄒ").empty(), "two initials are not expanded");
+    check(index.complete("中").empty(), "one character is not completed");
+    check(chewing_plus::AllBopomofo("ㄍㄒ") &&
+              !chewing_plus::AllBopomofo("ㄍa"),
+          "AllBopomofo");
+}
+
 } // namespace
 
 int main() {
@@ -177,6 +226,8 @@ int main() {
     testShortcodes();
     testEnglish();
     testDoubleTap();
+    testPhrases();
+    testDataCache();
     std::printf(failures ? "CORE TESTS FAILED (%d)\n" : "CORE TESTS OK\n",
                 failures);
     return failures ? 1 : 0;
