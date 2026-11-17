@@ -29,7 +29,8 @@
 #include <string>
 #include <vector>
 
-#include "plus/ChewingPlus.h"
+#include "chewing_plus.h"
+#include <memory>
 #ifdef CHEWING_WITH_VOXKIT
 #include <voxkit_public.h>
 #endif
@@ -225,6 +226,14 @@ FCITX_CONFIGURATION(
         this, "PlusEnglishDoubleTapMs",
         _("Plus: English mode double-tap window (ms)"), 300,
         IntConstrain(100, 1000)};
+    Option<bool> PlusEnglishHintCommit{
+        this, "PlusEnglishHintCommit",
+        _("Plus: English shortcut fills the hinted word directly"), false};
+    Option<bool> PlusSuggestions{
+        this, "PlusSuggestions",
+        _("Plus: Phrase suggestions (completion and initials, Shift+1-9)"),
+        false};
+
     Option<std::string> VoiceModel{
         this, "VoiceModel",
         _("Voice: active model id (empty keeps the daemon's choice; "
@@ -236,6 +245,13 @@ FCITX_CONFIGURATION(
           "(refreshed when this dialog opens)"),
         ""};);
 
+// All composition logic lives in libchewing-plus-core (chewing_plus.h), the
+// same C ABI the IBus engine and the macOS input method use. This class maps
+// fcitx key events in and draws the core's view out.
+//
+// Chinese / English: fcitx5's own "Temporarily Toggle Input Method" key
+// (AltTriggerKeys, Left Shift by default) already switches to the keyboard
+// layout and shows it in the indicator, so this engine does not add its own.
 class ChewingEngine final : public InputMethodEngine {
 public:
     ChewingEngine(Instance *instance);
@@ -267,27 +283,27 @@ public:
     }
 
     void updateUI(InputContext *ic);
-    void updatePreedit(InputContext *ic);
-    Text getPreedit(InputContext *ic);
-
     void flushBuffer(InputContextEvent &event);
     void doReset(InputContextEvent &event);
 
-    ChewingContext *context() { return context_.get(); }
-    chewing_plus::ChewingPlus &plus() { return plus_; }
-    // Commit through Plus post-processing (auto spacing), unless sensitive.
-    void commit(InputContext *ic, const std::string &text);
+    chewing_plus_session *session() { return session_.get(); }
+    InputContext *currentContext() { return ic_.get(); }
 
 private:
+    struct SessionDelete {
+        void operator()(chewing_plus_session *s) const { chewing_plus_free(s); }
+    };
+
     bool handleCandidateKeyEvent(const KeyEvent &keyEvent) const;
-    void updatePreeditImpl(InputContext *ic);
+    bool englishShortcut(const KeyEvent &keyEvent, bool sensitive);
+    bool pickSuggestion(const KeyEvent &keyEvent, InputContext *ic);
+    void updatePreedit(InputContext *ic);
 
     FCITX_ADDON_DEPENDENCY_LOADER(chttrans, instance_->addonManager());
 #ifdef CHEWING_WITH_VOXKIT
     FCITX_ADDON_DEPENDENCY_LOADER(voxkit, instance_->addonManager());
     std::unique_ptr<HandlerTableEntry<VoxkitRegistration>> voxkitHandle_;
     void registerVoxkit();
-    std::vector<std::string> dictationVocabulary();
 #endif
 
     void populateConfig();
@@ -295,15 +311,16 @@ private:
     void applyVoiceModel();
     Instance *instance_;
     ChewingConfig config_;
-    UniqueCPtr<ChewingContext, chewing_delete> context_;
+    std::unique_ptr<chewing_plus_session, SessionDelete> session_;
     TrackableObjectReference<InputContext> ic_;
-    chewing_plus::ChewingPlus plus_;
     KeyList englishToggleKeys_;
     std::vector<KeySym> englishDoubleTapSyms_;
-    chewing_plus::DoubleTap englishDoubleTap_;
+    // English double tap on a configurable modifier (the core only knows
+    // Right Shift).
+    bool tapPressed_ = false;
+    int64_t tapDownMs_ = 0;
+    int64_t tapUpMs_ = -1;
     bool plusCursorMoved_ = false;
-    bool plusToggleEnglish(InputContext *ic);
-    void loadPlusData();
 };
 
 class ChewingEngineFactory : public AddonFactory {

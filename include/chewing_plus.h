@@ -222,6 +222,11 @@ CHEWING_PLUS_API void chewing_plus_set_english(chewing_plus_session *session,
 CHEWING_PLUS_API void
 chewing_plus_set_english_hint_commit(chewing_plus_session *session,
                                      int enabled);
+/* Ctrl+Shift+Space toggles English mode (on by default when English is
+ * enabled). Frontends with their own configurable shortcut turn it off and
+ * call chewing_plus_toggle_english() themselves. */
+CHEWING_PLUS_API void
+chewing_plus_set_english_combo(chewing_plus_session *session, int enabled);
 /* Right Shift tapped twice. `window_ms` <= 0 keeps the previous window. */
 CHEWING_PLUS_API void
 chewing_plus_set_english_double_tap(chewing_plus_session *session, int enabled,
@@ -260,6 +265,34 @@ CHEWING_PLUS_API int chewing_plus_key(chewing_plus_session *session,
                                       const chewing_plus_key_event *event);
 
 CHEWING_PLUS_API int chewing_plus_toggle_english(chewing_plus_session *session);
+
+/*
+ * ASCII (英) mode. While on, chewing_plus_key() returns 0 for every key, so
+ * the frontend passes keys to the application unchanged. With the lone-Shift
+ * option, pressing and releasing CHEWING_PLUS_KEY_SHIFT_L with no other key
+ * in between (within 500 ms) switches the mode; send both the press and the
+ * release. Switching to ASCII commits the composition first. Off by default.
+ */
+CHEWING_PLUS_API void
+chewing_plus_set_shift_toggle(chewing_plus_session *session, int enabled);
+CHEWING_PLUS_API int
+chewing_plus_ascii_mode(const chewing_plus_session *session);
+CHEWING_PLUS_API void chewing_plus_set_ascii_mode(chewing_plus_session *session,
+                                                  int enabled);
+
+/* Next (1) or previous (0) candidate page, wrapping around. Returns 1 when
+ * the list changed. */
+CHEWING_PLUS_API int chewing_plus_page(chewing_plus_session *session, int next);
+
+/* Leave the session empty, committing first as asked. Used when the user
+ * switches input methods or the text field loses focus. */
+enum {
+    CHEWING_PLUS_FLUSH_CLEAR = 0,   /* drop everything */
+    CHEWING_PLUS_FLUSH_PREEDIT = 1, /* commit the text as shown */
+    CHEWING_PLUS_FLUSH_DEFAULT = 2  /* commit the default choice */
+};
+CHEWING_PLUS_API void chewing_plus_flush(chewing_plus_session *session,
+                                         int mode);
 
 /*
  * Voice (and any other outside text). ASCII is inserted into the Chewing

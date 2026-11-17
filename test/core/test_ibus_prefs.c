@@ -37,11 +37,12 @@ int main(void) {
     saved.emoji = 1;
     saved.english = 1;
     saved.suggestions = 1;
+    saved.shift_toggle = 1;
     check(chewing_plus_ibus_prefs_save(&saved) == 0, "save");
     chewing_plus_ibus_prefs_load(&loaded);
     check(loaded.emoji && !loaded.calculator && !loaded.space &&
               !loaded.shortcode && loaded.english && loaded.suggestions &&
-              !loaded.hint_commit && !loaded.easy_symbol,
+              !loaded.hint_commit && !loaded.easy_symbol && loaded.shift_toggle,
           "file round trip");
 
     setenv("CHEWING_PLUS_IBUS_FEATURES", "calculator,shortcode,hintcommit", 1);

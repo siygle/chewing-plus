@@ -18,6 +18,7 @@ typedef struct chewing_plus_ibus_prefs {
     int suggestions; /* phrase completion and initials, Shift+1..9 */
     int hint_commit; /* English shortcut fills the hinted word */
     int easy_symbol;
+    int shift_toggle; /* lone Left Shift switches 中/英 */
 } chewing_plus_ibus_prefs;
 
 void chewing_plus_ibus_prefs_load(chewing_plus_ibus_prefs *out);

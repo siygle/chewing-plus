@@ -35,6 +35,18 @@ int main(void) {
     d = chewing_ibus_map_key('A', 30, 1u << 0, 0, 0);
     check(d.event.mods & CHEWING_PLUS_MOD_SHIFT && d.event.ascii == 'A',
           "shift letter");
+    /* Lone Left Shift: both the press and the release reach the core, so it
+     * can tell a tap (中/英 switch) from Shift held for a capital. */
+    d = chewing_ibus_map_key(0xffe1, 42, 0, 0, 0);
+    check(d.action == CHEWING_IBUS_KEY_TO_CORE &&
+              d.event.key == CHEWING_PLUS_KEY_SHIFT_L &&
+              !(d.event.mods & CHEWING_PLUS_MOD_RELEASE),
+          "Left Shift press reaches the core");
+    d = chewing_ibus_map_key(0xffe1, 42, (1u << 30) | 1u, 0, 0);
+    check(d.action == CHEWING_IBUS_KEY_TO_CORE &&
+              d.event.key == CHEWING_PLUS_KEY_SHIFT_L &&
+              (d.event.mods & CHEWING_PLUS_MOD_RELEASE),
+          "Left Shift release reaches the core");
     printf(failures ? "IBUS KEY TESTS FAILED (%d)\n" : "IBUS KEY TESTS OK\n",
            failures);
     return failures ? 1 : 0;

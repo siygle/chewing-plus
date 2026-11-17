@@ -49,6 +49,7 @@ static void from_list(chewing_plus_ibus_prefs *out, const char *list) {
     out->suggestions = has_token(list, "suggest");
     out->hint_commit = has_token(list, "hintcommit");
     out->easy_symbol = has_token(list, "easysymbol");
+    out->shift_toggle = has_token(list, "shift");
 }
 
 static void read_file(chewing_plus_ibus_prefs *out, const char *path) {
@@ -80,6 +81,8 @@ static void read_file(chewing_plus_ibus_prefs *out, const char *path) {
             out->hint_commit = value;
         } else if (strcmp(key, "easy_symbol") == 0) {
             out->easy_symbol = value;
+        } else if (strcmp(key, "shift_toggle") == 0) {
+            out->shift_toggle = value;
         }
     }
     fclose(file);
@@ -154,6 +157,7 @@ int chewing_plus_ibus_prefs_save(const chewing_plus_ibus_prefs *in) {
     fprintf(file, "suggestions=%d\n", in->suggestions ? 1 : 0);
     fprintf(file, "hint_commit=%d\n", in->hint_commit ? 1 : 0);
     fprintf(file, "easy_symbol=%d\n", in->easy_symbol ? 1 : 0);
+    fprintf(file, "shift_toggle=%d\n", in->shift_toggle ? 1 : 0);
     if (fclose(file) != 0) {
         return -1;
     }

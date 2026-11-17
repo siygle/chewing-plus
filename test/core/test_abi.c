@@ -362,6 +362,119 @@ static void test_view(void) {
           "view after 你");
 }
 
+static void press(uint32_t key, uint32_t mods) {
+    chewing_plus_key_event ev;
+    memset(&ev, 0, sizeof(ev));
+    ev.key = key;
+    ev.mods = mods;
+    ev.time_ms = clock_ms;
+    clock_ms += 20;
+    chewing_plus_key(session, &ev);
+}
+
+static void test_ascii_mode(void) {
+    const char *got;
+    chewing_plus_view v;
+    reset();
+    check(chewing_plus_ascii_mode(session) == 0, "Chinese mode by default");
+    /* Lone Left Shift does nothing until the option is on. */
+    press(CHEWING_PLUS_KEY_SHIFT_L, 0);
+    press(CHEWING_PLUS_KEY_SHIFT_L, CHEWING_PLUS_MOD_RELEASE);
+    check(chewing_plus_ascii_mode(session) == 0, "shift toggle off by default");
+
+    chewing_plus_set_shift_toggle(session, 1);
+    type_text("su3");
+    press(CHEWING_PLUS_KEY_SHIFT_L, 0);
+    press(CHEWING_PLUS_KEY_SHIFT_L, CHEWING_PLUS_MOD_RELEASE);
+    check(chewing_plus_ascii_mode(session) == 1, "lone Left Shift -> ASCII");
+    got = chewing_plus_take_commit(session);
+    check(strcmp(got, "你") == 0, "switching to ASCII commits 你");
+    chewing_plus_get_view(session, &v);
+    check(v.preedit[0] == '\0', "nothing left after the switch");
+    {
+        chewing_plus_key_event ev;
+        memset(&ev, 0, sizeof(ev));
+        ev.ascii = 's';
+        ev.time_ms = clock_ms;
+        check(chewing_plus_key(session, &ev) == 0,
+              "ASCII mode passes letters to the app");
+    }
+    /* Shift used as a modifier is not a toggle. */
+    press(CHEWING_PLUS_KEY_SHIFT_L, 0);
+    {
+        chewing_plus_key_event ev;
+        memset(&ev, 0, sizeof(ev));
+        ev.ascii = 'A';
+        ev.mods = CHEWING_PLUS_MOD_SHIFT;
+        ev.time_ms = clock_ms;
+        chewing_plus_key(session, &ev);
+    }
+    press(CHEWING_PLUS_KEY_SHIFT_L, CHEWING_PLUS_MOD_RELEASE);
+    check(chewing_plus_ascii_mode(session) == 1, "Shift+A does not toggle");
+    /* A long hold is not a tap. */
+    press(CHEWING_PLUS_KEY_SHIFT_L, 0);
+    clock_ms += 900;
+    press(CHEWING_PLUS_KEY_SHIFT_L, CHEWING_PLUS_MOD_RELEASE);
+    check(chewing_plus_ascii_mode(session) == 1, "a long hold does not toggle");
+    press(CHEWING_PLUS_KEY_SHIFT_L, 0);
+    press(CHEWING_PLUS_KEY_SHIFT_L, CHEWING_PLUS_MOD_RELEASE);
+    check(chewing_plus_ascii_mode(session) == 0, "tap again -> Chinese");
+    chewing_plus_set_ascii_mode(session, 1);
+    check(chewing_plus_ascii_mode(session) == 1, "set_ascii_mode on");
+    chewing_plus_set_shift_toggle(session, 0);
+    check(chewing_plus_ascii_mode(session) == 0,
+          "turning the option off returns to Chinese");
+}
+
+static void test_flush_and_page(void) {
+    const char *got;
+    chewing_plus_view v;
+    reset();
+    type_text("su3cl3");
+    chewing_plus_flush(session, CHEWING_PLUS_FLUSH_DEFAULT);
+    got = chewing_plus_take_commit(session);
+    check(strcmp(got, "你好") == 0, "flush default commits 你好");
+    reset();
+    type_text("su3s");
+    chewing_plus_flush(session, CHEWING_PLUS_FLUSH_PREEDIT);
+    got = chewing_plus_take_commit(session);
+    check(strcmp(got, "你ㄋ") == 0, "flush preedit commits the text as shown");
+    reset();
+    type_text("su3cl3");
+    chewing_plus_flush(session, CHEWING_PLUS_FLUSH_CLEAR);
+    got = chewing_plus_take_commit(session);
+    chewing_plus_get_view(session, &v);
+    check(got[0] == '\0' && v.preedit[0] == '\0', "flush clear drops it");
+
+    reset();
+    type_text("su3");
+    tap(CHEWING_PLUS_KEY_DOWN, 0, 0);
+    chewing_plus_get_view(session, &v);
+    if (v.candidate_count > 0) {
+        const char *first = chewing_plus_candidate(session, 0);
+        char before[64];
+        snprintf(before, sizeof(before), "%s", first ? first : "");
+        check(chewing_plus_page(session, 1) == 1, "page forward");
+        first = chewing_plus_candidate(session, 0);
+        check(first && strcmp(first, before) != 0, "next page differs");
+        chewing_plus_page(session, 0);
+        first = chewing_plus_candidate(session, 0);
+        check(first && strcmp(first, before) == 0, "page back to the first");
+    } else {
+        check(0, "candidates for 你");
+    }
+
+    /* Ctrl+Shift+Space can be turned off for frontends with their own key. */
+    reset();
+    chewing_plus_set_english_combo(session, 0);
+    tap(CHEWING_PLUS_KEY_SPACE, ' ',
+        CHEWING_PLUS_MOD_CTRL | CHEWING_PLUS_MOD_SHIFT);
+    check(chewing_plus_panel(session) != CHEWING_PLUS_PANEL_ENGLISH,
+          "combo off: Ctrl+Shift+Space does not open [EN]");
+    chewing_plus_set_english_combo(session, 1);
+    reset();
+}
+
 static void test_emoji_candidate(void) {
     int found;
     reset();
@@ -459,6 +572,8 @@ int main(void) {
     test_hint_commit();
     test_suggestions();
     test_view();
+    test_ascii_mode();
+    test_flush_and_page();
     test_emoji_candidate();
     test_sensitive();
 

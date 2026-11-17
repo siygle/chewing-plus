@@ -96,6 +96,12 @@ struct Session {
     chewing_plus::Options opt;
     bool sensitive = false;
     bool englishDoubleTap = false;
+    bool englishCombo = true;
+    bool shiftToggle = false;
+    bool asciiMode = false;
+    // Lone Left Shift: pressed with nothing else since.
+    bool shiftPending = false;
+    int64_t shiftDownMs = 0;
     bool easySymbol = false;
     std::string layout = "KB_DEFAULT";
     std::string selKeys = "1234567890";
@@ -246,6 +252,7 @@ struct Session {
         add(std::to_string(cursor) + "," + std::to_string(hlStart) + "," +
             std::to_string(hlLen) + "," + std::to_string(panelKind));
         add(aux);
+        add(asciiMode ? "A" : "C");
         for (const auto &c : cands) {
             add(c.label + c.text);
         }
@@ -373,6 +380,72 @@ struct Session {
         }
     }
 
+    void setAscii(bool on) {
+        if (on == asciiMode) {
+            return;
+        }
+        if (on) {
+            flush(CHEWING_PLUS_FLUSH_DEFAULT);
+        }
+        asciiMode = on;
+        shiftPending = false;
+        refresh();
+    }
+
+    // Commit as asked, then leave everything empty.
+    void flush(int mode) {
+        ChewingContext *c = raw();
+        std::string text;
+        if (plus.panel().active()) {
+            // A Plus panel holds typed input, not a composition.
+            if (mode == CHEWING_PLUS_FLUSH_PREEDIT) {
+                text = BufferOf(c);
+            }
+        } else if (mode != CHEWING_PLUS_FLUSH_CLEAR) {
+            chewing_cand_close(c);
+            if (chewing_buffer_Check(c) && chewing_commit_preedit_buf(c) == 0) {
+                text = CommitOf(c);
+            }
+            if (mode == CHEWING_PLUS_FLUSH_PREEDIT) {
+                text += BufferOf(c) + ZuinOf(c);
+            }
+        }
+        plus.reset();
+        englishTap.reset();
+        chewing_cand_close(c);
+        chewing_clean_preedit_buf(c);
+        chewing_clean_bopomofo_buf(c);
+        chewing_Reset(c);
+        if (!text.empty()) {
+            commitText(text);
+        }
+        refresh();
+    }
+
+    // Wrap from the last page to the first and back, like fcitx5-chewing.
+    bool page(bool next) {
+        ChewingContext *c = raw();
+        if (cands.empty() || chewing_cand_TotalPage(c) <= 0) {
+            return false;
+        }
+        const int current = chewing_cand_CurrentPage(c);
+        if (next) {
+            if (current == chewing_cand_TotalPage(c) - 1) {
+                chewing_handle_Down(c);
+            } else {
+                chewing_handle_PageDown(c);
+            }
+        } else if (current == 0 && (chewing_cand_list_has_next(c) == 1 ||
+                                    chewing_cand_list_has_prev(c) == 1)) {
+            chewing_handle_Down(c);
+        } else {
+            chewing_handle_PageUp(c);
+        }
+        const bool changed = chewing_keystroke_CheckAbsorb(c) != 0;
+        refresh();
+        return changed;
+    }
+
     bool toggleEnglish() {
         if (sensitive) {
             return false;
@@ -437,6 +510,24 @@ struct Session {
                       .count();
         plus.setNowMs(now);
 
+        if (shiftToggle && !sensitive) {
+            if (ev.key == CHEWING_PLUS_KEY_SHIFT_L) {
+                if (!release) {
+                    shiftPending = true;
+                    shiftDownMs = now;
+                } else if (shiftPending && now - shiftDownMs <= 500) {
+                    shiftPending = false;
+                    setAscii(!asciiMode);
+                    return 1;
+                }
+            } else {
+                shiftPending = false;
+            }
+        }
+        if (asciiMode) {
+            return 0;
+        }
+
         if (opt.english && englishDoubleTap) {
             const bool watched = ev.key == CHEWING_PLUS_KEY_SHIFT_R;
             if (englishTap.onKey(watched, release, now) && !sensitive &&
@@ -457,8 +548,8 @@ struct Session {
         const uint32_t ascii = ev.ascii;
 
         if (!sensitive) {
-            if (opt.english && isSpace && ctrl && shift && !alt &&
-                toggleEnglish()) {
+            if (opt.english && englishCombo && isSpace && ctrl && shift &&
+                !alt && toggleEnglish()) {
                 refresh();
                 return 1;
             }
@@ -804,6 +895,45 @@ void chewing_plus_set_english_hint_commit(chewing_plus_session *session,
     auto *s = S(session);
     s->opt.englishHintCommit = enabled != 0;
     s->applyOptions();
+}
+
+void chewing_plus_set_english_combo(chewing_plus_session *session,
+                                    int enabled) {
+    if (session) {
+        S(session)->englishCombo = enabled != 0;
+    }
+}
+
+void chewing_plus_set_shift_toggle(chewing_plus_session *session, int enabled) {
+    if (!session) {
+        return;
+    }
+    auto *s = S(session);
+    s->shiftToggle = enabled != 0;
+    s->shiftPending = false;
+    if (!s->shiftToggle) {
+        s->setAscii(false);
+    }
+}
+
+int chewing_plus_ascii_mode(const chewing_plus_session *session) {
+    return session && S(session)->asciiMode ? 1 : 0;
+}
+
+void chewing_plus_set_ascii_mode(chewing_plus_session *session, int enabled) {
+    if (session) {
+        S(session)->setAscii(enabled != 0);
+    }
+}
+
+int chewing_plus_page(chewing_plus_session *session, int next) {
+    return session && S(session)->page(next != 0) ? 1 : 0;
+}
+
+void chewing_plus_flush(chewing_plus_session *session, int mode) {
+    if (session) {
+        S(session)->flush(mode);
+    }
 }
 
 void chewing_plus_set_english_double_tap(chewing_plus_session *session,

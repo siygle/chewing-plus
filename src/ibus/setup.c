@@ -24,6 +24,7 @@ typedef struct {
     GtkWidget *suggestions;
     GtkWidget *hint_commit;
     GtkWidget *easy_symbol;
+    GtkWidget *shift_toggle;
     voxkit_client voice;
     guint timer;
     uint64_t req;
@@ -272,6 +273,7 @@ static void save_switches(void) {
     prefs.suggestions = gtk_switch_get_active(GTK_SWITCH(UI->suggestions));
     prefs.hint_commit = gtk_switch_get_active(GTK_SWITCH(UI->hint_commit));
     prefs.easy_symbol = gtk_switch_get_active(GTK_SWITCH(UI->easy_symbol));
+    prefs.shift_toggle = gtk_switch_get_active(GTK_SWITCH(UI->shift_toggle));
     chewing_plus_ibus_prefs_save(&prefs);
 }
 
@@ -313,6 +315,7 @@ static void load_switches(void) {
     gtk_switch_set_active(GTK_SWITCH(UI->suggestions), prefs.suggestions);
     gtk_switch_set_active(GTK_SWITCH(UI->hint_commit), prefs.hint_commit);
     gtk_switch_set_active(GTK_SWITCH(UI->easy_symbol), prefs.easy_symbol);
+    gtk_switch_set_active(GTK_SWITCH(UI->shift_toggle), prefs.shift_toggle);
     UI->loading = 0;
 }
 
@@ -373,6 +376,8 @@ static void activate(GtkApplication *app, gpointer user) {
                    switch_row("詞語建議（Shift+1–9 選取）", &UI->suggestions));
     gtk_box_append(GTK_BOX(plus),
                    switch_row("簡易符號（Shift+英文字母）", &UI->easy_symbol));
+    gtk_box_append(GTK_BOX(plus),
+                   switch_row("左 Shift 切換中／英", &UI->shift_toggle));
     gtk_box_append(GTK_BOX(page), plus);
 
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), page);

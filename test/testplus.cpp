@@ -224,6 +224,66 @@ void testPlus(Instance *instance) {
         }
         check(found, "開心😊 offered among candidates");
 
+        // --- phrase suggestions: 中華 (5j/ cj86) lists 中華民國, Shift+N picks
+        reset();
+        {
+            RawConfig more;
+            more.setValueByPath("PlusSuggestions", "True");
+            chewing->setConfig(more);
+        }
+        reset();
+        type("5j/ cj86");
+        check(aux().find("中華民國") != std::string::npos,
+              "suggestions on the aux line, got [" + aux() + "]");
+        {
+            // Position of 中華民國 in the list, then pick it with Shift+N.
+            const std::string line = aux();
+            int pick = 0;
+            for (int i = 1; i <= 9; i++) {
+                auto at = line.find("⇧" + std::to_string(i) + " 中華民國");
+                if (at != std::string::npos) {
+                    pick = i;
+                }
+            }
+            check(pick > 0, "中華民國 has a Shift+N label");
+            key(Key(static_cast<KeySym>(FcitxKey_1 + pick - 1), KeyState::Shift,
+                    10 + pick - 1));
+        }
+        check(committed == "中華民國",
+              "Shift+N commits 中華民國, got [" + committed + "]");
+        reset();
+        type("evzh");
+        check(preedit() == "ㄍㄒㄈㄘ" &&
+                  aux().find("恭喜發財") != std::string::npos,
+              "initials ㄍㄒㄈㄘ suggest 恭喜發財, got " + preedit() + " / " +
+                  aux());
+        key(Key(FcitxKey_exclam, KeyState::Shift, 10));
+        check(committed == "恭喜發財",
+              "Shift+1 commits 恭喜發財, got [" + committed + "]");
+
+        // --- Chinese / English: fcitx5's own Left Shift toggle (AltTrigger)
+        // switches to the keyboard layout; the composition is committed.
+        reset();
+        type("su3");
+        send(Key(FcitxKey_Shift_L));
+        send(Key(FcitxKey_Shift_L, KeyState::Shift), true);
+        check(instance->inputMethod(ic) == "keyboard-us",
+              "Left Shift -> keyboard, got " + instance->inputMethod(ic));
+        check(committed == "你",
+              "switching commits 你, got [" + committed + "]");
+        send(Key(FcitxKey_Shift_L));
+        send(Key(FcitxKey_Shift_L, KeyState::Shift), true);
+        check(instance->inputMethod(ic) == "chewing",
+              "Left Shift again -> chewing, got " + instance->inputMethod(ic));
+        type("su3");
+        check(preedit() == "你", "Chinese again, got " + preedit());
+
+        // --- Backspace on an empty buffer goes to the app
+        reset();
+        check(!tf->call<ITestFrontend::sendKeyEvent>(
+                  uuid, Key(FcitxKey_BackSpace), false),
+              "empty Backspace is not consumed");
+
         // --- password field: no Plus
         reset();
         ic->setCapabilityFlags(CapabilityFlag::Password);

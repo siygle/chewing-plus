@@ -20,6 +20,9 @@ typedef struct {
     int voice_active;
     int voice_failed;
     uint64_t drawn; /* chewing_plus_view revision last drawn */
+    IBusPropList *props;
+    IBusProperty *mode_prop; /* 中 / 英 in the IBus panel */
+    int shift_toggle;
 } ChewingPlusEngine;
 
 typedef struct {
@@ -34,9 +37,13 @@ G_DEFINE_TYPE(ChewingPlusEngine, chewing_plus_engine, IBUS_TYPE_ENGINE)
 
 static void refresh(ChewingPlusEngine *self);
 
+static int last_shift_toggle = 0;
+
 static void apply_features(chewing_plus_session *session) {
     chewing_plus_ibus_prefs prefs;
     chewing_plus_ibus_prefs_load(&prefs);
+    last_shift_toggle = prefs.shift_toggle;
+    chewing_plus_set_shift_toggle(session, prefs.shift_toggle);
     chewing_plus_set_emoji(session, prefs.emoji);
     chewing_plus_set_calculator(session, prefs.calculator);
     chewing_plus_set_spacing(session, prefs.space, prefs.space);
@@ -114,6 +121,23 @@ static void show_aux(IBusEngine *engine, const char *text) {
     IBusText *aux = ibus_text_new_from_string(text ? text : "");
     ibus_engine_update_auxiliary_text(engine, aux, text && text[0]);
     g_object_unref(aux);
+}
+
+/* 中 / 英 indicator. Shown only with the lone-Shift option. */
+static void update_mode_prop(ChewingPlusEngine *self) {
+    int english;
+    IBusText *label;
+    IBusText *symbol;
+    if (!self->mode_prop || !self->session) {
+        return;
+    }
+    english = chewing_plus_ascii_mode(self->session);
+    label = ibus_text_new_from_string(english ? "英" : "中");
+    symbol = ibus_text_new_from_string(english ? "英" : "中");
+    ibus_property_set_label(self->mode_prop, label);
+    ibus_property_set_symbol(self->mode_prop, symbol);
+    ibus_property_set_visible(self->mode_prop, self->shift_toggle);
+    ibus_engine_update_property(IBUS_ENGINE(self), self->mode_prop);
 }
 
 /* Phrase suggestions on the aux line under the preedit: "⇧1 中華民國 ⇧2 …".
@@ -364,7 +388,11 @@ static gboolean process_key(IBusEngine *engine, guint keyval, guint keycode,
         }
     }
     {
+        int was_english = chewing_plus_ascii_mode(self->session);
         int consumed = chewing_plus_key(self->session, &decision.event);
+        if (was_english != chewing_plus_ascii_mode(self->session)) {
+            update_mode_prop(self);
+        }
         refresh(self);
         /* A key the core does not want (Backspace on an empty buffer, a
          * release, a lone modifier) goes back to the application. */
@@ -379,8 +407,36 @@ static void focus_in(IBusEngine *engine) {
     if (self->session) {
         apply_features(self->session);
     }
+    self->shift_toggle = last_shift_toggle;
     apply_sensitive(self);
     self->voice_failed = 0;
+    if (!self->props) {
+        self->props = ibus_prop_list_new();
+        g_object_ref_sink(self->props);
+        self->mode_prop = ibus_property_new(
+            "chewing-plus-mode", PROP_TYPE_NORMAL,
+            ibus_text_new_from_string("中"), NULL,
+            ibus_text_new_from_string("中／英（左 Shift 切換）"), TRUE, TRUE,
+            PROP_STATE_UNCHECKED, NULL);
+        ibus_prop_list_append(self->props, self->mode_prop);
+    }
+    ibus_engine_register_properties(engine, self->props);
+    update_mode_prop(self);
+    self->drawn = 0;
+    refresh(self);
+}
+
+/* Clicking 中/英 in the IBus panel switches the mode too. */
+static void property_activate(IBusEngine *engine, const gchar *name,
+                              guint state) {
+    ChewingPlusEngine *self = (ChewingPlusEngine *)engine;
+    (void)state;
+    if (!self->session || g_strcmp0(name, "chewing-plus-mode") != 0) {
+        return;
+    }
+    chewing_plus_set_ascii_mode(self->session,
+                                !chewing_plus_ascii_mode(self->session));
+    update_mode_prop(self);
     refresh(self);
 }
 
@@ -419,6 +475,11 @@ static void init_engine(ChewingPlusEngine *self) {
 static void dispose_engine(GObject *object) {
     ChewingPlusEngine *self = (ChewingPlusEngine *)object;
     voice_close(self);
+    if (self->props) {
+        g_object_unref(self->props);
+        self->props = NULL;
+        self->mode_prop = NULL;
+    }
     if (self->session) {
         chewing_plus_free(self->session);
         self->session = NULL;
@@ -436,6 +497,7 @@ static void chewing_plus_engine_class_init(ChewingPlusEngineClass *klass) {
     engine->reset = reset;
     engine->disable = disable;
     engine->candidate_clicked = candidate_clicked;
+    engine->property_activate = property_activate;
 }
 
 static void chewing_plus_engine_init(ChewingPlusEngine *self) {
