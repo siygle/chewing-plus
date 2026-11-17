@@ -64,7 +64,8 @@ Table<PhraseIndex> &PhraseTable() {
     return t;
 }
 
-template <typename T> size_t Live(Table<T> &table) {
+template <typename T>
+size_t Live(Table<T> &table) {
     size_t n = 0;
     for (auto &[key, weak] : table)
         n += !weak.expired();
