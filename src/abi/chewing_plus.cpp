@@ -113,6 +113,8 @@ struct Session {
     std::string englishUser;
     std::string phrasesPath;
     bool suggestions = false;
+    // Initials typed before suggesting phrases (ㄇㄇ -> 媽媽 at 2).
+    size_t initialsMin = 2;
     std::shared_ptr<const chewing_plus::PhraseIndex> phrases =
         std::make_shared<chewing_plus::PhraseIndex>();
     // Current suggestions and what they replace: the last `replaceChars`
@@ -292,7 +294,7 @@ struct Session {
             // only on layouts that queue them, e.g. Hsu). Use the raw keys
             // recorded for the English hint when the reading does not grow.
             std::string initials = plus.typedInitials(c);
-            sugg = phrases->expand(initials);
+            sugg = phrases->expand(initials, 9, initialsMin);
             replaceReading = !sugg.empty();
             if (replaceReading && initials != zuin) {
                 // libchewing shows only the last initial; show them all.
@@ -1270,6 +1272,11 @@ void ApplySetting(chewing_plus_session *session, const std::string &key) {
                                              on("english_hint_commit"));
     } else if (key == "suggestions") {
         chewing_plus_set_suggestions(session, on("suggestions"), nullptr);
+    } else if (key == "initials_min") {
+        // Below 2 every lone initial would list thousands of phrases.
+        S(session)->initialsMin =
+            static_cast<size_t>(std::max(2, num("initials_min")));
+        S(session)->refresh();
     } else if (key == "shift_toggle") {
         chewing_plus_set_shift_toggle(session, on("shift_toggle"));
     } else if (key == "easy_symbol") {

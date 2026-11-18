@@ -51,7 +51,7 @@ public:
     // (ㄍㄒㄈㄘ). At least `minSyllables` symbols; most frequent first.
     std::vector<std::string> expand(const std::string &initials,
                                     size_t limit = 9,
-                                    size_t minSyllables = 3) const;
+                                    size_t minSyllables = 2) const;
 
 private:
     struct Phrase {

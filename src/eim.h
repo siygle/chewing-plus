@@ -229,6 +229,10 @@ FCITX_CONFIGURATION(
     Option<bool> PlusEnglishHintCommit{
         this, "PlusEnglishHintCommit",
         _("Plus: English shortcut fills the hinted word directly"), false};
+    Option<int, IntConstrain> PlusInitialsMin{
+        this, "PlusInitialsMin",
+        _("Plus: Initials needed before suggesting (ㄇㄇ -> 媽媽 at 2)"), 2,
+        IntConstrain(2, 6)};
     Option<bool> PlusSuggestions{
         this, "PlusSuggestions",
         _("Plus: Phrase suggestions (completion and initials, Shift+1-9)"),

@@ -93,6 +93,20 @@ final class ChewingPlusInputController: IMKInputController {
             item.state = Settings.isOn(row.key) ? .on : .off
             menu.addItem(item)
         }
+        let current = Int(Settings.value("initials_min") ?? "2") ?? 2
+        let initialsMenu = NSMenu(title: "字首注音")
+        for n in 2...6 {
+            let choice = NSMenuItem(title: "\(n) 個以上", action: #selector(pickInitialsMin(_:)),
+                                    keyEquivalent: "")
+            choice.target = self
+            choice.representedObject = n
+            choice.state = n == current ? .on : .off
+            initialsMenu.addItem(choice)
+        }
+        let initials = NSMenuItem(title: "字首注音幾個以上開始建議：\(current)",
+                                  action: nil, keyEquivalent: "")
+        initials.submenu = initialsMenu
+        menu.addItem(initials)
         let indicator = NSMenuItem(title: "選單列顯示「中／英」",
                                    action: #selector(toggleIndicator(_:)), keyEquivalent: "")
         indicator.target = self
@@ -119,6 +133,14 @@ final class ChewingPlusInputController: IMKInputController {
         Settings.set(key, Settings.isOn(key) ? "0" : "1")
         if let session { applyFeatures(session) }
         if key == "shift_toggle" && !Settings.isOn(key) { englishMode = false }
+    }
+
+    @objc private func pickInitialsMin(_ sender: Any?) {
+        let item = (sender as? [String: Any])?[kIMKCommandMenuItemName] as? NSMenuItem
+            ?? sender as? NSMenuItem
+        guard let n = item?.representedObject as? Int else { return }
+        Settings.set("initials_min", String(n))
+        if let session { applyFeatures(session) }
     }
 
     @objc private func toggleIndicator(_: Any?) {

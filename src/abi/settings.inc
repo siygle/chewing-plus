@@ -37,6 +37,9 @@ SETTING(english_hint_commit, BOOL, "0",
 SETTING(suggestions, BOOL, "0",
         "Phrase suggestions (completion and initials, Shift+1-9)",
         "詞語建議（自動完成、字首注音，⇧1–9 選取）")
+SETTING(initials_min, INT, "2",
+        "Initials needed before suggesting (2 or more)",
+        "字首注音幾個以上開始建議")
 SETTING(shift_toggle, BOOL, "0", "Tap Left Shift alone to switch 中/英",
         "左 Shift 切換中／英")
 SETTING(easy_symbol, BOOL, "0", "Easy symbol (Shift+letter)",

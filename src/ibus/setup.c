@@ -11,6 +11,7 @@
 
 #include <adwaita.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct {
@@ -26,6 +27,7 @@ typedef struct {
     GtkWidget *switches[CHEWING_PLUS_IBUS_MAX_PREFS];
     const char *switch_keys[CHEWING_PLUS_IBUS_MAX_PREFS];
     int switch_count;
+    GtkWidget *initials_min;
 } Setup;
 
 static Setup *UI;
@@ -269,7 +271,20 @@ static void save_switches(void) {
             &prefs, UI->switch_keys[i],
             gtk_switch_get_active(GTK_SWITCH(UI->switches[i])) ? "1" : "0");
     }
+    if (UI->initials_min) {
+        char value[16];
+        snprintf(value, sizeof(value), "%d",
+                 gtk_spin_button_get_value_as_int(
+                     GTK_SPIN_BUTTON(UI->initials_min)));
+        chewing_plus_ibus_prefs_set(&prefs, "initials_min", value);
+    }
     chewing_plus_ibus_prefs_save(&prefs);
+}
+
+static void on_spin(GtkSpinButton *spin, gpointer user) {
+    (void)spin;
+    (void)user;
+    save_switches();
 }
 
 static void on_switch(GObject *object, GParamSpec *spec, gpointer user) {
@@ -319,6 +334,11 @@ static void load_switches(void) {
         }
         gtk_switch_set_active(GTK_SWITCH(UI->switches[i]),
                               value && strcmp(value, "1") == 0);
+    }
+    if (UI->initials_min) {
+        const char *value = chewing_plus_ibus_prefs_get(&prefs, "initials_min");
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(UI->initials_min),
+                                  value ? atoi(value) : 2);
     }
     UI->loading = 0;
 }
@@ -398,6 +418,18 @@ static void activate(GtkApplication *app, gpointer user) {
                 switch_row(info.label_zh, &UI->switches[UI->switch_count]));
             UI->switch_count++;
         }
+    }
+    {
+        GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+        GtkWidget *text = gtk_label_new("字首注音幾個以上開始建議");
+        gtk_widget_set_hexpand(text, TRUE);
+        gtk_label_set_xalign(GTK_LABEL(text), 0);
+        UI->initials_min = gtk_spin_button_new_with_range(2, 6, 1);
+        g_signal_connect(UI->initials_min, "value-changed", G_CALLBACK(on_spin),
+                         NULL);
+        gtk_box_append(GTK_BOX(row), text);
+        gtk_box_append(GTK_BOX(row), UI->initials_min);
+        gtk_box_append(GTK_BOX(plus), row);
     }
     gtk_box_append(GTK_BOX(page), plus);
 

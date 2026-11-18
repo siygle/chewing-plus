@@ -260,6 +260,11 @@ void testPlus(Instance *instance) {
         key(Key(FcitxKey_exclam, KeyState::Shift, 10));
         check(committed == "恭喜發財",
               "Shift+1 commits 恭喜發財, got [" + committed + "]");
+        // Two initials (default minimum 2): ㄇㄇ lists 媽媽.
+        reset();
+        type("aa");
+        check(preedit() == "ㄇㄇ" && aux().find("媽媽") != std::string::npos,
+              "ㄇㄇ suggests 媽媽, got " + preedit() + " / " + aux());
 
         // --- Chinese / English: fcitx5's own Left Shift toggle (AltTrigger)
         // switches to the keyboard layout; the composition is committed.

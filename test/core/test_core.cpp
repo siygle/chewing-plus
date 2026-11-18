@@ -12,6 +12,7 @@
 #include "PlusFeatures.h"
 #include "PlusPhrases.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <string>
@@ -240,7 +241,12 @@ void testPhrases() {
     check(!c.empty() && c[0] == "中華民國", "中華 completes to 中華民國 first");
     auto e = index.expand("ㄍㄒㄈㄘ");
     check(e.size() == 1 && e[0] == "恭喜發財", "ㄍㄒㄈㄘ expands to 恭喜發財");
-    check(index.expand("ㄍㄒ").empty(), "two initials are not expanded");
+    auto mm = index.expand("ㄇㄇ");
+    check(std::find(mm.begin(), mm.end(), "媽媽") != mm.end(),
+          "ㄇㄇ lists 媽媽");
+    check(index.expand("ㄍㄒ", 9, 3).empty(),
+          "two initials are not expanded with a minimum of 3");
+    check(index.expand("ㄇ").empty(), "one initial is never expanded");
     check(index.complete("中").empty(), "one character is not completed");
     check(chewing_plus::AllBopomofo("ㄍㄒ") &&
               !chewing_plus::AllBopomofo("ㄍa"),

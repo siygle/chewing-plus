@@ -312,9 +312,28 @@ static void test_suggestions(void) {
     check(preedit()[0] == '\0', "reading cleared after the pick");
 
     reset();
-    type_text("ev");
+    type_text("evzh");
+    reset();
+    /* ㄇㄇ (a a): two initials, default minimum 2 -> 媽媽 listed */
+    type_text("aa");
+    found = 0;
+    for (i = 0; i < chewing_plus_suggestion_count(session); i++) {
+        found |= strcmp(chewing_plus_suggestion(session, i), "媽媽") == 0;
+    }
+    check(found, "ㄇㄇ suggests 媽媽 (default minimum 2)");
+    check(strstr(preedit(), "ㄇㄇ") != NULL, "preedit shows ㄇㄇ");
+    check(chewing_plus_set_setting(session, "initials_min", "3") == 1,
+          "initials_min setting");
+    reset();
+    type_text("aa");
     check(chewing_plus_suggestion_count(session) == 0,
-          "two initials are not expanded");
+          "minimum 3: two initials are not expanded");
+    chewing_plus_set_setting(session, "initials_min", "1");
+    reset();
+    type_text("a");
+    check(chewing_plus_suggestion_count(session) == 0,
+          "minimum is never below 2");
+    chewing_plus_set_setting(session, "initials_min", "2");
     reset();
     type_text("su3");
     check(chewing_plus_suggestion_count(session) == 0,
