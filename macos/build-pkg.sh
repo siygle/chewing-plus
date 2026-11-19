@@ -87,12 +87,16 @@ pkgbuild --root "$stage" \
     --scripts "$root/macos/pkg-scripts" \
     --install-location / \
     "$component"
-# pkgbuild can still emit a <relocate> search. Strip it and set the
-# package attribute so Installer will not move the app.
-expand_root=$(mktemp -d "${TMPDIR:-/tmp}/chewing-plus-expand.XXXXXX")
-expanded="$expand_root/pkg"
-pkgutil --expand "$component" "$expanded"
-python3 - "$expanded/PackageInfo" <<'PY'
+# pkgbuild can still emit a <relocate> search (even an empty <relocate/>
+# for a scripts-only package). Strip it and set the package attribute so
+# Installer will not move the app.
+strip_relocate() {
+    local pkg=$1
+    local expand_root expanded
+    expand_root=$(mktemp -d "${TMPDIR:-/tmp}/chewing-plus-expand.XXXXXX")
+    expanded="$expand_root/pkg"
+    pkgutil --expand "$pkg" "$expanded"
+    python3 - "$expanded/PackageInfo" <<'PY'
 import re
 import sys
 from pathlib import Path
@@ -105,8 +109,10 @@ if "relocatable=" not in text:
     text = text.replace("<pkg-info ", '<pkg-info relocatable="false" ', 1)
 path.write_text(text)
 PY
-pkgutil --flatten "$expanded" "$component"
-rm -rf "$expand_root"
+    pkgutil --flatten "$expanded" "$pkg"
+    rm -rf "$expand_root"
+}
+strip_relocate "$component"
 # Optional "啟用語音" choice: an empty payload whose postinstall starts the
 # voxkit agent. Unticked, voice stays off until enabled from the input menu.
 voice_component="$root/macos/build/ChewingPlus-voice.pkg"
@@ -115,6 +121,7 @@ pkgbuild --nopayload \
     --version "${CHEWING_PLUS_VERSION:-6.0.0}" \
     --scripts "$root/macos/pkg-voice-scripts" \
     "$voice_component"
+strip_relocate "$voice_component"
 dist="$root/macos/build/distribution.xml"
 cat > "$dist" <<XML
 <?xml version="1.0" encoding="utf-8"?>
