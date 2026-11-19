@@ -233,6 +233,14 @@ FCITX_CONFIGURATION(
         this, "PlusInitialsMin",
         _("Plus: Initials needed before suggesting (ㄇㄇ -> 媽媽 at 2)"), 2,
         IntConstrain(2, 6)};
+    Option<bool> PlusFuzzy{
+        this, "PlusFuzzy",
+        _("Plus: Toneless typing (finish a syllable at the next initial)"),
+        true};
+    Option<bool> PlusLiveChars{
+        this, "PlusLiveChars",
+        _("Plus: List likely characters while a syllable is being typed"),
+        true};
     Option<bool> PlusSuggestions{
         this, "PlusSuggestions",
         _("Plus: Phrase suggestions (completion and initials, Shift+1-9)"),

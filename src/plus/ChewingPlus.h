@@ -114,6 +114,12 @@ public:
     const std::string &typedInitials(ChewingContext *) const {
         return initials_;
     }
+    // Buffer length (characters) when the initials began. With toneless
+    // typing libchewing turns each initial into a character as it goes
+    // (ㄍㄒ -> 更); those belong to the initials, not to the text.
+    size_t initialsStart() const { return initialsStart_; }
+    // Drop characters toneless typing added after `start`, and the reading.
+    static void dropAfter(ChewingContext *ctx, size_t start);
 
     // Raw-key tracking for the hint: call after Chewing handled a key.
     void afterChewingKey(ChewingContext *ctx, char ascii, bool isBackspace);
@@ -154,6 +160,8 @@ private:
     std::vector<bool> overwriteFlags_; // per key, for Backspace
     size_t lastZuinLen_ = 0;
     std::string initials_;
+    size_t initialsStart_ = 0;
+    size_t keysStart_ = 0; // buffer length when keys_ began
     // Emoji double tap.
     int64_t prefixPendingMs_ = -1;
     std::string prefixPendingBuffer_;

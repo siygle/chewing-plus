@@ -115,6 +115,13 @@ struct Session {
     bool suggestions = false;
     // Initials typed before suggesting phrases (ㄇㄇ -> 媽媽 at 2).
     size_t initialsMin = 2;
+    // Likely characters for the syllable being typed (live_chars).
+    bool liveChars = false;
+    std::string charsPath;
+    std::shared_ptr<const chewing_plus::PhraseIndex> chars =
+        std::make_shared<chewing_plus::PhraseIndex>();
+    // The list holds characters for the reading, not phrases.
+    bool suggChars = false;
     std::shared_ptr<const chewing_plus::PhraseIndex> phrases =
         std::make_shared<chewing_plus::PhraseIndex>();
     // Current suggestions and what they replace: the last `replaceChars`
@@ -280,13 +287,17 @@ struct Session {
         sugg.clear();
         replaceChars = 0;
         replaceReading = false;
-        if (!suggestions || sensitive || phrases->size() == 0 ||
-            panelKind != CHEWING_PLUS_PANEL_NONE ||
+        suggChars = false;
+        if (sensitive || panelKind != CHEWING_PLUS_PANEL_NONE ||
             chewing_cand_TotalPage(c) > 0) {
             return;
         }
         std::string buffer = BufferOf(c);
         std::string zuin = ZuinOf(c);
+        if (!suggestions || phrases->size() == 0) {
+            fillLiveChars(zuin);
+            return;
+        }
         if (!zuin.empty()) {
             // Initials only: each syllable typed as its first symbol, so the
             // reading holds one symbol per key (libchewing overwrites the
@@ -296,13 +307,20 @@ struct Session {
             std::string initials = plus.typedInitials(c);
             sugg = phrases->expand(initials, 9, initialsMin);
             replaceReading = !sugg.empty();
+            if (!replaceReading) {
+                fillLiveChars(zuin);
+                return;
+            }
             if (replaceReading && initials != zuin) {
-                // libchewing shows only the last initial; show them all.
-                size_t at = preedit.find(zuin, hlStart);
-                if (at != std::string::npos) {
-                    preedit.replace(at, zuin.size(), initials);
-                    hlLen = initials.size();
-                }
+                // Show the text before the initials, then all of them.
+                // libchewing shows only the last one, and with toneless
+                // typing it has turned the others into characters.
+                size_t start = plus.initialsStart();
+                size_t keep = std::min(start, CodePoints(buffer));
+                preedit = buffer.substr(0, ByteOffset(buffer, keep)) + initials;
+                hlStart = ByteOffset(buffer, keep);
+                hlLen = initials.size();
+                cursor = preedit.size();
             }
             return;
         }
@@ -325,13 +343,42 @@ struct Session {
         }
     }
 
+    // ㄋ -> 你 年 您: characters whose toneless reading starts with what is
+    // typed so far. Tones in the reading are dropped before the lookup.
+    void fillLiveChars(const std::string &zuin) {
+        if (!liveChars || zuin.empty() || chars->size() == 0) {
+            return;
+        }
+        std::string reading;
+        for (size_t i = 0; i + 1 < zuin.size() || i < zuin.size();) {
+            auto b = static_cast<unsigned char>(zuin[i]);
+            size_t n = b < 0x80 ? 1 : b < 0xE0 ? 2 : b < 0xF0 ? 3 : 4;
+            std::string cp = zuin.substr(i, n);
+            if (chewing_plus::AllBopomofo(cp)) {
+                reading += cp;
+            }
+            i += n;
+        }
+        sugg = chars->byReading(reading);
+        replaceReading = !sugg.empty();
+        suggChars = replaceReading;
+    }
+
     void selectSuggestion(ChewingContext *c, int index) {
         if (index < 0 || index >= static_cast<int>(sugg.size())) {
             return;
         }
         std::string pick = sugg[index];
+        if (suggChars) {
+            // A character for the syllable being typed: it replaces the
+            // reading. libchewing's buffer cannot hold an arbitrary
+            // character, so the composition is committed with it at the
+            // cursor (the same path as dictation and emoji).
+            insertText(c, pick);
+            return;
+        }
         if (replaceReading) {
-            chewing_clean_bopomofo_buf(c);
+            chewing_plus::ChewingPlus::dropAfter(c, plus.initialsStart());
             plus.reset();
         } else {
             for (size_t i = 0; i < replaceChars; ++i) {
@@ -726,6 +773,137 @@ const Session *S(const chewing_plus_session *session) {
 
 } // namespace
 
+namespace {
+
+struct SettingRow {
+    const char *key;
+    int type;
+    const char *defaultValue;
+    const char *labelEn;
+    const char *labelZh;
+};
+
+constexpr SettingRow kSettings[] = {
+#define BOOL CHEWING_PLUS_SETTING_BOOL
+#define INT CHEWING_PLUS_SETTING_INT
+#define STRING CHEWING_PLUS_SETTING_STRING
+#define SETTING(key, type, def, en, zh) {#key, type, def, en, zh},
+#include "settings.inc"
+#undef SETTING
+#undef BOOL
+#undef INT
+#undef STRING
+};
+
+const SettingRow *FindSetting(const char *key) {
+    if (!key) {
+        return nullptr;
+    }
+    for (const auto &row : kSettings) {
+        if (std::strcmp(row.key, key) == 0) {
+            return &row;
+        }
+    }
+    return nullptr;
+}
+
+// "1"/"0" for a boolean, or "" if it does not parse.
+std::string ParseBool(const char *value) {
+    std::string v = value ? value : "";
+    std::transform(v.begin(), v.end(), v.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    if (v == "1" || v == "true" || v == "on" || v == "yes") {
+        return "1";
+    }
+    if (v == "0" || v == "false" || v == "off" || v == "no") {
+        return "0";
+    }
+    return "";
+}
+
+bool ParseInt(const char *value, int &out) {
+    if (!value || !*value) {
+        return false;
+    }
+    char *end = nullptr;
+    long n = std::strtol(value, &end, 10);
+    if (*end != '\0' || n < -100000 || n > 100000) {
+        return false;
+    }
+    out = static_cast<int>(n);
+    return true;
+}
+
+// Push the stored values into the engine. Grouped settings (spacing,
+// shortcode, English) are applied together from their stored keys.
+void ApplySetting(chewing_plus_session *session, const std::string &key) {
+    auto &st = S(session)->settings;
+    auto on = [&st](const char *k) { return st[k] == "1" ? 1 : 0; };
+    auto num = [&st](const char *k) {
+        int n = 0;
+        ParseInt(st[k].c_str(), n);
+        return n;
+    };
+    if (key == "emoji") {
+        chewing_plus_set_emoji(session, on("emoji"));
+    } else if (key == "calculator") {
+        chewing_plus_set_calculator(session, on("calculator"));
+    } else if (key == "space_letters" || key == "space_digits") {
+        chewing_plus_set_spacing(session, on("space_letters"),
+                                 on("space_digits"));
+    } else if (key == "shortcode" || key == "shortcode_prefix" ||
+               key == "shortcode_tap_ms") {
+        chewing_plus_set_emoji_shortcode(session, on("shortcode"),
+                                         st["shortcode_prefix"].c_str(),
+                                         num("shortcode_tap_ms"));
+    } else if (key == "english" || key == "english_hint") {
+        chewing_plus_set_english(session, on("english"), on("english_hint"),
+                                 nullptr);
+    } else if (key == "english_hint_commit") {
+        chewing_plus_set_english_hint_commit(session,
+                                             on("english_hint_commit"));
+    } else if (key == "suggestions") {
+        chewing_plus_set_suggestions(session, on("suggestions"), nullptr);
+    } else if (key == "fuzzy") {
+        chewing_config_set_int(S(session)->raw(), "chewing.conversion_engine",
+                               on("fuzzy") ? FUZZY_CHEWING_CONVERSION_ENGINE
+                                           : CHEWING_CONVERSION_ENGINE);
+        S(session)->refresh();
+    } else if (key == "live_chars") {
+        auto *s = S(session);
+        s->liveChars = on("live_chars");
+        s->chars = s->liveChars && !s->charsPath.empty()
+                       ? chewing_plus::DataCache::chars(s->charsPath)
+                       : std::make_shared<chewing_plus::PhraseIndex>();
+        s->refresh();
+    } else if (key == "initials_min") {
+        // Below 2 every lone initial would list thousands of phrases.
+        S(session)->initialsMin =
+            static_cast<size_t>(std::max(2, num("initials_min")));
+        S(session)->refresh();
+    } else if (key == "shift_toggle") {
+        chewing_plus_set_shift_toggle(session, on("shift_toggle"));
+    } else if (key == "easy_symbol") {
+        chewing_plus_set_easy_symbol(session, on("easy_symbol"));
+    } else if (key == "keyboard_layout") {
+        chewing_plus_set_keyboard_layout(session,
+                                         st["keyboard_layout"].c_str());
+    } else if (key == "selection_keys") {
+        chewing_plus_set_selection_keys(session, st["selection_keys"].c_str());
+    } else if (key == "page_size") {
+        chewing_plus_set_page_size(session, num("page_size"));
+    } else if (key == "space_as_selection") {
+        chewing_plus_set_space_as_selection(session, on("space_as_selection"));
+    } else if (key == "add_phrase_forward" || key == "choice_backward" ||
+               key == "auto_shift_cursor") {
+        chewing_plus_set_phrase_options(session, on("add_phrase_forward"),
+                                        on("choice_backward"),
+                                        on("auto_shift_cursor"));
+    }
+}
+
+} // namespace
+
 extern "C" {
 
 int chewing_plus_abi_version(void) { return CHEWING_PLUS_ABI_VERSION; }
@@ -753,12 +931,15 @@ chewing_plus_session *chewing_plus_new(const char *chewing_sys_path,
     chewing_set_phraseChoiceRearward(raw, 1);
     chewing_set_autoShiftCur(raw, 0);
     chewing_set_spaceAsSelection(raw, 1);
-    // Record the defaults (they match the engine state set above) without
-    // re-applying them.
+    // Record the defaults; most match the engine state set above. The
+    // ones the engine does not start with are applied.
     for (int i = 0; i < chewing_plus_setting_count(); i++) {
         chewing_plus_setting_info info;
         chewing_plus_setting_info_at(i, &info);
         session->settings[info.key] = info.default_value;
+    }
+    for (const char *key : {"fuzzy", "live_chars"}) {
+        ApplySetting(reinterpret_cast<chewing_plus_session *>(session), key);
     }
     session->refresh();
     return reinterpret_cast<chewing_plus_session *>(session);
@@ -815,6 +996,19 @@ void chewing_plus_set_suggestions(chewing_plus_session *session, int enabled,
         s->phrases = chewing_plus::DataCache::phrases(s->phrasesPath);
     }
     s->refresh();
+}
+
+void chewing_plus_set_chars_path(chewing_plus_session *session,
+                                 const char *path) {
+    if (!session || !path) {
+        return;
+    }
+    auto *s = S(session);
+    s->charsPath = path;
+    if (s->liveChars) {
+        s->chars = chewing_plus::DataCache::chars(path);
+        s->refresh();
+    }
 }
 
 void chewing_plus_set_phrases_path(chewing_plus_session *session,
@@ -1180,125 +1374,6 @@ void chewing_plus_select(chewing_plus_session *session, int index) {
     }
     s->refresh();
 }
-
-namespace {
-
-struct SettingRow {
-    const char *key;
-    int type;
-    const char *defaultValue;
-    const char *labelEn;
-    const char *labelZh;
-};
-
-constexpr SettingRow kSettings[] = {
-#define BOOL CHEWING_PLUS_SETTING_BOOL
-#define INT CHEWING_PLUS_SETTING_INT
-#define STRING CHEWING_PLUS_SETTING_STRING
-#define SETTING(key, type, def, en, zh) {#key, type, def, en, zh},
-#include "settings.inc"
-#undef SETTING
-#undef BOOL
-#undef INT
-#undef STRING
-};
-
-const SettingRow *FindSetting(const char *key) {
-    if (!key) {
-        return nullptr;
-    }
-    for (const auto &row : kSettings) {
-        if (std::strcmp(row.key, key) == 0) {
-            return &row;
-        }
-    }
-    return nullptr;
-}
-
-// "1"/"0" for a boolean, or "" if it does not parse.
-std::string ParseBool(const char *value) {
-    std::string v = value ? value : "";
-    std::transform(v.begin(), v.end(), v.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-    if (v == "1" || v == "true" || v == "on" || v == "yes") {
-        return "1";
-    }
-    if (v == "0" || v == "false" || v == "off" || v == "no") {
-        return "0";
-    }
-    return "";
-}
-
-bool ParseInt(const char *value, int &out) {
-    if (!value || !*value) {
-        return false;
-    }
-    char *end = nullptr;
-    long n = std::strtol(value, &end, 10);
-    if (*end != '\0' || n < -100000 || n > 100000) {
-        return false;
-    }
-    out = static_cast<int>(n);
-    return true;
-}
-
-// Push the stored values into the engine. Grouped settings (spacing,
-// shortcode, English) are applied together from their stored keys.
-void ApplySetting(chewing_plus_session *session, const std::string &key) {
-    auto &st = S(session)->settings;
-    auto on = [&st](const char *k) { return st[k] == "1" ? 1 : 0; };
-    auto num = [&st](const char *k) {
-        int n = 0;
-        ParseInt(st[k].c_str(), n);
-        return n;
-    };
-    if (key == "emoji") {
-        chewing_plus_set_emoji(session, on("emoji"));
-    } else if (key == "calculator") {
-        chewing_plus_set_calculator(session, on("calculator"));
-    } else if (key == "space_letters" || key == "space_digits") {
-        chewing_plus_set_spacing(session, on("space_letters"),
-                                 on("space_digits"));
-    } else if (key == "shortcode" || key == "shortcode_prefix" ||
-               key == "shortcode_tap_ms") {
-        chewing_plus_set_emoji_shortcode(session, on("shortcode"),
-                                         st["shortcode_prefix"].c_str(),
-                                         num("shortcode_tap_ms"));
-    } else if (key == "english" || key == "english_hint") {
-        chewing_plus_set_english(session, on("english"), on("english_hint"),
-                                 nullptr);
-    } else if (key == "english_hint_commit") {
-        chewing_plus_set_english_hint_commit(session,
-                                             on("english_hint_commit"));
-    } else if (key == "suggestions") {
-        chewing_plus_set_suggestions(session, on("suggestions"), nullptr);
-    } else if (key == "initials_min") {
-        // Below 2 every lone initial would list thousands of phrases.
-        S(session)->initialsMin =
-            static_cast<size_t>(std::max(2, num("initials_min")));
-        S(session)->refresh();
-    } else if (key == "shift_toggle") {
-        chewing_plus_set_shift_toggle(session, on("shift_toggle"));
-    } else if (key == "easy_symbol") {
-        chewing_plus_set_easy_symbol(session, on("easy_symbol"));
-    } else if (key == "keyboard_layout") {
-        chewing_plus_set_keyboard_layout(session,
-                                         st["keyboard_layout"].c_str());
-    } else if (key == "selection_keys") {
-        chewing_plus_set_selection_keys(session, st["selection_keys"].c_str());
-    } else if (key == "page_size") {
-        chewing_plus_set_page_size(session, num("page_size"));
-    } else if (key == "space_as_selection") {
-        chewing_plus_set_space_as_selection(session, on("space_as_selection"));
-    } else if (key == "add_phrase_forward" || key == "choice_backward" ||
-               key == "auto_shift_cursor") {
-        chewing_plus_set_phrase_options(session, on("add_phrase_forward"),
-                                        on("choice_backward"),
-                                        on("auto_shift_cursor"));
-    }
-}
-
-} // namespace
 
 int chewing_plus_setting_count(void) {
     return static_cast<int>(sizeof(kSettings) / sizeof(kSettings[0]));

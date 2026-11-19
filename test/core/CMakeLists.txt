@@ -24,7 +24,8 @@ target_compile_features(test_plus_core PRIVATE cxx_std_20)
 target_compile_definitions(test_plus_core PRIVATE
     PLUS_EMOJI_PATH="${CMAKE_SOURCE_DIR}/data/plus-emoji-shortcodes.txt"
     PLUS_ENGLISH_PATH="${CMAKE_SOURCE_DIR}/data/plus-english.txt"
-    PLUS_PHRASES_PATH="${CMAKE_SOURCE_DIR}/data/plus-phrases.txt")
+    PLUS_PHRASES_PATH="${CMAKE_SOURCE_DIR}/data/plus-phrases.txt"
+    PLUS_CHARS_PATH="${CMAKE_SOURCE_DIR}/data/plus-chars.txt")
 
 add_executable(test_plus_abi test_abi.c)
 target_link_libraries(test_plus_abi PRIVATE chewing-plus-core)
@@ -33,7 +34,8 @@ set_target_properties(test_plus_abi PROPERTIES LINKER_LANGUAGE CXX)
 target_compile_definitions(test_plus_abi PRIVATE
     PLUS_EMOJI_PATH="${CMAKE_SOURCE_DIR}/data/plus-emoji-shortcodes.txt"
     PLUS_ENGLISH_PATH="${CMAKE_SOURCE_DIR}/data/plus-english.txt"
-    PLUS_PHRASES_PATH="${CMAKE_SOURCE_DIR}/data/plus-phrases.txt")
+    PLUS_PHRASES_PATH="${CMAKE_SOURCE_DIR}/data/plus-phrases.txt"
+    PLUS_CHARS_PATH="${CMAKE_SOURCE_DIR}/data/plus-chars.txt")
 
 if(Chewing_LIBRARY_DIRS)
     set_target_properties(test_plus_core test_plus_abi PROPERTIES

@@ -40,6 +40,12 @@ SETTING(suggestions, BOOL, "0",
 SETTING(initials_min, INT, "2",
         "Initials needed before suggesting (2 or more)",
         "字首注音幾個以上開始建議")
+SETTING(fuzzy, BOOL, "1",
+        "Toneless typing: finish a syllable at the next initial",
+        "免打聲調（打下一個聲母時自動選字）")
+SETTING(live_chars, BOOL, "1",
+        "List likely characters while a syllable is being typed",
+        "邊打邊列出可能的字")
 SETTING(shift_toggle, BOOL, "0", "Tap Left Shift alone to switch 中/英",
         "左 Shift 切換中／英")
 SETTING(easy_symbol, BOOL, "0", "Easy symbol (Shift+letter)",

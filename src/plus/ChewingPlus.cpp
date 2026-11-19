@@ -167,7 +167,7 @@ bool ChewingPlus::toggleEnglish(ChewingContext *ctx, const Commit &commit) {
         // word in place of the unfinished syllable, keeping the rest of the
         // buffer, as Space would after typing it in the [EN] panel.
         std::string word = lexicon_->canonical(keys_);
-        chewing_clean_bopomofo_buf(ctx);
+        dropAfter(ctx, keysStart_);
         keys_.clear();
         overwrites_ = 0;
         overwriteFlags_.clear();
@@ -183,7 +183,7 @@ bool ChewingPlus::toggleEnglish(ChewingContext *ctx, const Commit &commit) {
             return false;
         }
         keys = keys_;
-        chewing_clean_bopomofo_buf(ctx);
+        dropAfter(ctx, keysStart_);
         keys_.clear();
         overwrites_ = 0;
         overwriteFlags_.clear();
@@ -395,6 +395,7 @@ void ChewingPlus::afterChewingKey(ChewingContext *ctx, char ascii,
         return;
     }
     size_t len = CodePoints(zuin);
+    const size_t bufLen = CodePoints(Buffer(ctx));
     // ㄅ..ㄙ (U+3105..U+3119): E3 84 85..99. A lone initial that replaced
     // another lone initial extends the abbreviation.
     const bool loneInitial = zuin.size() == 3 &&
@@ -415,6 +416,7 @@ void ChewingPlus::afterChewingKey(ChewingContext *ctx, char ascii,
         initials_ += zuin;
     } else {
         initials_ = zuin;
+        initialsStart_ = bufLen;
     }
     if (isBackspace) {
         if (!keys_.empty()) {
@@ -425,12 +427,36 @@ void ChewingPlus::afterChewingKey(ChewingContext *ctx, char ascii,
             }
         }
     } else if (ascii > 0x20 && ascii < 0x7f && keys_.size() < 40) {
+        if (keys_.empty()) {
+            keysStart_ = bufLen;
+        }
         keys_ += ascii;
         bool overwrote = len <= lastZuinLen_;
         overwriteFlags_.push_back(overwrote);
         overwrites_ += overwrote;
     }
     lastZuinLen_ = len;
+}
+
+void ChewingPlus::dropAfter(ChewingContext *ctx, size_t start) {
+    chewing_cand_close(ctx);
+    chewing_clean_bopomofo_buf(ctx);
+    // Cursor at the end, then Backspace back to where the sequence began.
+    // Right after the reading is cleared, libchewing's first Backspace can
+    // be absorbed without removing anything, so allow a few misses.
+    chewing_handle_End(ctx);
+    size_t len = CodePoints(Buffer(ctx));
+    int misses = 0;
+    while (len > start && misses < 3) {
+        chewing_handle_Backspace(ctx);
+        size_t now = CodePoints(Buffer(ctx));
+        if (now < len) {
+            len = now;
+            misses = 0;
+        } else {
+            ++misses;
+        }
+    }
 }
 
 std::string ChewingPlus::englishHint(ChewingContext *ctx) const {

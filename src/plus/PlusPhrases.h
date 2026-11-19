@@ -31,7 +31,10 @@ public:
 
     // Text: "phrase<TAB>freq<TAB>abbr" lines, '#' comments. Or a compiled
     // file. Returns the number of phrases.
-    size_t load(const std::string &path);
+    //
+    // `readings`: the third column is a whole toneless reading (好 ㄏㄠ,
+    // data/plus-chars.txt) instead of one initial per character.
+    size_t load(const std::string &path, bool readings = false);
     void clear();
     size_t size() const;
     bool compiled() const { return map_ != nullptr; }
@@ -46,6 +49,12 @@ public:
     std::vector<std::string> complete(const std::string &typed,
                                       size_t limit = 9,
                                       size_t minChars = 2) const;
+
+    // Entries whose reading starts with `typed` (a partly typed syllable:
+    // ㄋ -> 你 年 您, ㄋㄧ -> 你 妳 尼), most frequent first. For an index
+    // loaded with readings = true.
+    std::vector<std::string> byReading(const std::string &typed,
+                                       size_t limit = 9) const;
 
     // Phrases whose syllables start with these Bopomofo symbols, in order
     // (ㄍㄒㄈㄘ). At least `minSyllables` symbols; most frequent first.

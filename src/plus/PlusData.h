@@ -31,6 +31,8 @@ std::shared_ptr<const EnglishLexicon> english(const std::string &builtIn,
 std::shared_ptr<const EmojiShortcodes> emoji(const std::string &builtIn,
                                              const std::string &user);
 std::shared_ptr<const PhraseIndex> phrases(const std::string &path);
+// Character index keyed by whole toneless reading (data/plus-chars.txt).
+std::shared_ptr<const PhraseIndex> chars(const std::string &path);
 // Number of dictionaries currently alive, for tests.
 size_t liveCount();
 } // namespace DataCache

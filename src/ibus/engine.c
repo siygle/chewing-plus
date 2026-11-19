@@ -49,8 +49,14 @@ static void apply_features(chewing_plus_session *session) {
 #define CHEWING_PLUS_IBUS_PHRASES ""
 #endif
     const char *phrases = getenv("CHEWING_PLUS_PHRASES");
+#ifndef CHEWING_PLUS_IBUS_CHARS
+#define CHEWING_PLUS_IBUS_CHARS ""
+#endif
+    const char *chars = getenv("CHEWING_PLUS_CHARS");
     chewing_plus_set_phrases_path(
         session, phrases && phrases[0] ? phrases : CHEWING_PLUS_IBUS_PHRASES);
+    chewing_plus_set_chars_path(
+        session, chars && chars[0] ? chars : CHEWING_PLUS_IBUS_CHARS);
     chewing_plus_ibus_prefs_load(&prefs);
     for (i = 0; i < prefs.count; i++) {
         chewing_plus_set_setting(session, prefs.items[i].key,

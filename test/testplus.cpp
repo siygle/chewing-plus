@@ -95,6 +95,19 @@ void testPlus(Instance *instance) {
         };
         auto preedit = [&]() { return ic->inputPanel().preedit().toString(); };
         auto aux = [&]() { return ic->inputPanel().auxDown().toString(); };
+        // The core's own aux text, before the suggestion list ("⇧1 ...")
+        // that shares the line now that live characters are on by default.
+        auto hint = [&]() {
+            std::string a = aux();
+            auto at = a.find("⇧1 ");
+            if (at != std::string::npos) {
+                a = a.substr(0, at);
+            }
+            while (!a.empty() && a.back() == ' ') {
+                a.pop_back();
+            }
+            return a;
+        };
         auto cand = [&](int i) -> std::string {
             auto l = ic->inputPanel().candidateList();
             return l && i < l->size() ? l->candidate(i).text().toString() : "";
@@ -188,7 +201,7 @@ void testPlus(Instance *instance) {
         reset();
         type("su3");
         type("github");
-        check(aux() == "Control+Shift+Space / Right Shift ×2 → GitHub",
+        check(hint() == "Control+Shift+Space / Right Shift ×2 → GitHub",
               "hint shown, got [" + aux() + "]");
         key(Key("Control+Shift+space"));
         check(preedit() == "你[EN] github",
@@ -201,7 +214,7 @@ void testPlus(Instance *instance) {
         // --- no hint for real Zhuyin
         reset();
         type("vu0");
-        check(aux().empty(), "no hint for ㄒㄧㄢ, got [" + aux() + "]");
+        check(hint().empty(), "no hint for ㄒㄧㄢ, got [" + aux() + "]");
 
         // --- Right Shift x2 toggles English mode
         reset();
@@ -265,6 +278,32 @@ void testPlus(Instance *instance) {
         type("aa");
         check(preedit() == "ㄇㄇ" && aux().find("媽媽") != std::string::npos,
               "ㄇㄇ suggests 媽媽, got " + preedit() + " / " + aux());
+
+        // --- toneless typing and live characters
+        reset();
+        {
+            RawConfig more;
+            more.setValueByPath("PlusFuzzy", "True");
+            more.setValueByPath("PlusLiveChars", "True");
+            chewing->setConfig(more);
+        }
+        reset();
+        type("s");
+        check(aux().find("你") != std::string::npos,
+              "ㄋ lists 你, got [" + aux() + "]");
+        type("ucla8");
+        check(preedit().find("你好") == 0,
+              "toneless ㄋㄧㄏㄠㄇㄚ, got " + preedit());
+        key(Key(FcitxKey_space));
+        key(Key(FcitxKey_Return));
+        check(committed == "你好嗎",
+              "toneless commit 你好嗎, got [" + committed + "]");
+        {
+            RawConfig more;
+            more.setValueByPath("PlusFuzzy", "False");
+            more.setValueByPath("PlusLiveChars", "False");
+            chewing->setConfig(more);
+        }
 
         // --- Chinese / English: fcitx5's own Left Shift toggle (AltTrigger)
         // switches to the keyboard layout; the composition is committed.

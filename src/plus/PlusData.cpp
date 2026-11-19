@@ -107,6 +107,15 @@ std::shared_ptr<const PhraseIndex> phrases(const std::string &path) {
     });
 }
 
+std::shared_ptr<const PhraseIndex> chars(const std::string &path) {
+    // Same table, distinct key: a text file loads differently here.
+    return Get(PhraseTable(), "chars\n" + Stamp(path), [&](PhraseIndex &index) {
+        if (!path.empty())
+            index.load(path, true);
+        index.finalize();
+    });
+}
+
 size_t liveCount() {
     std::lock_guard<std::mutex> guard(Lock());
     return Live(EnglishTable()) + Live(EmojiTable()) + Live(PhraseTable());

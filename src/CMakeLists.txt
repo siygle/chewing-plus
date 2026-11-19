@@ -73,7 +73,17 @@ add_custom_command(
             "${CHEWING_PLUS_PHRASES_BIN}"
     DEPENDS chewing-plus-compile-phrases "${CMAKE_SOURCE_DIR}/data/plus-phrases.txt"
     COMMENT "Compiling plus-phrases.bin")
-add_custom_target(chewing-plus-phrases ALL DEPENDS "${CHEWING_PLUS_PHRASES_BIN}")
+set(CHEWING_PLUS_CHARS_BIN "${CMAKE_BINARY_DIR}/plus-chars.bin"
+    CACHE INTERNAL "Compiled character index")
+add_custom_command(
+    OUTPUT "${CHEWING_PLUS_CHARS_BIN}"
+    COMMAND chewing-plus-compile-phrases --chars
+            "${CMAKE_SOURCE_DIR}/data/plus-chars.txt"
+            "${CHEWING_PLUS_CHARS_BIN}"
+    DEPENDS chewing-plus-compile-phrases "${CMAKE_SOURCE_DIR}/data/plus-chars.txt"
+    COMMENT "Compiling plus-chars.bin")
+add_custom_target(chewing-plus-phrases ALL
+    DEPENDS "${CHEWING_PLUS_PHRASES_BIN}" "${CHEWING_PLUS_CHARS_BIN}")
 
 install(TARGETS chewing-plus-core
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -143,7 +153,8 @@ if(ENABLE_IBUS)
     target_compile_definitions(ibus-chewing-plus PRIVATE
         CHEWING_PLUS_IBUS_EMOJI="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-emoji-shortcodes.txt"
         CHEWING_PLUS_IBUS_ENGLISH="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-english.txt"
-        CHEWING_PLUS_IBUS_PHRASES="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-phrases.bin")
+        CHEWING_PLUS_IBUS_PHRASES="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-phrases.bin"
+        CHEWING_PLUS_IBUS_CHARS="${CMAKE_INSTALL_FULL_DATADIR}/chewing-plus/plus-chars.bin")
     set_target_properties(ibus-chewing-plus PROPERTIES
         C_STANDARD 99 C_STANDARD_REQUIRED ON
         RUNTIME_OUTPUT_NAME ibus-chewing-plus)
@@ -153,6 +164,7 @@ if(ENABLE_IBUS)
     install(FILES "${CMAKE_SOURCE_DIR}/data/plus-emoji-shortcodes.txt"
                   "${CMAKE_SOURCE_DIR}/data/plus-english.txt"
                   "${CHEWING_PLUS_PHRASES_BIN}"
+                  "${CHEWING_PLUS_CHARS_BIN}"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/chewing-plus")
     if(ENABLE_IBUS_SETUP)
         pkg_check_modules(Adw REQUIRED libadwaita-1)

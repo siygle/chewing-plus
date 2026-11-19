@@ -498,6 +498,10 @@ void ChewingEngine::populateConfig() {
     chewing_plus_set_phrases_path(
         s, builtIn("data/chewing-plus-phrases.bin").c_str());
     set("initials_min", std::to_string(*config_.PlusInitialsMin));
+    set("fuzzy", flag(*config_.PlusFuzzy));
+    chewing_plus_set_chars_path(s,
+                                builtIn("data/chewing-plus-chars.bin").c_str());
+    set("live_chars", flag(*config_.PlusLiveChars));
     set("suggestions", flag(*config_.PlusSuggestions));
     chewing_plus_reset(s);
 }

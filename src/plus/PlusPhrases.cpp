@@ -102,7 +102,7 @@ size_t PhraseIndex::size() const {
     return map_ ? static_cast<const Header *>(map_)->count : phrases_.size();
 }
 
-size_t PhraseIndex::load(const std::string &path) {
+size_t PhraseIndex::load(const std::string &path, bool readings) {
     if (loadCompiled(path)) {
         return size();
     }
@@ -131,7 +131,7 @@ size_t PhraseIndex::load(const std::string &path) {
         }
         if (p.text.empty() || p.text.size() > kMaxPhraseBytes ||
             !AllBopomofo(p.abbr) ||
-            CodePointCount(p.abbr) != CodePointCount(p.text))
+            (!readings && CodePointCount(p.abbr) != CodePointCount(p.text)))
             continue;
         phrases_.push_back(std::move(p));
         ++added;
@@ -283,6 +283,26 @@ std::vector<std::string> PhraseIndex::complete(const std::string &typed,
         return {};
     return collect(false, typed, limit,
                    [&](uint32_t i) { return text(i).size() > typed.size(); });
+}
+
+std::vector<std::string> PhraseIndex::byReading(const std::string &typed,
+                                                size_t limit) const {
+    if (!AllBopomofo(typed) || size() == 0)
+        return {};
+    // Characters read exactly as typed come first (ㄋㄧ: 你 before 年
+    // ㄋㄧㄢ), then longer readings that start with it (ㄋ: ㄋㄧ, ㄋㄢ...).
+    std::vector<std::string> out = collect(
+        true, typed, limit, [&](uint32_t i) { return abbr(i) == typed; });
+    std::vector<std::string> longer = collect(
+        true, typed, limit * 3, [&](uint32_t i) { return abbr(i) != typed; });
+    // A character with two readings that both match appears once.
+    for (auto &s : longer) {
+        if (out.size() >= limit)
+            break;
+        if (std::find(out.begin(), out.end(), s) == out.end())
+            out.push_back(std::move(s));
+    }
+    return out;
 }
 
 std::vector<std::string> PhraseIndex::expand(const std::string &initials,

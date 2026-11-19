@@ -46,6 +46,7 @@ cp "$prefix/share/libchewing/"*.bin "$prefix/share/libchewing/"*.dat \
     "$app/Contents/Resources/libchewing/" 2>/dev/null || true
 cp "$root/data/plus-emoji-shortcodes.txt" "$root/data/plus-english.txt" \
     "$root/macos/build/core/plus-phrases.bin" \
+    "$root/macos/build/core/plus-chars.bin" \
     "$app/Contents/Resources/"
 cp "$libchewing" "$app/Contents/Frameworks/libchewing.dylib"
 # Also copy the versioned name the linker recorded, if it is a separate file.

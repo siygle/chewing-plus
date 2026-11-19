@@ -293,6 +293,10 @@ final class ChewingPlusInputController: IMKInputController {
             .appendingPathComponent("plus-phrases.bin").path {
             chewing_plus_set_phrases_path(session, phrases)
         }
+        if let chars = Bundle.main.resourceURL?
+            .appendingPathComponent("plus-chars.bin").path {
+            chewing_plus_set_chars_path(session, chars)
+        }
         Settings.apply(to: session)
         chewing_plus_set_english(session, Settings.isOn("english") ? 1 : 0,
                                  Settings.isOn("english") ? 1 : 0,
@@ -739,7 +743,7 @@ enum Settings {
     private static let macDefaults: [String: String] = [
         "emoji": "1", "calculator": "1", "space_letters": "1", "space_digits": "1",
         "shortcode": "1", "english": "1", "english_hint_commit": "1",
-        "suggestions": "1", "shift_toggle": "1",
+        "suggestions": "1", "shift_toggle": "1", "fuzzy": "1", "live_chars": "1",
     ]
 
     private static let store = UserDefaults.standard

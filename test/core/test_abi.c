@@ -551,6 +551,91 @@ static void test_settings(void) {
     reset();
 }
 
+static void test_fuzzy_and_live(void) {
+    chewing_plus_view v;
+    const char *got;
+    int i, found;
+    /* Toneless: ㄋㄧㄏㄠㄇㄚ then Space -> 你好嗎 */
+    check(chewing_plus_set_setting(session, "fuzzy", "1") == 1, "fuzzy on");
+    reset();
+    type_text("sucla8");
+    chewing_plus_get_view(session, &v);
+    check(strstr(v.preedit, "你好") != NULL,
+          "toneless ㄋㄧㄏㄠ converts at the next initial");
+    tap(CHEWING_PLUS_KEY_SPACE, ' ', 0);
+    tap(CHEWING_PLUS_KEY_RETURN, 0, 0);
+    got = chewing_plus_take_commit(session);
+    check(strcmp(got, "你好嗎") == 0, "toneless commit 你好嗎");
+    if (strcmp(got, "你好嗎") != 0) {
+        fprintf(stderr, "  commit=[%s] preedit=[%s]\n", got, preedit());
+    }
+    /* Tones still work in fuzzy mode. */
+    reset();
+    type_text("su3cl3");
+    check(strcmp(preedit(), "你好") == 0, "fuzzy mode keeps toned typing");
+    chewing_plus_set_setting(session, "fuzzy", "0");
+    reset();
+    type_text("sucl");
+    check(strstr(preedit(), "你") == NULL, "fuzzy off: no conversion");
+
+    /* Live characters: ㄋ lists 你; picking it replaces the reading. */
+    chewing_plus_set_chars_path(session, PLUS_CHARS_PATH);
+    chewing_plus_set_setting(session, "live_chars", "1");
+    reset();
+    type_text("s");
+    found = 0;
+    for (i = 0; i < chewing_plus_suggestion_count(session); i++) {
+        found |= strcmp(chewing_plus_suggestion(session, i), "你") == 0;
+    }
+    check(found, "ㄋ lists 你");
+    type_text("u");
+    check(chewing_plus_suggestion_count(session) > 0 &&
+              strcmp(chewing_plus_suggestion(session, 0), "你") == 0,
+          "ㄋㄧ lists 你 first");
+    reset();
+    type_text("su3s");
+    for (i = 0; i < chewing_plus_suggestion_count(session); i++) {
+        if (strcmp(chewing_plus_suggestion(session, i), "你") == 0) {
+            chewing_plus_select_suggestion(session, i);
+            break;
+        }
+    }
+    got = chewing_plus_take_commit(session);
+    check(strcmp(got, "你你") == 0, "picking keeps the buffer: 你 + 你");
+    /* Off: nothing listed for a lone ㄋ. */
+    chewing_plus_set_setting(session, "live_chars", "0");
+    reset();
+    type_text("s");
+    check(chewing_plus_suggestion_count(session) == 0, "live chars off");
+
+    /* Everything on together: toneless typing must not eat initials or the
+     * English hint (it converts each initial to a character as it goes). */
+    chewing_plus_set_setting(session, "fuzzy", "1");
+    chewing_plus_set_setting(session, "live_chars", "1");
+    chewing_plus_set_setting(session, "suggestions", "1");
+    reset();
+    type_text("su3evzh");
+    check(strcmp(preedit(), "你ㄍㄒㄈㄘ") == 0,
+          "toneless + initials: preedit shows 你ㄍㄒㄈㄘ");
+    chewing_plus_select_suggestion(session, 0);
+    got = chewing_plus_take_commit(session);
+    check(strcmp(got, "你恭喜發財") == 0, "toneless + initials: 你恭喜發財");
+    if (strcmp(got, "你恭喜發財") != 0) {
+        fprintf(stderr, "  commit=[%s]\n", got);
+    }
+    chewing_plus_set_english_hint_commit(session, 1);
+    reset();
+    type_text("su3github");
+    chewing_plus_toggle_english(session);
+    check(strcmp(preedit(), "你GitHub ") == 0,
+          "toneless + English hint: 你GitHub");
+    chewing_plus_set_english_hint_commit(session, 0);
+    chewing_plus_set_setting(session, "suggestions", "0");
+    chewing_plus_set_setting(session, "fuzzy", "0");
+    chewing_plus_set_setting(session, "live_chars", "0");
+    reset();
+}
+
 static void test_emoji_candidate(void) {
     int found;
     reset();
@@ -624,6 +709,13 @@ int main(void) {
         fprintf(stderr, "chewing_plus_new failed for %s\n", sys);
         return 1;
     }
+    check(strcmp(chewing_plus_get_setting(session, "fuzzy"), "1") == 0 &&
+              strcmp(chewing_plus_get_setting(session, "live_chars"), "1") == 0,
+          "toneless typing and live characters are on by default");
+    /* The tests below were written for toned typing; test_fuzzy_and_live
+     * turns these back on. */
+    chewing_plus_set_setting(session, "fuzzy", "0");
+    chewing_plus_set_setting(session, "live_chars", "0");
     memset(&cb, 0, sizeof(cb));
     cb.commit = on_commit;
     chewing_plus_set_callbacks(session, &cb);
@@ -651,6 +743,7 @@ int main(void) {
     test_ascii_mode();
     test_flush_and_page();
     test_settings();
+    test_fuzzy_and_live();
     test_emoji_candidate();
     test_sensitive();
 

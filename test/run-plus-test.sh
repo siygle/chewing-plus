@@ -14,6 +14,7 @@ src=$(cd "$(dirname "$0")/.." && pwd)
 cp "$src/data/plus-emoji-shortcodes.txt" "$root/share/fcitx5/data/chewing-plus-emoji-shortcodes.txt"
 cp "$src/data/plus-english.txt" "$root/share/fcitx5/data/chewing-plus-english.txt"
 cp "$build/plus-phrases.bin" "$root/share/fcitx5/data/chewing-plus-phrases.bin"
+cp "$build/plus-chars.bin" "$root/share/fcitx5/data/chewing-plus-chars.bin"
 env -i PATH="$PATH" HOME="$root/home" \
   XDG_DATA_HOME="$root/home/.local/share" XDG_CONFIG_HOME="$root/config" \
   XDG_RUNTIME_DIR="$root" XDG_DATA_DIRS="$root/share" \

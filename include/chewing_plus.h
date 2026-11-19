@@ -183,6 +183,11 @@ CHEWING_PLUS_API void chewing_plus_set_data_paths(chewing_plus_session *session,
 CHEWING_PLUS_API void
 chewing_plus_set_suggestions(chewing_plus_session *session, int enabled,
                              const char *path);
+/* Character file (data/plus-chars.txt or the compiled plus-chars.bin) for
+ * the "live_chars" setting: while a syllable is being typed, the suggestion
+ * list holds the likely characters for it (ㄋ -> 你 年 您). */
+CHEWING_PLUS_API void chewing_plus_set_chars_path(chewing_plus_session *session,
+                                                  const char *path);
 /* Phrase file for suggestions (plain text or the compiled .bin), used by the
  * "suggestions" setting. Reloads if suggestions are on. */
 CHEWING_PLUS_API void
