@@ -305,7 +305,8 @@ static void voice_start(ChewingPlusEngine *self) {
     if (voxkit_client_fd(&self->voice) < 0) {
         if (voxkit_client_connect(&self->voice, NULL) != 0) {
             self->voice_failed = 1;
-            show_aux(IBUS_ENGINE(self), "語音服務未啟動（voxkit serve）");
+            show_aux(IBUS_ENGINE(self),
+                     "語音尚未啟用：請到新酷音 Plus 設定打開「啟用語音」");
             return;
         }
         voice_arm(self);
@@ -323,7 +324,8 @@ static void voice_start(ChewingPlusEngine *self) {
     if (voxkit_proto_write_start(line, sizeof(line), self->voice_req, "zh",
                                  convert, NULL, words, count) < 0 ||
         voxkit_client_send(&self->voice, line) != 0) {
-        show_aux(IBUS_ENGINE(self), "語音服務未啟動（voxkit serve）");
+        show_aux(IBUS_ENGINE(self),
+                 "語音尚未啟用：請到新酷音 Plus 設定打開「啟用語音」");
         voice_close(self);
     } else {
         self->voice_active = 1;

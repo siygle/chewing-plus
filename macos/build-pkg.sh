@@ -6,7 +6,7 @@
 #   macos/build-pkg.sh
 #
 # Output: macos/build/ChewingPlus.pkg
-# CHEWING_PLUS_VERSION sets the package and bundle version (default 5.1.13).
+# CHEWING_PLUS_VERSION sets the package and bundle version (default 6.0.0).
 set -euo pipefail
 export COPYFILE_DISABLE=1
 if [[ "$(uname)" != Darwin ]]; then
@@ -83,7 +83,7 @@ component="$root/macos/build/ChewingPlus-component.pkg"
 pkgbuild --root "$stage" \
     --component-plist "$plist" \
     --identifier im.chewing.plus.inputmethod \
-    --version "${CHEWING_PLUS_VERSION:-5.1.13}" \
+    --version "${CHEWING_PLUS_VERSION:-6.0.0}" \
     --scripts "$root/macos/pkg-scripts" \
     --install-location / \
     "$component"
@@ -107,6 +107,36 @@ path.write_text(text)
 PY
 pkgutil --flatten "$expanded" "$component"
 rm -rf "$expand_root"
-productbuild --package "$component" \
+# Optional "啟用語音" choice: an empty payload whose postinstall starts the
+# voxkit agent. Unticked, voice stays off until enabled from the input menu.
+voice_component="$root/macos/build/ChewingPlus-voice.pkg"
+pkgbuild --nopayload \
+    --identifier im.chewing.plus.voice \
+    --version "${CHEWING_PLUS_VERSION:-6.0.0}" \
+    --scripts "$root/macos/pkg-voice-scripts" \
+    "$voice_component"
+dist="$root/macos/build/distribution.xml"
+cat > "$dist" <<XML
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>新酷音 Plus</title>
+    <options customize="always" require-scripts="false" hostArchitectures="arm64"/>
+    <choices-outline>
+        <line choice="main"/>
+        <line choice="voice"/>
+    </choices-outline>
+    <choice id="main" title="新酷音 Plus 輸入法" enabled="false" selected="true"
+            description="輸入法、詞庫與語音服務程式。">
+        <pkg-ref id="im.chewing.plus.inputmethod"/>
+    </choice>
+    <choice id="voice" title="啟用語音" start_selected="false"
+            description="安裝後立即啟動語音服務（按住右 Option 說話）。第一次使用要下載語音模型（約 850 MB），模型載入後約佔 260 MB 記憶體。之後也可以在輸入法選單開啟或關閉。">
+        <pkg-ref id="im.chewing.plus.voice"/>
+    </choice>
+    <pkg-ref id="im.chewing.plus.inputmethod">ChewingPlus-component.pkg</pkg-ref>
+    <pkg-ref id="im.chewing.plus.voice">ChewingPlus-voice.pkg</pkg-ref>
+</installer-gui-script>
+XML
+productbuild --distribution "$dist" --package-path "$root/macos/build" \
     "$root/macos/build/ChewingPlus.pkg"
 echo "pkg: $root/macos/build/ChewingPlus.pkg (unsigned, not relocatable)"

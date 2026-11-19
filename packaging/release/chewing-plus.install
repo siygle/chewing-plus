@@ -1,0 +1,23 @@
+# pacman install hooks for chewing-plus-fcitx5 / chewing-plus-ibus.
+# pacman cannot ask questions here, and it runs as root without knowing which
+# user is installing, so dictation is never switched on from here.
+
+_voice_note() {
+    cat <<'MSG'
+==> 新酷音 Plus：語音輸入預設未啟用。
+    在新酷音 Plus 設定中打開「啟用語音」，或執行：
+      systemctl --user enable --now voxkit.service
+    第一次使用前要下載語音模型（約 850 MB），模型載入後語音服務約佔 260 MB 記憶體。
+MSG
+}
+
+post_install() {
+    _voice_note
+}
+
+post_upgrade() {
+    # Upgrades from 5.1.13-plus.x keep whatever the user had enabled.
+    if [ "$(vercmp "$2" 6.0.0)" -lt 0 ]; then
+        _voice_note
+    fi
+}

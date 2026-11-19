@@ -1,11 +1,11 @@
 name: Release
-# Push a tag like 5.1.13-plus.1 to build every platform package and publish a
+# Push a tag like v6.0.0 to build every platform package and publish a
 # GitHub release. workflow_dispatch builds the packages as artifacts only,
 # unless "tag" names an existing tag to (re)publish.
 on:
   push:
     tags:
-      - '*-plus.*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
@@ -53,7 +53,7 @@ jobs:
           v=${TAG:-$(git describe --tags --always)}
           echo "TAG=$v" >> "$GITHUB_ENV"
           # CFBundleVersion and pkgbuild want dotted numbers.
-          echo "CHEWING_PLUS_VERSION=$(printf '%s' "$v" | sed 's/-plus\./.900./; s/-.*//; s/[^0-9.]//g')" >> "$GITHUB_ENV"
+          echo "CHEWING_PLUS_VERSION=$(printf '%s' "$v" | sed 's/^v//; s/-.*//; s/[^0-9.]//g')" >> "$GITHUB_ENV"
         env:
           TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
       - name: Build package

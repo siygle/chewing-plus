@@ -28,6 +28,8 @@ typedef struct {
     const char *switch_keys[CHEWING_PLUS_IBUS_MAX_PREFS];
     int switch_count;
     GtkWidget *initials_min;
+    GtkWidget *voice_switch;
+    GtkWidget *voice_note;
 } Setup;
 
 static Setup *UI;
@@ -343,6 +345,63 @@ static void load_switches(void) {
     UI->loading = 0;
 }
 
+/* 「啟用語音」: the voxkit user unit for this user only. pacman cannot ask
+ * during install, so the switch lives here. */
+static int run_systemctl(const char *const *args, int quiet) {
+    GError *err = NULL;
+    gint status = 0;
+    gboolean ok = g_spawn_sync(
+        NULL, (gchar **)args, NULL,
+        G_SPAWN_SEARCH_PATH |
+            (quiet ? (G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL)
+                   : 0),
+        NULL, NULL, NULL, NULL, &status, &err);
+    if (!ok) {
+        g_clear_error(&err);
+        return -1;
+    }
+    return g_spawn_check_wait_status(status, NULL) ? 0 : 1;
+}
+
+static int voice_enabled(void) {
+    const char *args[] = {"systemctl", "--user",         "is-enabled",
+                          "--quiet",   "voxkit.service", NULL};
+    return run_systemctl(args, 1) == 0;
+}
+
+static void refresh_voice_note(void) {
+    const char *args[] = {"systemctl", "--user",         "is-active",
+                          "--quiet",   "voxkit.service", NULL};
+    gtk_label_set_text(GTK_LABEL(UI->voice_note),
+                       run_systemctl(args, 1) == 0
+                           ? "語音服務執行中（按住右 Alt 說話）。"
+                           : "語音服務未執行。模型載入後約佔 260 MB 記憶體。");
+}
+
+static void on_voice_switch(GObject *object, GParamSpec *spec, gpointer user) {
+    int on = gtk_switch_get_active(GTK_SWITCH(object));
+    const char *enable[] = {"systemctl", "--user",         "enable",
+                            "--now",     "voxkit.service", NULL};
+    const char *disable[] = {"systemctl", "--user",         "disable",
+                             "--now",     "voxkit.service", NULL};
+    (void)spec;
+    (void)user;
+    if (UI->loading) {
+        return;
+    }
+    if (run_systemctl(on ? enable : disable, 0) != 0) {
+        gtk_label_set_text(GTK_LABEL(UI->voice_note),
+                           on ? "無法啟用語音服務（systemctl --user 失敗）。"
+                              : "無法停用語音服務。");
+        UI->loading = 1;
+        gtk_switch_set_active(GTK_SWITCH(object), voice_enabled());
+        UI->loading = 0;
+        return;
+    }
+    refresh_voice_note();
+    refresh_list();
+}
+
 static void activate(GtkApplication *app, gpointer user) {
     GtkWidget *window;
     GtkWidget *root;
@@ -365,6 +424,26 @@ static void activate(GtkApplication *app, gpointer user) {
     gtk_widget_set_margin_start(page, 12);
     gtk_widget_set_margin_end(page, 12);
 
+    {
+        GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+        GtkWidget *text = gtk_label_new("啟用語音");
+        gtk_widget_set_hexpand(text, TRUE);
+        gtk_label_set_xalign(GTK_LABEL(text), 0);
+        UI->voice_switch = gtk_switch_new();
+        UI->loading = 1;
+        gtk_switch_set_active(GTK_SWITCH(UI->voice_switch), voice_enabled());
+        UI->loading = 0;
+        g_signal_connect(UI->voice_switch, "notify::active",
+                         G_CALLBACK(on_voice_switch), NULL);
+        gtk_box_append(GTK_BOX(row), text);
+        gtk_box_append(GTK_BOX(row), UI->voice_switch);
+        gtk_box_append(GTK_BOX(page), row);
+        UI->voice_note = gtk_label_new("");
+        gtk_label_set_xalign(GTK_LABEL(UI->voice_note), 0);
+        gtk_label_set_wrap(GTK_LABEL(UI->voice_note), TRUE);
+        gtk_box_append(GTK_BOX(page), UI->voice_note);
+        refresh_voice_note();
+    }
     gtk_box_append(GTK_BOX(page), gtk_label_new("語音模型"));
     UI->status = gtk_label_new("讀取中…");
     gtk_label_set_xalign(GTK_LABEL(UI->status), 0);

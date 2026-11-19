@@ -107,6 +107,11 @@ final class ChewingPlusInputController: IMKInputController {
                                   action: nil, keyEquivalent: "")
         initials.submenu = initialsMenu
         menu.addItem(initials)
+        let voice = NSMenuItem(title: "啟用語音", action: #selector(toggleVoice(_:)),
+                               keyEquivalent: "")
+        voice.target = self
+        voice.state = VoiceAgent.enabled ? .on : .off
+        menu.addItem(voice)
         let indicator = NSMenuItem(title: "選單列顯示「中／英」",
                                    action: #selector(toggleIndicator(_:)), keyEquivalent: "")
         indicator.target = self
@@ -141,6 +146,18 @@ final class ChewingPlusInputController: IMKInputController {
         guard let n = item?.representedObject as? Int else { return }
         Settings.set("initials_min", String(n))
         if let session { applyFeatures(session) }
+    }
+
+    @objc private func toggleVoice(_: Any?) {
+        if voiceActive { _ = voiceCancel() }
+        closeVoice()
+        let on = !VoiceAgent.enabled
+        if !VoiceAgent.set(on) {
+            HintWindow.shared.flash(on ? "無法啟用語音服務" : "無法停用語音服務",
+                                    client: lastClient)
+        } else if on {
+            HintWindow.shared.flash("語音已啟用：按住語音快速鍵說話", client: lastClient)
+        }
     }
 
     @objc private func toggleIndicator(_: Any?) {
@@ -505,7 +522,9 @@ final class ChewingPlusInputController: IMKInputController {
         guard session != nil, !secure() else { return true }
         if voxkit_client_fd(voice) < 0 {
             if voxkit_client_connect(voice, nil) != 0 {
-                HintWindow.shared.show("語音服務未啟動（voxkit）", client: lastClient)
+                HintWindow.shared.flash(VoiceAgent.enabled
+                    ? "語音服務啟動中，請稍候再試"
+                    : "語音尚未啟用：輸入法選單 →「啟用語音」", client: lastClient)
                 return true
             }
             watchVoice()
@@ -1004,5 +1023,45 @@ final class SessionPool {
             english: env("CHEWING_PLUS_ENGLISH") ?? res?.appendingPathComponent("plus-english.txt").path)
         paths = resolved
         return resolved
+    }
+}
+
+/// The voxkit LaunchAgent written by the installer. It is installed with
+/// Disabled=true unless the installer's 「啟用語音」 choice was ticked; the
+/// input menu flips it here. The daemon keeps the speech model in memory
+/// (about 260 MB once a model is downloaded), so it is off unless asked for.
+enum VoiceAgent {
+    static let label = "im.chewing.plus.voxkit"
+    static var plistURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents/\(label).plist")
+    }
+
+    static var enabled: Bool {
+        guard let dict = NSDictionary(contentsOf: plistURL) else { return false }
+        return !(dict["Disabled"] as? Bool ?? false)
+    }
+
+    /// Write Disabled and load or unload the agent. False if the agent file
+    /// is missing (installed without the pkg) or launchctl failed.
+    @discardableResult
+    static func set(_ on: Bool) -> Bool {
+        guard let dict = NSMutableDictionary(contentsOf: plistURL) else { return false }
+        dict["Disabled"] = !on
+        guard dict.write(to: plistURL, atomically: true) else { return false }
+        let domain = "gui/\(getuid())"
+        _ = launchctl(["bootout", "\(domain)/\(label)"])
+        return on ? launchctl(["bootstrap", domain, plistURL.path]) : true
+    }
+
+    private static func launchctl(_ args: [String]) -> Bool {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        p.arguments = args
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return false }
+        p.waitUntilExit()
+        return p.terminationStatus == 0
     }
 }

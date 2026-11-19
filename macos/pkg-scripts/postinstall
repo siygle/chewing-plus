@@ -51,13 +51,26 @@ fi
 exec "$bin" serve
 EOF
 chmod 755 "$support/voxkit-launch.sh"
-sed "s|__HOME__|$home|g" "$(dirname "$0")/agent.plist" \
-    > "$home/Library/LaunchAgents/im.chewing.plus.voxkit.plist"
+agent="$home/Library/LaunchAgents/im.chewing.plus.voxkit.plist"
+# Keep the user's choice across upgrades: an agent that was enabled stays
+# enabled. A new install starts disabled; the installer's optional
+# 「啟用語音」 choice (pkg-voice-scripts) or the input menu turns it on.
+was_enabled=false
+if [[ -f "$agent" ]] &&
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :Disabled' "$agent" 2>/dev/null || echo false)" == false ]]; then
+    was_enabled=true
+fi
+sed "s|__HOME__|$home|g" "$(dirname "$0")/agent.plist" > "$agent"
+/usr/libexec/PlistBuddy -c "Add :Disabled bool true" "$agent" 2>/dev/null || true
+if [[ "$was_enabled" == true ]]; then
+    /usr/libexec/PlistBuddy -c "Set :Disabled false" "$agent"
+fi
 chown "$user" "$support/voxkit-launch.sh" \
     "$home/Library/LaunchAgents/im.chewing.plus.voxkit.plist"
 launchctl bootout "gui/$uid/im.chewing.plus.voxkit" 2>/dev/null || true
-launchctl bootstrap "gui/$uid" \
-    "$home/Library/LaunchAgents/im.chewing.plus.voxkit.plist" || true
+if [[ "$was_enabled" == true ]]; then
+    launchctl bootstrap "gui/$uid" "$agent" || true
+fi
 # Register and enable the input source in the user's session, so it is in
 # the input menu without logging out. A stale copy is stopped first.
 app="/Library/Input Methods/ChewingPlus.app"

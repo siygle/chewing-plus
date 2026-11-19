@@ -246,6 +246,12 @@ FCITX_CONFIGURATION(
         _("Plus: Phrase suggestions (completion and initials, Shift+1-9)"),
         false};
 
+    // Not stored in chewing.conf: mirrors `systemctl --user is-enabled
+    // voxkit` when the dialog opens and switches the unit when saved.
+    Option<bool> VoiceEnabled{this, "VoiceEnabled",
+                              _("Voice: enable dictation (voxkit service, "
+                                "about 260 MB once a model is loaded)"),
+                              false};
     Option<std::string> VoiceModel{
         this, "VoiceModel",
         _("Voice: active model id (empty keeps the daemon's choice; "
@@ -287,8 +293,12 @@ public:
         return &config_;
     }
     void setConfig(const RawConfig &config) override {
+        const bool voiceWas = voiceUnitEnabled();
         config_.load(config, true);
         populateConfig();
+        if (*config_.VoiceEnabled != voiceWas) {
+            setVoiceUnit(*config_.VoiceEnabled);
+        }
         refreshVoiceStatus();
         applyVoiceModel();
         safeSaveAsIni(config_, "conf/chewing.conf");
@@ -321,6 +331,8 @@ private:
     void populateConfig();
     void refreshVoiceStatus() const;
     void applyVoiceModel();
+    static bool voiceUnitEnabled();
+    static void setVoiceUnit(bool on);
     Instance *instance_;
     ChewingConfig config_;
     std::unique_ptr<chewing_plus_session, SessionDelete> session_;

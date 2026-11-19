@@ -31,10 +31,13 @@
 #include <fcitx/text.h>
 #include <fcitx/userinterface.h>
 #include <fcitx/userinterfacemanager.h>
+#include <fcntl.h>
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <utility>
 #include <vector>
 
@@ -367,7 +370,50 @@ void ChewingEngine::reloadConfig() {
     applyVoiceModel();
 }
 
+namespace {
+// `systemctl --user ...` without a shell. Returns the exit status, or -1.
+int RunSystemctl(std::vector<std::string> args) {
+    args.insert(args.begin(), {"systemctl", "--user"});
+    std::vector<char *> argv;
+    for (auto &a : args) {
+        argv.push_back(a.data());
+    }
+    argv.push_back(nullptr);
+    pid_t pid = fork();
+    if (pid < 0) {
+        return -1;
+    }
+    if (pid == 0) {
+        int null = open("/dev/null", O_WRONLY);
+        if (null >= 0) {
+            dup2(null, STDOUT_FILENO);
+            dup2(null, STDERR_FILENO);
+        }
+        execvp("systemctl", argv.data());
+        _exit(127);
+    }
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0 || !WIFEXITED(status)) {
+        return -1;
+    }
+    return WEXITSTATUS(status);
+}
+} // namespace
+
+bool ChewingEngine::voiceUnitEnabled() {
+    return RunSystemctl({"is-enabled", "--quiet", "voxkit.service"}) == 0;
+}
+
+// The voxkit daemon is installed but not enabled (pacman cannot ask during
+// install, and it keeps a model in memory). This option switches it for the
+// user running fcitx5.
+void ChewingEngine::setVoiceUnit(bool on) {
+    RunSystemctl({on ? "enable" : "disable", "--now", "voxkit.service"});
+}
+
 void ChewingEngine::refreshVoiceStatus() const {
+    const_cast<ChewingEngine *>(this)->config_.VoiceEnabled.setValue(
+        voiceUnitEnabled());
     voxkit_client client;
     voxkit_message msg;
     char err[256] = "";
