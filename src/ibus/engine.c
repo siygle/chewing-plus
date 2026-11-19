@@ -64,6 +64,13 @@ static void apply_features(chewing_plus_session *session) {
     }
     shift = chewing_plus_get_setting(session, "shift_toggle");
     last_shift_toggle = shift && strcmp(shift, "1") == 0;
+    /* English mode: Ctrl+Shift+Space (on by default in the core) and Right
+     * Shift tapped twice, as before 6.0.0. */
+    {
+        const char *english = chewing_plus_get_setting(session, "english");
+        chewing_plus_set_english_double_tap(
+            session, english && strcmp(english, "1") == 0, 300);
+    }
 }
 
 static int sensitive(IBusEngine *engine) {

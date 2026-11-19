@@ -1,4 +1,4 @@
-# Pinned libchewing for fcitx5-chewing-plus.
+# Pinned libchewing for chewing-plus.
 # Tag v0.14.0-rc.1, commit d1506842db1a5693519efb616044e122cf791181
 # (the annotated tag peels to that commit).
 # Source: https://codeberg.org/chewing/libchewing

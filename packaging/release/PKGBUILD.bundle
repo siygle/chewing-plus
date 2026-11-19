@@ -13,7 +13,7 @@ pkgname=(chewing-plus-fcitx5 chewing-plus-ibus)
 pkgver=${CHEWING_PLUS_PKGVER:-6.0.0}
 pkgrel=1
 arch=(x86_64)
-url="https://github.com/siygle/fcitx5-chewing-plus"
+url="https://github.com/siygle/chewing-plus"
 license=(LGPL-2.1-or-later MIT)
 makedepends=(cmake extra-cmake-modules ninja rust git fcitx5 ibus libadwaita
              json-c alsa-lib opencc)

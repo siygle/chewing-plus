@@ -1,4 +1,4 @@
-新酷音 Plus：在新酷音上加入 emoji、計算機、英文模式與本機語音輸入。基於 [fcitx/fcitx5-chewing](https://github.com/fcitx/fcitx5-chewing) 與 libchewing 0.14.0-rc.1。功能說明請看 [README](https://github.com/siygle/fcitx5-chewing-plus#readme)。
+新酷音 Plus：在新酷音上加入 emoji、計算機、英文模式與本機語音輸入。基於 [fcitx/fcitx5-chewing](https://github.com/fcitx/fcitx5-chewing) 與 libchewing 0.14.0-rc.1。功能說明請看 [README](https://github.com/siygle/chewing-plus#readme)。
 
 ## 6.0.0
 
