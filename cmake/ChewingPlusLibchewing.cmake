@@ -1,11 +1,10 @@
 # Pinned libchewing for chewing-plus.
-# Tag v0.14.0-rc.1, commit d1506842db1a5693519efb616044e122cf791181
-# (the annotated tag peels to that commit).
+# Commit dad32411f66c15fc329938e4d65244ab920ac094 (v0.14.0-rc.1-17-gdad3241).
 # Source: https://codeberg.org/chewing/libchewing
-set(CHEWING_PLUS_LIBCHEWING_VERSION "0.14.0-rc.1")
+set(CHEWING_PLUS_LIBCHEWING_VERSION "0.14.0-rc.1-17-gdad3241")
 set(CHEWING_PLUS_LIBCHEWING_TAG "v0.14.0-rc.1")
 set(CHEWING_PLUS_LIBCHEWING_URL "https://codeberg.org/chewing/libchewing")
-set(CHEWING_PLUS_LIBCHEWING_COMMIT "d1506842db1a5693519efb616044e122cf791181")
+set(CHEWING_PLUS_LIBCHEWING_COMMIT "dad32411f66c15fc329938e4d65244ab920ac094")
 
 option(CHEWING_PLUS_BUNDLE_LIBCHEWING
        "Use libchewing from CHEWING_PLUS_LIBCHEWING_PREFIX (see scripts/bundle-libchewing.sh)"

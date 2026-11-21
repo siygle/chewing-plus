@@ -17,14 +17,14 @@
 #   --shared until upstream fixes it. -DCHEWING_PLUS_LIBCHEWING_STATIC=ON
 #   consumes a prefix that did install the archives.
 #
-# The pin is cmake/ChewingPlusLibchewing.cmake (v0.14.0-rc.1,
-# d1506842db1a5693519efb616044e122cf791181).
+# The pin is cmake/ChewingPlusLibchewing.cmake (v0.14.0-rc.1-17-gdad3241,
+# dad32411f66c15fc329938e4d65244ab920ac094).
 # Override the checkout with CHEWING_PLUS_LIBCHEWING_SRC.
 set -euo pipefail
 
-TAG=v0.14.0-rc.1
+VERSION=0.14.0-rc.1-17-gdad3241
 URL=https://codeberg.org/chewing/libchewing.git
-COMMIT=d1506842db1a5693519efb616044e122cf791181
+COMMIT=dad32411f66c15fc329938e4d65244ab920ac094
 
 mode=shared
 prefix=
@@ -49,7 +49,11 @@ prefix=${prefix:-$root/third_party/dist}
 src=${CHEWING_PLUS_LIBCHEWING_SRC:-$root/third_party/libchewing}
 
 if [[ ! -d "$src/.git" ]]; then
-    git clone --depth 1 --branch "$TAG" "$URL" "$src"
+    # Keep tags in the main repo so libchewing's `git describe` emits a
+    # valid semver-prefixed version for chewing.pc (the heavy data submodule
+    # is still fetched shallow below).
+    git clone --no-checkout "$URL" "$src"
+    git -C "$src" checkout --detach "$COMMIT"
 fi
 # Dictionary sources live in the libchewing-data submodule, and the large
 # language-model files are Git LFS pointers until `git lfs pull`.
@@ -72,12 +76,12 @@ if [[ ! -f "$arpa" ]] || head -n 1 "$arpa" | grep -q 'git-lfs.github.com'; then
 fi
 got=$(git -C "$src" rev-parse HEAD)
 if [[ "$got" != "$COMMIT" ]]; then
-    echo "libchewing checkout $src is $got, expected $COMMIT ($TAG)" >&2
+    echo "libchewing checkout $src is $got, expected $COMMIT ($VERSION)" >&2
     echo "Delete it or set CHEWING_PLUS_LIBCHEWING_SRC to a checkout of that commit." >&2
     exit 1
 fi
 if [[ "$mode" == fetch ]]; then
-    echo "libchewing ${TAG} (${COMMIT}) checked out at ${src}"
+    echo "libchewing ${VERSION} (${COMMIT}) checked out at ${src}"
     exit 0
 fi
 
@@ -123,4 +127,4 @@ if [[ "$mode" == static ]]; then
     fi
 fi
 
-echo "libchewing ${TAG} (${COMMIT}) installed to ${prefix} (${mode})"
+echo "libchewing ${VERSION} (${COMMIT}) installed to ${prefix} (${mode})"

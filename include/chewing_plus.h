@@ -50,8 +50,8 @@ extern "C" {
 
 #define CHEWING_PLUS_ABI_VERSION 1
 
-/* libchewing release this tree is built and tested against. */
-#define CHEWING_PLUS_LIBCHEWING_PIN "0.14.0-rc.1"
+/* libchewing release/commit this tree is built and tested against. */
+#define CHEWING_PLUS_LIBCHEWING_PIN "0.14.0-rc.1-17-gdad3241"
 
 #if defined(_WIN32)
 #if defined(CHEWING_PLUS_BUILDING)

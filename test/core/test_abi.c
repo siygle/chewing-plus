@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static int failures = 0;
@@ -636,6 +637,49 @@ static void test_fuzzy_and_live(void) {
     reset();
 }
 
+static void test_fuzzy_user_dict(const char *sys) {
+    char tmpl[] = "/tmp/chewing-plus-fuzzy-ud-XXXXXX";
+    char *dir = mkdtemp(tmpl);
+    char v4[256];
+    char csv[256];
+    FILE *f;
+    chewing_plus_session *saved = session;
+    chewing_plus_session *ud_session;
+    if (!dir) {
+        check(0, "fuzzy user dict temp dir");
+        return;
+    }
+    snprintf(v4, sizeof(v4), "%s/v4", dir);
+    snprintf(csv, sizeof(csv), "%s/v4/user_dict.csv", dir);
+    check(mkdir(v4, 0700) == 0, "fuzzy user dict v4 dir");
+    f = fopen(csv, "w");
+    if (f) {
+        fputs("設備,ㄕㄜˋ ㄅㄟˋ,0\n"
+              "設定,ㄕㄜˋ ㄉㄧㄥˋ,0\n"
+              "設計,ㄕㄜˋ ㄐㄧˋ,0\n",
+              f);
+        fclose(f);
+    }
+    ud_session = chewing_plus_new(sys, dir);
+    check(ud_session != NULL, "fuzzy user dict session");
+    if (ud_session) {
+        session = ud_session;
+        check(strcmp(chewing_plus_get_setting(session, "fuzzy"), "1") == 0,
+              "fuzzy user dict starts with fuzzy on");
+        type_text("gk4");
+        check(strcmp(preedit(), "社") == 0,
+              "fuzzy user dict: ㄕㄜˋ stays single char, not 設計");
+        if (strcmp(preedit(), "社") != 0) {
+            fprintf(stderr, "  preedit=[%s]\n", preedit());
+        }
+        tap(CHEWING_PLUS_KEY_DOWN, 0, 0);
+        check(cand_has("社") && cand_has("設"),
+              "fuzzy user dict: ㄕㄜˋ candidates remain single chars");
+        session = saved;
+        chewing_plus_free(ud_session);
+    }
+}
+
 static void test_emoji_candidate(void) {
     int found;
     reset();
@@ -689,7 +733,7 @@ int main(void) {
 
     check(chewing_plus_abi_version() == CHEWING_PLUS_ABI_VERSION,
           "ABI version");
-    check(strcmp(chewing_plus_libchewing_pin(), "0.14.0-rc.1") == 0,
+    check(strcmp(chewing_plus_libchewing_pin(), "0.14.0-rc.1-17-gdad3241") == 0,
           "libchewing pin");
     check(chewing_plus_key(NULL, NULL) == 0, "NULL session is a no-op");
 
@@ -744,6 +788,7 @@ int main(void) {
     test_flush_and_page();
     test_settings();
     test_fuzzy_and_live();
+    test_fuzzy_user_dict(sys);
     test_emoji_candidate();
     test_sensitive();
 

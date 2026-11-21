@@ -1,4 +1,10 @@
-新酷音 Plus：在新酷音上加入 emoji、計算機、英文模式與本機語音輸入。基於 [fcitx/fcitx5-chewing](https://github.com/fcitx/fcitx5-chewing) 與 libchewing 0.14.0-rc.1。功能說明請看 [README](https://github.com/siygle/chewing-plus#readme)。
+新酷音 Plus：在新酷音上加入 emoji、計算機、英文模式與本機語音輸入。基於 [fcitx/fcitx5-chewing](https://github.com/fcitx/fcitx5-chewing) 與 libchewing 0.14。功能說明請看 [README](https://github.com/siygle/chewing-plus#readme)。
+
+## 6.0.1
+
+- **修正免打聲調搭配使用者詞庫的選詞異常**：升級內附 `libchewing` 至上游最新 `v0.14.0-rc.1-17-gdad3241`（`dad32411`），修正開啟免打聲調時，若使用者詞庫（`user_dict.csv`）存有多字詞，輸入單一音節可能誤匹配成多字詞（例如 `ㄕㄜˋ` 直接變成「設計」）的問題。
+- **IBus**：修復連按兩下右 Shift 切換英文模式。
+- **文件與倉庫**：更名為 `chewing-plus`，補齊三平台說明。
 
 ## 6.0.0
 

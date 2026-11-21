@@ -76,7 +76,7 @@ jobs:
           source-root: fcitx5-chewing
       - name: Check IMK Info.plist
         run: python3 fcitx5-chewing/macos/check-bundle.py --source fcitx5-chewing
-      - name: Build pinned libchewing 0.14.0-rc.1
+      - name: Build pinned libchewing 0.14
         run: |
           bash fcitx5-chewing/scripts/bundle-libchewing.sh --shared /usr
           pkg-config --modversion chewing

@@ -30,8 +30,8 @@ insert handler and the user's own phrases as vocabulary. Works with or without t
 
 ## libchewing pin
 
-This tree is built and tested against **libchewing 0.14.0-rc.1**
-(`v0.14.0-rc.1`, commit `d1506842db1a5693519efb616044e122cf791181`) from
+This tree is built and tested against **libchewing 0.14**
+(`v0.14.0-rc.1-17-gdad3241`, commit `dad32411f66c15fc329938e4d65244ab920ac094`) from
 <https://codeberg.org/chewing/libchewing>. The same pin is in
 `cmake/ChewingPlusLibchewing.cmake` and `CHEWING_PLUS_LIBCHEWING_PIN`.
 Building that tag needs **Rust 1.85 or newer** (Cargo edition 2024), CMake
