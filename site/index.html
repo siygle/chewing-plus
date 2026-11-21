@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>新酷音 Plus — Chewing Plus</title>
+  <meta name="description" content="新酷音輸入法加強版：免打聲調、邊打邊列字、詞語與字首建議、內嵌英文模式、Emoji 短碼、計算機與本機語音輸入，支援 macOS、fcitx5 與 IBus。">
+  <meta property="og:title" content="新酷音 Plus (Chewing Plus)">
+  <meta property="og:description" content="A modern Traditional Chinese Bopomofo input method built on libchewing 0.14 — toneless typing, live characters, initials expansion, inline English, emoji shortcodes, calculator, and offline voice dictation.">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#top" aria-label="Chewing Plus Home">
+        <img src="favicon.svg" alt="" width="30" height="30" class="brand-icon">
+        <span class="brand-name" data-i18n="brand">新酷音 Plus</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#playground" data-i18n="nav.demo">互動體驗</a>
+        <a href="#features" data-i18n="nav.features">特色功能</a>
+        <a href="#architecture" data-i18n="nav.arch">架構與效能</a>
+        <a href="#download" data-i18n="nav.download">下載安裝</a>
+      </nav>
+
+      <div class="header-actions">
+        <div class="lang-switch" role="group" aria-label="Language">
+          <button type="button" class="lang-btn" data-lang="zh-tw" aria-pressed="true">繁中</button>
+          <button type="button" class="lang-btn" data-lang="en" aria-pressed="false">EN</button>
+        </div>
+        <button type="button" class="icon-btn" id="theme-toggle" aria-label="Toggle color theme" title="Toggle theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+        <a class="icon-btn" href="https://github.com/siygle/chewing-plus" target="_blank" rel="noopener" aria-label="GitHub Repository" title="GitHub">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+            <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11.02 11.02 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.26 5.67.41.36.78 1.06.78 2.14 0 1.55-.01 2.8-.01 3.18 0 .31.21.67.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="container hero-inner">
+        <a class="release-pill" href="https://github.com/siygle/chewing-plus/releases/latest" target="_blank" rel="noopener">
+          <span class="pill-dot"></span>
+          <span data-i18n="hero.badge">v6.0.1 · 基於 libchewing 0.14</span>
+          <span class="pill-arrow" aria-hidden="true">→</span>
+        </a>
+
+        <h1 class="hero-title" data-i18n="hero.title">
+          為現代打字節奏打造的<span class="accent-text">新酷音 Plus</span>
+        </h1>
+
+        <p class="hero-subtitle" data-i18n="hero.subtitle">
+          免打聲調、邊打邊列字、字首注音展開、免切輸入法打英文、Emoji 短碼、即時計算機與 100% 離線本機語音。一份核心，橫跨 fcitx5、IBus 與 macOS。
+        </p>
+
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#download" data-i18n="hero.ctaDownload">下載安裝檔</a>
+          <a class="btn btn-secondary" href="https://github.com/siygle/chewing-plus" target="_blank" rel="noopener" data-i18n="hero.ctaGithub">檢視原始碼</a>
+        </div>
+
+        <div class="platform-strip" aria-label="Supported platforms">
+          <span class="platform-chip">macOS · Apple Silicon</span>
+          <span class="platform-chip">Arch Linux · fcitx5</span>
+          <span class="platform-chip">Arch Linux · IBus</span>
+          <span class="platform-chip">LGPL-2.1-or-later</span>
+        </div>
+
+        <!-- Interactive IME Playground -->
+        <div class="playground" id="playground">
+          <div class="playground-tabs" role="tablist" aria-label="Feature demos">
+            <button type="button" class="demo-tab active" role="tab" aria-selected="true" data-demo="toneless" data-i18n="demo.tab.toneless">免打聲調</button>
+            <button type="button" class="demo-tab" role="tab" aria-selected="false" data-demo="initials" data-i18n="demo.tab.initials">字首注音</button>
+            <button type="button" class="demo-tab" role="tab" aria-selected="false" data-demo="english" data-i18n="demo.tab.english">英文模式</button>
+            <button type="button" class="demo-tab" role="tab" aria-selected="false" data-demo="emoji" data-i18n="demo.tab.emoji">Emoji 短碼</button>
+            <button type="button" class="demo-tab" role="tab" aria-selected="false" data-demo="calc" data-i18n="demo.tab.calc">計算機</button>
+            <button type="button" class="demo-tab" role="tab" aria-selected="false" data-demo="voice" data-i18n="demo.tab.voice">本機語音</button>
+          </div>
+
+          <div class="playground-stage">
+            <div class="window-chrome">
+              <div class="window-dots" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="window-title" id="demo-window-title">Notes — 新酷音 Plus</div>
+              <div class="mode-badge" id="demo-mode-badge">中</div>
+            </div>
+
+            <div class="editor-area">
+              <div class="editor-line">
+                <span class="committed-text" id="demo-committed"></span><span class="preedit-wrap" id="demo-preedit-wrap"><span class="preedit-text" id="demo-preedit"></span><span class="preedit-hl" id="demo-hl"></span></span><span class="caret" aria-hidden="true"></span>
+              </div>
+
+              <div class="ime-popup" id="demo-popup" aria-live="polite">
+                <div class="ime-aux" id="demo-aux"></div>
+                <div class="ime-list" id="demo-list"></div>
+              </div>
+            </div>
+
+            <div class="playground-footer">
+              <div class="demo-keys" id="demo-keys"></div>
+              <div class="demo-controls">
+                <p class="demo-caption" id="demo-caption"></p>
+                <button type="button" class="replay-btn" id="demo-replay">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/>
+                    <path d="M3 3v5h5"/>
+                  </svg>
+                  <span data-i18n="demo.replay">重播</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Core Plus Features -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow" data-i18n="features.eyebrow">PLUS 功能一覽</p>
+          <h2 class="section-title" data-i18n="features.title">保留新酷音的準確，加上超順手的現代效率工具</h2>
+          <p class="section-desc" data-i18n="features.desc">
+            所有 Plus 功能皆建構在公開的 libchewing C API 之上，不破壞原本注音習慣，並可逐項開關。
+          </p>
+        </div>
+
+        <div class="bento-grid">
+          <!-- 1. Toneless Typing -->
+          <article class="card card-wide">
+            <div class="card-badge" data-i18n="f.toneless.badge">全平台預設開啟</div>
+            <h3 data-i18n="f.toneless.title">免打聲調</h3>
+            <p data-i18n="f.toneless.desc">
+              不必逐字敲聲調鍵——輸入下一個字的聲母時，前一個字會自動選好。照原本習慣打聲調也完全相容。
+            </p>
+            <div class="micro-demo">
+              <span class="mono-pill">ㄋㄧㄏㄠㄇㄚ</span>
+              <span class="key-plus">+</span>
+              <kbd>Space</kbd>
+              <span class="arrow">→</span>
+              <span class="result-pill">你好嗎</span>
+            </div>
+          </article>
+
+          <!-- 2. Live Characters -->
+          <article class="card">
+            <div class="card-badge" data-i18n="f.live.badge">全平台預設開啟</div>
+            <h3 data-i18n="f.live.title">邊打邊列字</h3>
+            <p data-i18n="f.live.desc">
+              每敲一個注音符號，下方立刻列出最可能的常用字，用 <kbd>Shift</kbd>+<kbd>1…9</kbd> 直接選取，不必等整個音節打完。
+            </p>
+            <div class="micro-stack">
+              <div class="micro-row"><span class="mono-tag">ㄋ</span><span class="cand-preview">年　您　你　能　內…</span></div>
+              <div class="micro-row"><span class="mono-tag">ㄋㄧ</span><span class="cand-preview"><strong>你</strong>　妳　泥　擬…</span></div>
+            </div>
+          </article>
+
+          <!-- 3. Phrase Suggestions & Initials -->
+          <article class="card card-wide">
+            <h3 data-i18n="f.suggestions.title">詞語建議與字首注音</h3>
+            <p data-i18n="f.suggestions.desc">
+              雙向加速長詞輸入：打前兩個字自動補全後文，或只敲每個字的第一個注音直接展開整句，用 <kbd>Shift</kbd>+<kbd>1…9</kbd> 選取，不干擾原本按鍵。觸發門檻可自訂（預設 2 個聲母）。
+            </p>
+            <div class="micro-grid">
+              <div class="micro-demo">
+                <span class="mono-pill">中華</span>
+                <span class="arrow">→</span>
+                <span class="result-pill">中華民國 / 中華隊</span>
+              </div>
+              <div class="micro-demo">
+                <span class="mono-pill">ㄍㄒㄈㄘ</span>
+                <span class="arrow">→</span>
+                <span class="result-pill">恭喜發財</span>
+              </div>
+              <div class="micro-demo">
+                <span class="mono-pill">ㄇㄇ</span>
+                <span class="arrow">→</span>
+                <span class="result-pill">密碼 / 買賣 / 媽媽</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- 4. Inline English Mode & Hints -->
+          <article class="card card-wide">
+            <h3 data-i18n="f.english.title">內嵌英文模式與智慧提示</h3>
+            <p data-i18n="f.english.desc">
+              免切輸入法就能在中文句子裡插入英文並自動修正大小寫，前後中文留在組字區內持續可編輯。忘記切模式直接打英文時，下方自動提示轉換，按一下快速鍵直接填入。
+            </p>
+            <div class="micro-stack">
+              <div class="micro-demo">
+                <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd>
+                <span class="muted" data-i18n="f.english.or">或</span>
+                <kbd data-i18n="f.english.rshift">右 Shift ×2</kbd>
+                <span class="arrow">→</span>
+                <span class="mono-pill">[EN] github</span>
+                <span class="arrow">→</span>
+                <span class="result-pill">GitHub</span>
+              </div>
+              <div class="hint-preview">
+                <span class="hint-label">Ctrl+Shift+Space → GitHub</span>
+                <span class="hint-sub" data-i18n="f.english.hintNote">直接把英文當注音打也會自動偵測</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- 5. Emoji Shortcodes & Candidates -->
+          <article class="card">
+            <h3 data-i18n="f.emoji.title">Emoji 候選與 1,900+ 短碼</h3>
+            <p data-i18n="f.emoji.desc">
+              打「開心」按 <kbd>↓</kbd> 直接帶出「開心😊」；連按兩下 <kbd>;</kbd> 就能用 GitHub / Slack 風格短碼搜尋超過 1,900 個表情符號，並支援自訂詞表。
+            </p>
+            <div class="micro-stack">
+              <div class="micro-row"><span class="mono-tag">;;smile</span><span class="cand-preview">😄 :smile</span></div>
+              <div class="micro-row"><span class="mono-tag">;;fire</span><span class="cand-preview">🔥 :fire</span></div>
+              <div class="micro-row"><span class="mono-tag">開心 ↓</span><span class="cand-preview">開心😊</span></div>
+            </div>
+          </article>
+
+          <!-- 6. Inline Calculator -->
+          <article class="card">
+            <h3 data-i18n="f.calc.title">即時計算機</h3>
+            <p data-i18n="f.calc.desc">
+              組字區為空時按 <kbd>=</kbd> 直接輸入四則算式，按 <kbd>Enter</kbd> 輸出結果。支援 <code class="inline-code">+ - * / % ( )</code> 與小數。
+            </p>
+            <div class="micro-demo">
+              <span class="mono-pill">=1+2*3</span>
+              <span class="arrow">→</span>
+              <span class="result-pill">7</span>
+            </div>
+          </article>
+
+          <!-- 7. Auto Spacing -->
+          <article class="card">
+            <h3 data-i18n="f.spacing.title">中英數自動空格</h3>
+            <p data-i18n="f.spacing.desc">
+              中文與英文字母、數字相接時自動補上盤古空白，英文字母與數字可獨立開關，排版乾淨不費力。
+            </p>
+            <div class="micro-demo">
+              <span class="mono-pill">你好Linux第5章</span>
+              <span class="arrow">→</span>
+              <span class="result-pill">你好 Linux 第 5 章</span>
+            </div>
+          </article>
+
+          <!-- 8. Offline Local Voice Dictation -->
+          <article class="card card-wide card-voice">
+            <div class="card-badge badge-subtle" data-i18n="f.voice.badge">選用啟用 · 100% 離線</div>
+            <h3 data-i18n="f.voice.title">本機語音輸入（voxkit）</h3>
+            <p data-i18n="f.voice.desc">
+              按住快速鍵說話、放開即出字（Linux 預設右 Alt，macOS 預設右 Option）。由內附的 voxkit 服務在本機以 Qwen3-ASR-0.6B + Silero VAD + OpenCC <code>s2twp</code> 辨識並轉成台灣繁體，錄音絕不上傳，且會自動帶入你的新酷音個人詞庫提高專有名詞準確率。
+            </p>
+            <div class="voice-points">
+              <span class="voice-pill" data-i18n="f.voice.p1">🔒 音訊不離開本機</span>
+              <span class="voice-pill" data-i18n="f.voice.p2">🇹🇼 OpenCC 台灣用語轉換</span>
+              <span class="voice-pill" data-i18n="f.voice.p3">📚 自動參考個人詞庫</span>
+              <span class="voice-pill" data-i18n="f.voice.p4">💤 預設不啟用，零閒置佔用</span>
+            </div>
+          </article>
+
+          <!-- 9. Sensitive Field Safety + Shift Toggle -->
+          <article class="card">
+            <h3 data-i18n="f.privacy.title">密碼欄位防護與中／英切換</h3>
+            <p data-i18n="f.privacy.desc">
+              偵測到密碼或敏感欄位時，自動停用所有 Plus 面板、自動空格與語音輸入。IBus 與 macOS 內建單按左 <kbd>Shift</kbd> 切換中／英並於狀態列顯示指示。
+            </p>
+            <div class="micro-demo">
+              <kbd data-i18n="f.privacy.lshift">左 Shift</kbd>
+              <span class="arrow">⇄</span>
+              <span class="result-pill">中 / 英</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture & Performance -->
+    <section class="section section-alt" id="architecture">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow" data-i18n="arch.eyebrow">架構設計</p>
+          <h2 class="section-title" data-i18n="arch.title">一份核心，三個原生平台，零框架包袱</h2>
+          <p class="section-desc" data-i18n="arch.desc">
+            所有按鍵處理、設定表與記憶體映射詞庫都集中在 C++20 核心與穩定 C ABI，每個平台只負責繪製原生介面。
+          </p>
+        </div>
+
+        <div class="arch-layout">
+          <div class="arch-diagram" aria-label="Architecture diagram">
+            <div class="arch-layer arch-base">
+              <div class="arch-layer-title">libchewing 0.14</div>
+              <div class="arch-layer-sub" data-i18n="arch.libchewing">未修改上游引擎 · Bigram 語言模型 · v4 詞庫</div>
+            </div>
+            <div class="arch-connector" aria-hidden="true">↓</div>
+            <div class="arch-layer arch-core">
+              <div class="arch-layer-title">libchewing-plus-core</div>
+              <div class="arch-layer-sub" data-i18n="arch.core">C++20 核心 · 穩定 C ABI · 單一設定表 (settings.inc) · mmap 詞庫索引</div>
+            </div>
+            <div class="arch-branches" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="arch-frontends">
+              <div class="arch-node">
+                <strong>fcitx5</strong>
+                <span data-i18n="arch.fcitx5">原生 C++ Addon</span>
+              </div>
+              <div class="arch-node">
+                <strong>IBus</strong>
+                <span data-i18n="arch.ibus">純 C 引擎 + libadwaita 設定</span>
+              </div>
+              <div class="arch-node">
+                <strong>macOS</strong>
+                <span data-i18n="arch.macos">原生 Swift / InputMethodKit</span>
+              </div>
+            </div>
+            <div class="arch-connector" aria-hidden="true">↕</div>
+            <div class="arch-layer arch-voxkit">
+              <div class="arch-layer-title">voxkit Daemon <span class="arch-tag">Unix Socket v1</span></div>
+              <div class="arch-layer-sub" data-i18n="arch.voxkit">選用本機語音服務 · Qwen3-ASR-0.6B · Silero VAD · OpenCC s2twp</div>
+            </div>
+          </div>
+
+          <div class="metrics-col">
+            <div class="metric-card">
+              <div class="metric-value">&lt; 1 ms</div>
+              <div class="metric-label" data-i18n="metric.mmap.title">預編譯 mmap 詞庫載入</div>
+              <p class="metric-desc" data-i18n="metric.mmap.desc">
+                詞語建議與單字表於建置期編譯成二進位索引，啟動零解析且跨程序共用記憶體分頁。
+              </p>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">~30 MB</div>
+              <div class="metric-label" data-i18n="metric.mem.title">macOS 全功能執行記憶體</div>
+              <p class="metric-desc" data-i18n="metric.mem.desc">
+                純 AppKit + InputMethodKit 原生實作，無 Electron、無 Qt，多視窗共用同一份詞庫快取。
+              </p>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">1</div>
+              <div class="metric-label" data-i18n="metric.single.title">每平台單一安裝檔</div>
+              <p class="metric-desc" data-i18n="metric.single.desc">
+                內含 libchewing 0.14、輸入法本體、詞庫與語音服務，下載一次即可完成安裝。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download & Install -->
+    <section class="section" id="download">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow" data-i18n="dl.eyebrow">下載與安裝</p>
+          <h2 class="section-title" data-i18n="dl.title">每個平台，只要一個安裝檔</h2>
+          <p class="section-desc" data-i18n="dl.desc">
+            所有安裝檔均附帶 libchewing 0.14、輸入法、預編譯詞庫與選用的 voxkit 語音服務。
+          </p>
+        </div>
+
+        <div class="install-grid">
+          <!-- macOS -->
+          <article class="install-card install-featured">
+            <div class="install-head">
+              <div>
+                <h3>macOS</h3>
+                <span class="install-sub" data-i18n="dl.macos.sub">Apple Silicon · macOS 13+</span>
+              </div>
+              <span class="pkg-tag">.pkg</span>
+            </div>
+            <p class="install-note" data-i18n="dl.macos.desc">
+              安裝後自動註冊「新酷音 Plus」。所有 Plus 功能預設開啟，語音輸入可在安裝程式「自訂」畫面或輸入法選單中啟用。
+            </p>
+            <div class="callout-mini" data-i18n="dl.macos.gatekeeper">
+              套件未經 Apple 簽章：請對 .pkg 按右鍵 →「打開」以通過 Gatekeeper。
+            </div>
+            <a class="btn btn-primary btn-full" href="https://github.com/siygle/chewing-plus/releases/latest" target="_blank" rel="noopener" data-i18n="dl.macos.btn">
+              下載 macOS 安裝檔
+            </a>
+          </article>
+
+          <!-- Arch fcitx5 -->
+          <article class="install-card">
+            <div class="install-head">
+              <div>
+                <h3>Arch Linux · fcitx5</h3>
+                <span class="install-sub">x86_64 · All-in-one</span>
+              </div>
+              <span class="pkg-tag">.pkg.tar.zst</span>
+            </div>
+            <p class="install-note" data-i18n="dl.fcitx5.desc">
+              取代系統的 libchewing（0.13）與 fcitx5-chewing。免打聲調與邊打邊列字預設開啟，其餘 Plus 選項可在 fcitx5 設定中啟用。
+            </p>
+            <div class="code-box">
+              <code>sudo pacman -U chewing-plus-fcitx5-*.pkg.tar.zst</code>
+              <button type="button" class="copy-btn" data-copy="sudo pacman -U chewing-plus-fcitx5-*.pkg.tar.zst" data-i18n="dl.copy">複製</button>
+            </div>
+            <a class="btn btn-secondary btn-full" href="https://github.com/siygle/chewing-plus/releases/latest" target="_blank" rel="noopener" data-i18n="dl.releases">
+              前往 GitHub Releases
+            </a>
+          </article>
+
+          <!-- Arch IBus -->
+          <article class="install-card">
+            <div class="install-head">
+              <div>
+                <h3>Arch Linux · IBus</h3>
+                <span class="install-sub">x86_64 · GTK4 / libadwaita</span>
+              </div>
+              <span class="pkg-tag">.pkg.tar.zst</span>
+            </div>
+            <p class="install-note" data-i18n="dl.ibus.desc">
+              含原生 IBus 引擎與「新酷音 Plus」設定程式（可管理 Plus 開關與語音模型）。安裝後執行 ibus restart 並加入輸入法即可。
+            </p>
+            <div class="code-box">
+              <code>sudo pacman -U chewing-plus-ibus-*.pkg.tar.zst &amp;&amp; ibus restart</code>
+              <button type="button" class="copy-btn" data-copy="sudo pacman -U chewing-plus-ibus-*.pkg.tar.zst && ibus restart" data-i18n="dl.copy">複製</button>
+            </div>
+            <a class="btn btn-secondary btn-full" href="https://github.com/siygle/chewing-plus/releases/latest" target="_blank" rel="noopener" data-i18n="dl.releases">
+              前往 GitHub Releases
+            </a>
+          </article>
+        </div>
+
+        <div class="defaults-bar">
+          <div>
+            <strong data-i18n="dl.defaults.title">預設行為與自訂詞庫</strong>
+            <p data-i18n="dl.defaults.body">
+              免打聲調與邊打邊列字在三個平台皆預設開啟；語音輸入預設不啟用（載入模型約佔 260 MB RAM，首次使用前於設定中下載 ~850 MB 模型）。fcitx5 亦支援在 <code>~/.local/share/fcitx5-chewing/</code> 放置自訂的 <code>plus-emoji-shortcodes.txt</code> 與 <code>plus-english.txt</code>。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <img src="favicon.svg" alt="" width="24" height="24">
+        <span><strong data-i18n="brand">新酷音 Plus</strong> · LGPL-2.1-or-later</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/siygle/chewing-plus" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/siygle/chewing-plus/releases" target="_blank" rel="noopener" data-i18n="footer.releases">版本下載</a>
+        <a href="https://github.com/siygle/chewing-plus/blob/master/docs/DEVELOPMENT.md" target="_blank" rel="noopener" data-i18n="footer.dev">開發文件</a>
+        <a href="https://github.com/siygle/chewing-plus/blob/master/docs/ABI.md" target="_blank" rel="noopener">C ABI</a>
+        <a href="https://github.com/siygle/chewing-plus/issues" target="_blank" rel="noopener" data-i18n="footer.issues">問題回報</a>
+      </div>
+      <p class="footer-credits" data-i18n="footer.credits">
+        基於 libchewing 0.14 與 fcitx5-chewing；內建資料來自 libchewing-data、gemoji（MIT）、SCOWL 與 fcitx5-voxkit（MIT）。
+      </p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
