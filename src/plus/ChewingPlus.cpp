@@ -228,7 +228,8 @@ Handled ChewingPlus::onKey(ChewingContext *ctx, char ascii, bool ctrl,
             } else if (isSpace) {
                 std::string word = lexicon_->canonical(in);
                 closePanel();
-                insertAscii(ctx, word.empty() ? word : word + " ", commit, true);
+                insertAscii(ctx, word.empty() ? word : word + " ", commit,
+                            true);
             } else if (isBackspace) {
                 if (in.empty()) {
                     closePanel();
