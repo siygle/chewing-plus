@@ -12,6 +12,13 @@
 # upgrade is skipped. This script removes the conflicting packages first
 # (`-Rdd`, dependencies are satisfied by the new package) and then
 # `pacman -U --noconfirm`.
+#
+# `pacman -Qq NAME` also matches provides=, so a query for libchewing /
+# fcitx5-chewing / fcitx5-voxkit succeeds when chewing-plus-fcitx5 is
+# already installed, and a later `pacman -Rdd libchewing` fails with
+# "target not found". Only real installed names are removed. Packages
+# being installed (chewing-plus-*) are left in place for `pacman -U` to
+# upgrade.
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -22,6 +29,20 @@ if [[ $(id -u) -ne 0 ]]; then
     echo "$0 must run as root (pacman -U)" >&2
     exit 1
 fi
+
+pkgname_of() {
+    local n
+    n=$(bsdtar -xOf "$1" .PKGINFO 2>/dev/null | awk '/^pkgname / {print $3; exit}')
+    if [[ -z $n ]]; then
+        n=$(basename "$1" | sed -E 's/-[0-9].*//')
+    fi
+    printf '%s\n' "$n"
+}
+
+# Real package names only; pacman -Qq NAME also matches provides=.
+installed_exact() {
+    pacman -Qq 2>/dev/null | grep -qx -- "$1"
+}
 
 pkgs=()
 for p in "$@"; do
@@ -43,10 +64,11 @@ candidates=(
     chewing-plus-fcitx5
     chewing-plus-ibus
 )
+
 # Don't remove a package we are about to install (reinstall / upgrade of itself).
 incoming=()
 for p in "${pkgs[@]}"; do
-    incoming+=("$(basename "$p" | sed -E 's/-[0-9].*//')")
+    incoming+=("$(pkgname_of "$p")")
 done
 
 remove=()
@@ -59,7 +81,7 @@ for name in "${candidates[@]}"; do
         fi
     done
     [[ -n $skip ]] && continue
-    if pacman -Qq "$name" >/dev/null 2>&1; then
+    if installed_exact "$name"; then
         remove+=("$name")
     fi
 done
@@ -67,5 +89,7 @@ done
 if [[ ${#remove[@]} -gt 0 ]]; then
     echo "removing conflicting packages: ${remove[*]}"
     pacman -Rdd --noconfirm "${remove[@]}"
+else
+    echo "no conflicting packages to remove"
 fi
 pacman -U --noconfirm "${pkgs[@]}"

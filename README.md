@@ -22,7 +22,9 @@
 # 若系統已有官方 libchewing / fcitx5-chewing，或舊的 *-plus 套件，不要用
 # `pacman -U --noconfirm`（衝突提示的預設是 N，升級會被略過）。請用：
 sudo packaging/release/install-arch.sh chewing-plus-fcitx5-*.pkg.tar.zst
-# 或先手動卸載衝突套件再 pacman -U，衝突提示請答 y。
+# 不要手動 `pacman -Rdd libchewing fcitx5-chewing …`：若已安裝
+# chewing-plus-*，那些名稱只是它的 provides，卸載會失敗。本機不用腳本時，
+# 請用沒有 --noconfirm 的 `pacman -U`，衝突提示答 y。
 # IBus：
 sudo packaging/release/install-arch.sh chewing-plus-ibus-*.pkg.tar.zst
 # 裝完執行 ibus restart，在 IBus 設定加入「新酷音 Plus」

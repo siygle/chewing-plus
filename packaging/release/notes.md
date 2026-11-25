@@ -67,7 +67,7 @@ sudo packaging/release/install-arch.sh chewing-plus-ibus-*.pkg.tar.zst
 # IBus 裝完執行 ibus restart，在 IBus 設定加入「新酷音 Plus」
 ```
 
-從套件庫 `pacman -Syu` 升級時，`replaces=` 會自動取代官方 `libchewing` / `fcitx5-chewing` 以及舊的 `libchewing-plus`、`fcitx5-chewing-plus`、`ibus-chewing-plus`、`fcitx5-voxkit`（預設答 Y）。本機 `pacman -U` 仍會詢問，請答 `y`，或改用上面的腳本。兩個安裝檔互斥，切換框架時改裝另一個就好。
+從套件庫 `pacman -Syu` 升級時，`replaces=` 會自動取代官方 `libchewing` / `fcitx5-chewing` 以及舊的 `libchewing-plus`、`fcitx5-chewing-plus`、`ibus-chewing-plus`、`fcitx5-voxkit`（預設答 Y）。本機 `pacman -U` 仍會詢問，請答 `y`，或改用上面的腳本。不要手動 `pacman -Rdd libchewing fcitx5-chewing fcitx5-voxkit …`：已安裝 chewing-plus-* 時，那些名稱只是 provides，卸載會失敗。兩個安裝檔互斥，切換框架時改裝另一個就好。
 
 **語音輸入預設不啟用**（模型載入後語音服務約佔 260 MB 記憶體）。要用時：
 - fcitx5：設定 → 新酷音 → 勾選 `Voice: enable dictation`
