@@ -70,6 +70,50 @@ int64_t NowMs() {
 
 std::string Str(const char *s) { return s ? s : ""; }
 
+// X11 / fcitx keycodes (linux evdev + 8). Under the common xkb option
+// shift:both_capslock_cancel, a Shift release arrives with keysym Caps_Lock,
+// so Shift must also be recognized by the physical keycode.
+constexpr uint32_t kX11ShiftL = 50;
+constexpr uint32_t kX11ShiftR = 62;
+
+uint32_t ShiftFromX11Code(uint32_t code) {
+    if (code == kX11ShiftL) {
+        return CHEWING_PLUS_KEY_SHIFT_L;
+    }
+    if (code == kX11ShiftR) {
+        return CHEWING_PLUS_KEY_SHIFT_R;
+    }
+    return 0;
+}
+
+void AddDoubleTapKey(const Key &k, std::vector<KeySym> &syms,
+                     std::vector<uint32_t> &codes) {
+    if (!k.isValid() || !k.isModifier()) {
+        return;
+    }
+    syms.push_back(k.sym());
+    if (k.code()) {
+        codes.push_back(static_cast<uint32_t>(k.code()));
+        return;
+    }
+    if (k.sym() == FcitxKey_Shift_R) {
+        codes.push_back(kX11ShiftR);
+    } else if (k.sym() == FcitxKey_Shift_L) {
+        codes.push_back(kX11ShiftL);
+    }
+}
+
+bool IsDoubleTapKey(const KeyEvent &keyEvent, const std::vector<KeySym> &syms,
+                    const std::vector<uint32_t> &codes) {
+    const Key &raw = keyEvent.rawKey();
+    if (std::find(syms.begin(), syms.end(), raw.sym()) != syms.end()) {
+        return true;
+    }
+    const uint32_t code = raw.code();
+    return code != 0 &&
+           std::find(codes.begin(), codes.end(), code) != codes.end();
+}
+
 // fcitx key -> core key event. Returns false for keys the core never sees.
 bool MapKey(const KeyEvent &keyEvent, chewing_plus_key_event &out) {
     std::memset(&out, 0, sizeof(out));
@@ -144,6 +188,14 @@ bool MapKey(const KeyEvent &keyEvent, chewing_plus_key_event &out) {
         return true;
     default:
         break;
+    }
+    // Caps_Lock on a Shift keycode is still that Shift (see ShiftFromX11Code).
+    if (const uint32_t shift = ShiftFromX11Code(keyEvent.rawKey().code())) {
+        if (key.sym() == FcitxKey_Caps_Lock ||
+            keyEvent.rawKey().sym() == FcitxKey_Caps_Lock) {
+            out.key = shift;
+            return true;
+        }
     }
     if (key.isModifier() || keyEvent.isRelease()) {
         // Other modifiers and releases still reach the core so it can tell
@@ -551,14 +603,13 @@ void ChewingEngine::populateConfig() {
         }
     }
     englishDoubleTapSyms_.clear();
+    englishDoubleTapCodes_.clear();
     std::string tapLabel;
     for (const auto &k : *config_.PlusEnglishDoubleTapKeys) {
-        if (k.isValid() && k.isModifier()) {
-            englishDoubleTapSyms_.push_back(k.sym());
-            if (tapLabel.empty()) {
-                tapLabel =
-                    Key(k.sym()).toString(KeyStringFormat::Localized) + " ×2";
-            }
+        AddDoubleTapKey(k, englishDoubleTapSyms_, englishDoubleTapCodes_);
+        if (k.isValid() && k.isModifier() && tapLabel.empty()) {
+            tapLabel =
+                Key(k.sym()).toString(KeyStringFormat::Localized) + " ×2";
         }
     }
     tapPressed_ = false;
@@ -691,10 +742,8 @@ bool ChewingEngine::englishShortcut(const KeyEvent &keyEvent, bool sensitive) {
         return false;
     }
     if (!englishDoubleTapSyms_.empty()) {
-        const bool watched =
-            std::find(englishDoubleTapSyms_.begin(),
-                      englishDoubleTapSyms_.end(),
-                      keyEvent.rawKey().sym()) != englishDoubleTapSyms_.end();
+        const bool watched = IsDoubleTapKey(keyEvent, englishDoubleTapSyms_,
+                                            englishDoubleTapCodes_);
         const int64_t now = NowMs();
         const int64_t window = *config_.PlusEnglishDoubleTapMs;
         if (!watched) {

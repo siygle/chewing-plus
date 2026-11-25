@@ -227,6 +227,36 @@ void testPlus(Instance *instance) {
         check(preedit() == "[EN] ",
               "Right Shift x2 enters EN, got " + preedit());
 
+        // --- same double-tap when xkb reports the release as Caps_Lock
+        // (shift:both_capslock_cancel). Right Shift is X11 keycode 62.
+        reset();
+        auto tapShiftCaps = [&]() {
+            send(Key(FcitxKey_Shift_R, KeyState::NoState, 62));
+            send(Key(FcitxKey_Caps_Lock, KeyState::Shift, 62), true);
+        };
+        tapShiftCaps();
+        tapShiftCaps();
+        check(preedit() == "[EN] ",
+              "Right Shift x2 with Caps_Lock release enters EN, got " +
+                  preedit());
+
+        // --- one tap is not a toggle
+        reset();
+        tapShiftCaps();
+        check(preedit().find("[EN]") == std::string::npos,
+              "single Right Shift is not a toggle, got " + preedit());
+
+        // --- the Caps_Lock key itself (X11 66) is not a Shift double-tap
+        reset();
+        auto tapCaps = [&]() {
+            send(Key(FcitxKey_Caps_Lock, KeyState::NoState, 66));
+            send(Key(FcitxKey_Caps_Lock, KeyState::NoState, 66), true);
+        };
+        tapCaps();
+        tapCaps();
+        check(preedit().find("[EN]") == std::string::npos,
+              "Caps_Lock key does not enter EN, got " + preedit());
+
         // --- emoji suggestion after phrase (開心 = d9 vup)
         reset();
         type("d9 vup ");
