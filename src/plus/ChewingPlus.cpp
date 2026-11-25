@@ -350,9 +350,13 @@ void ChewingPlus::insertDictation(ChewingContext *ctx, const std::string &text,
     overwrites_ = 0;
     overwriteFlags_.clear();
     lastZuinLen_ = 0;
-    const bool ascii = std::all_of(
-        text.begin(), text.end(), [](char c) { return c >= 0x20 && c < 0x7f; });
-    if (ascii) {
+    // One ASCII word joins the composition (Chewing's buffer can hold it,
+    // so the user keeps editing). A phrase with spaces, such as an English
+    // translation, is committed whole: in SYMBOL_MODE a space would commit
+    // the buffer and leave the rest of the words behind in it.
+    const bool word = std::all_of(text.begin(), text.end(),
+                                  [](char c) { return c > 0x20 && c < 0x7f; });
+    if (word) {
         insertAscii(ctx, text, commit, false);
     } else {
         commitAround(ctx, text, commit);
