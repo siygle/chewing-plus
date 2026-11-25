@@ -60,11 +60,14 @@
 依你用的輸入框架擇一安裝，會取代系統的 `libchewing`（0.13）與 `fcitx5-chewing`：
 
 ```bash
-sudo pacman -U chewing-plus-fcitx5-*.pkg.tar.zst   # fcitx5
-sudo pacman -U chewing-plus-ibus-*.pkg.tar.zst     # IBus：裝完執行 ibus restart，在 IBus 設定加入「新酷音 Plus」
+# 已有官方 libchewing / fcitx5-chewing 或舊的 *-plus 套件時，請用輔助腳本
+# （`pacman -U --noconfirm` 對衝突提示會答 N，升級會被略過）：
+sudo packaging/release/install-arch.sh chewing-plus-fcitx5-*.pkg.tar.zst
+sudo packaging/release/install-arch.sh chewing-plus-ibus-*.pkg.tar.zst
+# IBus 裝完執行 ibus restart，在 IBus 設定加入「新酷音 Plus」
 ```
 
-從 5.1.13-plus.x 升級時，pacman 會詢問是否移除舊的 `libchewing-plus`、`fcitx5-chewing-plus`、`ibus-chewing-plus`、`fcitx5-voxkit`，回答 `y` 即可。兩個安裝檔互斥，切換框架時改裝另一個就好。
+從套件庫 `pacman -Syu` 升級時，`replaces=` 會自動取代官方 `libchewing` / `fcitx5-chewing` 以及舊的 `libchewing-plus`、`fcitx5-chewing-plus`、`ibus-chewing-plus`、`fcitx5-voxkit`（預設答 Y）。本機 `pacman -U` 仍會詢問，請答 `y`，或改用上面的腳本。兩個安裝檔互斥，切換框架時改裝另一個就好。
 
 **語音輸入預設不啟用**（模型載入後語音服務約佔 260 MB 記憶體）。要用時：
 - fcitx5：設定 → 新酷音 → 勾選 `Voice: enable dictation`

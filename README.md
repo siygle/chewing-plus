@@ -19,9 +19,16 @@
 | macOS（Apple Silicon） | `ChewingPlus-*-macos-arm64.pkg` |
 
 ```bash
-sudo pacman -U chewing-plus-fcitx5-*.pkg.tar.zst   # fcitx5
-sudo pacman -U chewing-plus-ibus-*.pkg.tar.zst     # IBus：裝完執行 ibus restart，在 IBus 設定加入「新酷音 Plus」
+# 若系統已有官方 libchewing / fcitx5-chewing，或舊的 *-plus 套件，不要用
+# `pacman -U --noconfirm`（衝突提示的預設是 N，升級會被略過）。請用：
+sudo packaging/release/install-arch.sh chewing-plus-fcitx5-*.pkg.tar.zst
+# 或先手動卸載衝突套件再 pacman -U，衝突提示請答 y。
+# IBus：
+sudo packaging/release/install-arch.sh chewing-plus-ibus-*.pkg.tar.zst
+# 裝完執行 ibus restart，在 IBus 設定加入「新酷音 Plus」
 ```
+
+從套件庫 `pacman -Syu` 升級時，PKGBUILD 的 `replaces=` 會自動換成新酷音 Plus（預設答 Y）。
 
 macOS 套件尚未經 Apple 簽章，請對 `.pkg` 按右鍵 → 打開。詳細步驟見各版本的發布說明。
 

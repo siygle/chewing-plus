@@ -107,7 +107,10 @@ package_chewing-plus-fcitx5() {
   provides=("libchewing=0.14.0" libchewing.so "fcitx5-chewing=${pkgver}"
             "fcitx5-voxkit=${pkgver}")
   conflicts=(libchewing fcitx5-chewing chewing-plus-ibus "${_old_packages[@]}")
-  replaces=(libchewing-plus fcitx5-chewing-plus fcitx5-voxkit)
+  # Official packages and the old split Plus packages. `replaces=` is
+  # honoured on `pacman -Syu`; a local `pacman -U` still prompts, and
+  # `--noconfirm` answers N — use packaging/release/install-arch.sh.
+  replaces=(libchewing fcitx5-chewing libchewing-plus fcitx5-chewing-plus fcitx5-voxkit)
   install=chewing-plus.install
   _install_common
   DESTDIR="$pkgdir" cmake --install "$srcdir/build-voxkit"
@@ -120,7 +123,7 @@ package_chewing-plus-ibus() {
   depends=(ibus libadwaita alsa-lib opencc gcc-libs glibc)
   provides=("libchewing=0.14.0" libchewing.so)
   conflicts=(libchewing chewing-plus-fcitx5 "${_old_packages[@]}")
-  replaces=(libchewing-plus ibus-chewing-plus)
+  replaces=(libchewing libchewing-plus ibus-chewing-plus)
   install=chewing-plus.install
   _install_common
   DESTDIR="$pkgdir" cmake --install "$srcdir/build-ibus"
