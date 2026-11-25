@@ -78,6 +78,13 @@ typedef struct voxkit_message {
     uint64_t store_bytes;
     int installed;
     int active;
+    /* Translation extension (fcitx5-voxkit feat/voice-translate). */
+    char mode[16];            /* final: "translate" for a translate request */
+    char target[16];          /* final: canonical target language */
+    char translate_error[64]; /* final: why it fell back to the original */
+    char source[4096];        /* final: the transcript before translation */
+    int translated;           /* final: 1 when `text` is a translation */
+    int caps_translate;       /* model.status/list: "translate" capability */
 } voxkit_message;
 
 /* One catalog row from a model.list line. */
@@ -105,6 +112,16 @@ int voxkit_proto_write_start(char *buf, size_t n, uint64_t req,
                              const char *language, const char *convert,
                              const char *model, const char *const *vocabulary,
                              size_t vocabulary_count);
+/* `start` with `mode` ("dictate" or "translate"; NULL omits it, which
+ * every daemon treats as dictate) and `target` (NULL omits it). Send
+ * "translate" only to a daemon whose model.status listed the "translate"
+ * capability (caps_translate): an older daemon ignores both fields. */
+int voxkit_proto_write_start_mode(char *buf, size_t n, uint64_t req,
+                                  const char *language, const char *convert,
+                                  const char *model,
+                                  const char *const *vocabulary,
+                                  size_t vocabulary_count, const char *mode,
+                                  const char *target);
 int voxkit_proto_write_model_list(char *buf, size_t n, uint64_t req);
 int voxkit_proto_write_model_progress(char *buf, size_t n, uint64_t req);
 int voxkit_proto_write_model_cancel(char *buf, size_t n, uint64_t req);

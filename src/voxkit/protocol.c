@@ -411,7 +411,8 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
                 out->store_bytes = (uint64_t)num;
             }
         } else if (strcmp(key, "installed") == 0 ||
-                   strcmp(key, "active") == 0) {
+                   strcmp(key, "active") == 0 ||
+                   strcmp(key, "translated") == 0) {
             int flag = 0;
             if (parse_bool(&p, &flag) != 0) {
                 set_err(err, err_n, "bad flag");
@@ -419,9 +420,36 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
             }
             if (strcmp(key, "installed") == 0) {
                 out->installed = flag;
-            } else {
+            } else if (strcmp(key, "active") == 0) {
                 out->active = flag;
+            } else {
+                out->translated = flag;
             }
+        } else if (strcmp(key, "capabilities") == 0 && *p == '[') {
+            p = skip(p + 1);
+            while (*p != ']') {
+                char cap[32];
+                if (*p == '"') {
+                    if (parse_string(&p, cap, sizeof(cap)) != 0) {
+                        set_err(err, err_n, "bad capability");
+                        return VOXKIT_PROTO_ERR_PARSE;
+                    }
+                    if (strcmp(cap, "translate") == 0) {
+                        out->caps_translate = 1;
+                    }
+                } else if (skip_value(&p) != 0) {
+                    set_err(err, err_n, "bad capability");
+                    return VOXKIT_PROTO_ERR_PARSE;
+                }
+                p = skip(p);
+                if (*p == ',') {
+                    p = skip(p + 1);
+                } else if (*p != ']') {
+                    set_err(err, err_n, "bad capabilities");
+                    return VOXKIT_PROTO_ERR_PARSE;
+                }
+            }
+            p++;
         } else if (*p == '"') {
             char value[4096];
             if (parse_string(&p, value, sizeof(value)) != 0) {
@@ -452,6 +480,15 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
                 copy_field(out->state, sizeof(out->state), value);
             } else if (strcmp(key, "daemon") == 0) {
                 copy_field(out->daemon, sizeof(out->daemon), value);
+            } else if (strcmp(key, "mode") == 0) {
+                copy_field(out->mode, sizeof(out->mode), value);
+            } else if (strcmp(key, "target") == 0) {
+                copy_field(out->target, sizeof(out->target), value);
+            } else if (strcmp(key, "translate_error") == 0) {
+                copy_field(out->translate_error, sizeof(out->translate_error),
+                           value);
+            } else if (strcmp(key, "source") == 0) {
+                copy_field(out->source, sizeof(out->source), value);
             }
         } else if (skip_value(&p) != 0) {
             set_err(err, err_n, "bad value");
@@ -618,6 +655,17 @@ int voxkit_proto_write_start(char *buf, size_t n, uint64_t req,
                              const char *language, const char *convert,
                              const char *model, const char *const *vocabulary,
                              size_t vocabulary_count) {
+    return voxkit_proto_write_start_mode(buf, n, req, language, convert, model,
+                                         vocabulary, vocabulary_count, NULL,
+                                         NULL);
+}
+
+int voxkit_proto_write_start_mode(char *buf, size_t n, uint64_t req,
+                                  const char *language, const char *convert,
+                                  const char *model,
+                                  const char *const *vocabulary,
+                                  size_t vocabulary_count, const char *mode,
+                                  const char *target) {
     char prefix[160];
     size_t used = 0;
     size_t i;
@@ -641,6 +689,18 @@ int voxkit_proto_write_start(char *buf, size_t n, uint64_t req,
     if (model && model[0]) {
         if (append(buf, n, &used, ",\"model\":") != 0 ||
             append_json_string(buf, n, &used, model) != 0) {
+            return -1;
+        }
+    }
+    if (mode && mode[0]) {
+        if (append(buf, n, &used, ",\"mode\":") != 0 ||
+            append_json_string(buf, n, &used, mode) != 0) {
+            return -1;
+        }
+    }
+    if (target && target[0]) {
+        if (append(buf, n, &used, ",\"target\":") != 0 ||
+            append_json_string(buf, n, &used, target) != 0) {
             return -1;
         }
     }

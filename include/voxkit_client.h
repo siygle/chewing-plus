@@ -61,6 +61,11 @@ int voxkit_client_model_status(voxkit_client *client, uint64_t req,
                                voxkit_message *reply, int timeout_ms, char *err,
                                size_t err_n);
 
+/* 1 when the daemon's model.status lists the "translate" capability, 0 for
+ * an older daemon, an error or a timeout. Blocks up to `timeout_ms`; call it
+ * once per connection, before the first translate start. */
+int voxkit_client_supports_translate(voxkit_client *client, int timeout_ms);
+
 #ifdef __cplusplus
 }
 #endif

@@ -146,6 +146,48 @@ process answered), `state` (`idle`, `downloading`, `done`, `error`,
 `chewing-plus-models` is the toolkit-free client for those commands.
 `include/voxkit_client.h` is the same client for the frontends.
 
+## Translation (v1 extension)
+
+Added with fcitx5-voxkit `feat/voice-translate`; still protocol version 1.
+
+A daemon that can translate lists it in `model.status` (and `model.list`):
+
+```json
+{"v":1,"type":"model.status","req":0,"state":"idle","capabilities":["translate"],"translate":{"plugin":true,"plugin_path":"/usr/lib/voxkit/libvoxkit-mt.so","model":"hy-mt1.5-1.8b","installed":true,"downloading":false,"targets":["en","ja","ko","zh-Hant","zh-Hans","fr","de","es","pt","it","ru","vi","th","id","ms","tr","ar","nl","pl"]}}
+```
+
+`capabilities` only says the daemon understands translate requests; the
+plugin and the model can still be missing, which shows up per request as a
+fallback. A client asks once per connection
+(`voxkit_client_supports_translate`) and sends `mode` only when the
+capability is there: an older daemon ignores unknown fields and would just
+dictate.
+
+`start` takes two optional fields:
+
+```json
+{"v":1,"type":"start","req":9,"language":"zh","convert":"s2twp","mode":"translate","target":"ja","vocabulary":[]}
+```
+
+- `mode`: `dictate` (default) or `translate`. Anything else is `bad-request`.
+- `target`: `en`, `ja`, `ko`, `zh-Hant`, `zh-Hans`, ... (aliases such as
+  `zh-TW` are accepted). Default `en`.
+
+The turn is the same; after `辨識中` the daemon sends a `partial` with
+`翻譯中`, then a `final` with extra fields:
+
+```json
+{"v":1,"type":"final","req":9,"text":"今日はいい天気です。","mode":"translate","target":"ja","translated":true,"source":"今天天氣很好"}
+{"v":1,"type":"final","req":9,"text":"今天天氣很好","mode":"translate","target":"ja","translated":false,"source":"今天天氣很好","translate_error":"model-downloading"}
+```
+
+When `translated` is false, `text` is the ordinary dictation result (with
+`convert` applied) and `translate_error` says why: `bad-target`,
+`plugin-missing`, `plugin-error`, `model-downloading`, `load-failed`,
+`translate-failed`, `empty`, `cancelled`. The client inserts `text` either
+way. OpenCC s2twp is applied to translations only for a Traditional Chinese
+target; the user dictionary is never applied to translated text.
+
 ## What this version does not promise
 
 - No binary audio framing. A future version would bump `v`.
