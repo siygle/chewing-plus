@@ -25,6 +25,8 @@ static void check(int ok, const char *what) {
     }
 }
 
+static volatile int translate_caps = 0;
+
 static void *serve(void *arg) {
     int fd = *(int *)arg;
     char buf[1024];
@@ -56,6 +58,12 @@ static void *serve(void *arg) {
                          "\"stable\":\"\",\"tentative\":\"聆聽中\"}\n",
                          (unsigned long long)msg.req,
                          (unsigned long long)msg.req);
+            } else if (msg.type == VOXKIT_MSG_MODEL_STATUS && msg.req == 0 &&
+                       translate_caps) {
+                snprintf(reply, sizeof(reply),
+                         "{\"v\":1,\"type\":\"model.status\",\"req\":0,"
+                         "\"state\":\"idle\",\"capabilities\":[\"translate\"],"
+                         "\"translate\":{\"plugin\":true}}\n");
             } else if (msg.type == VOXKIT_MSG_MODEL_STATUS) {
                 snprintf(reply, sizeof(reply),
                          "{\"v\":1,\"type\":\"model.status\",\"req\":%llu,"
@@ -149,6 +157,12 @@ int main(void) {
                   !rows[0].installed,
               "catalog row");
     }
+
+    check(voxkit_client_supports_translate(&client, 1000) == 0,
+          "old daemon: no translate capability");
+    translate_caps = 1;
+    check(voxkit_client_supports_translate(&client, 1000) == 1,
+          "new daemon: translate capability");
 
     check(voxkit_proto_write_start(line, sizeof(line), 1, "zh", "s2twp", NULL,
                                    NULL, 0) > 0,

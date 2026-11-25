@@ -282,3 +282,13 @@ int voxkit_client_model_status(voxkit_client *client, uint64_t req,
     return roundtrip(client, line, VOXKIT_MSG_MODEL_STATUS, reply, timeout_ms,
                      err, err_n);
 }
+
+int voxkit_client_supports_translate(voxkit_client *client, int timeout_ms) {
+    voxkit_message reply;
+    char err[64];
+    if (voxkit_client_model_status(client, 0, &reply, timeout_ms, err,
+                                   sizeof(err)) != 0) {
+        return 0;
+    }
+    return reply.caps_translate ? 1 : 0;
+}

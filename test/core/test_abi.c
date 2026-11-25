@@ -642,6 +642,10 @@ static void test_settings(void) {
         }
     }
     check(seen_emoji, "emoji is a bool, off by default");
+    got = chewing_plus_get_setting(session, "voice_translate");
+    check(got && strcmp(got, "0") == 0, "voice translation is off by default");
+    got = chewing_plus_get_setting(session, "voice_translate_to");
+    check(got && strcmp(got, "en") == 0, "voice translation targets en");
     check(chewing_plus_setting_info_at(n, &info) == 0, "row past the end");
 
     check(chewing_plus_set_setting(session, "no_such_key", "1") == 0,
@@ -850,6 +854,22 @@ static void test_sensitive(void) {
         if (strcmp(got, "你好 A") != 0) {
             fprintf(stderr, "  commit=[%s]\n", got);
         }
+    }
+
+    /* A sentence with spaces (an English translation) is committed whole,
+     * together with the composition in front of it. */
+    reset();
+    type_text("su3cl3");
+    chewing_plus_insert_text(session, "Nice weather today.");
+    {
+        const char *got = chewing_plus_take_commit(session);
+        check(strstr(got, "Nice weather today.") != NULL &&
+                  strncmp(got, "你好", strlen("你好")) == 0,
+              "a sentence is committed whole after the composition");
+        if (!strstr(got, "Nice weather today.")) {
+            fprintf(stderr, "  commit=[%s]\n", got);
+        }
+        check(preedit()[0] == '\0', "nothing left in the buffer");
     }
 }
 

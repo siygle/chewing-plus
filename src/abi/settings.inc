@@ -50,6 +50,12 @@ SETTING(shift_toggle, BOOL, "0", "Tap Left Shift alone to switch 中/英",
         "左 Shift 切換中／英")
 SETTING(easy_symbol, BOOL, "0", "Easy symbol (Shift+letter)",
         "簡易符號（Shift＋英文字母）")
+SETTING(voice_translate, BOOL, "0",
+        "Voice translation: hold Right Ctrl (macOS: Right Command) and speak",
+        "語音翻譯（按住右 Ctrl／macOS 右 ⌘ 說話，輸入譯文）")
+SETTING(voice_translate_to, STRING, "en",
+        "Translate speech into (en, ja, ko, zh-Hant, zh-Hans, fr, de, ...)",
+        "語音翻譯的目標語言（en、ja、ko、zh-Hant、zh-Hans、fr、de…）")
 SETTING(keyboard_layout, STRING, "KB_DEFAULT", "Keyboard layout", "鍵盤排列")
 SETTING(selection_keys, STRING, "1234567890", "Selection keys", "選字鍵")
 SETTING(page_size, INT, "10", "Candidates per page", "每頁候選字數")

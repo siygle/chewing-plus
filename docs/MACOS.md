@@ -12,7 +12,8 @@ The fcitx5 addon is not part of this build.
 
 | Path | Role |
 |---|---|
-| `macos/ChewingPlus/ChewingPlusInputController.swift` | IMK controller: marked text, `IMKCandidates`, digit selection, English toggle via the core, secure input, Right Option push-to-talk |
+| `macos/ChewingPlus/ChewingPlusInputController.swift` | IMK controller: marked text, `IMKCandidates`, digit selection, English toggle via the core, secure input, push-to-talk / push-to-translate |
+| `macos/ChewingPlus/Shortcuts.swift` | 「快速鍵…」window: dictation (default Right Option), translation (default Right Command) and English (Right Shift) use the same recorder; warns if two of them collide |
 | `macos/ChewingPlus/Info.plist` | Bundle id `im.chewing.inputmethod.ChewingPlus`, IMK keys, microphone usage string |
 | `macos/ChewingPlus/main.swift` | `IMKServer` named `ChewingPlus_Connection` |
 | `macos/Voxkit/Info.plist` | Usage string for a helper bundle, if you wrap the daemon |
@@ -178,6 +179,12 @@ Do these in order. Stop at the first failure and note the exact message.
     macOS asks for microphone access for the helper. Allow it.
     Hold Right Option, say a short Traditional Chinese phrase, release.
     The text is inserted at the caret. The recording never leaves the Mac.
+    With 「語音翻譯」 on in the input menu, hold Right Command (the
+    「語音翻譯」 shortcut), speak, release: the translation into
+    「語音翻譯成」 (default English) is typed. Needs a voxkit with the
+    translate capability and libvoxkit-mt.dylib next to it; otherwise the
+    hint says why and the original text is typed. (The macOS plugin build is
+    not packaged yet.)
 12. `macos/uninstall.sh`. The input source disappears after the next login.
     Model files are still in Application Support.
 

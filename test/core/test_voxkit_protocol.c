@@ -143,8 +143,76 @@ static void test_socket(void) {
     unsetenv("VOXKIT_SOCKET");
 }
 
+/* Translation extension: mode/target on start, translated finals, and the
+ * capability that gates sending mode=translate at all. */
+static void test_translate(void) {
+    char buf[512];
+    char err[128];
+    voxkit_message msg;
+    int n;
+
+    n = voxkit_proto_write_start_mode(buf, sizeof(buf), 9, "zh", "s2twp", NULL,
+                                      NULL, 0, "translate", "ja");
+    check(n > 0, "translate start writes");
+    check(strstr(buf, "\"mode\":\"translate\"") != NULL &&
+              strstr(buf, "\"target\":\"ja\"") != NULL,
+          "translate start carries mode and target");
+    check(voxkit_proto_parse(buf, &msg, err, sizeof(err)) == VOXKIT_PROTO_OK &&
+              strcmp(msg.mode, "translate") == 0 &&
+              strcmp(msg.target, "ja") == 0,
+          "translate start parses");
+
+    n = voxkit_proto_write_start(buf, sizeof(buf), 10, "zh", "s2twp", NULL,
+                                 NULL, 0);
+    check(n > 0 && strstr(buf, "\"mode\"") == NULL &&
+              strstr(buf, "\"target\"") == NULL,
+          "plain start has no mode (old daemons see the same bytes)");
+
+    check(voxkit_proto_parse(
+              "{\"v\":1,\"type\":\"final\",\"req\":9,\"text\":\"Hello\","
+              "\"mode\":\"translate\",\"target\":\"en\",\"translated\":true,"
+              "\"source\":\"你好\"}",
+              &msg, err, sizeof(err)) == VOXKIT_PROTO_OK,
+          "translated final parses");
+    check(msg.translated == 1 && strcmp(msg.text, "Hello") == 0 &&
+              strcmp(msg.source, "你好") == 0 &&
+              strcmp(msg.mode, "translate") == 0 && msg.translate_error[0] == 0,
+          "translated final fields");
+
+    check(voxkit_proto_parse(
+              "{\"v\":1,\"type\":\"final\",\"req\":9,\"text\":\"你好\","
+              "\"mode\":\"translate\",\"target\":\"en\",\"translated\":false,"
+              "\"source\":\"你好\",\"translate_error\":\"plugin-missing\"}",
+              &msg, err, sizeof(err)) == VOXKIT_PROTO_OK,
+          "fallback final parses");
+    check(msg.translated == 0 && strcmp(msg.text, "你好") == 0 &&
+              strcmp(msg.translate_error, "plugin-missing") == 0,
+          "fallback final keeps the original text and the reason");
+
+    check(voxkit_proto_parse(
+              "{\"v\":1,\"type\":\"model.status\",\"req\":0,\"state\":\"idle\","
+              "\"capabilities\":[\"translate\"],\"translate\":{\"plugin\":true,"
+              "\"model\":\"hy-mt1.5-1.8b\",\"installed\":false,"
+              "\"targets\":[\"en\",\"ja\"]}}",
+              &msg, err, sizeof(err)) == VOXKIT_PROTO_OK,
+          "status with capabilities parses");
+    check(msg.caps_translate == 1, "translate capability seen");
+    check(
+        voxkit_proto_parse(
+            "{\"v\":1,\"type\":\"model.status\",\"req\":0,\"state\":\"idle\"}",
+            &msg, err, sizeof(err)) == VOXKIT_PROTO_OK &&
+            msg.caps_translate == 0,
+        "old daemon status: no translate capability");
+    check(voxkit_proto_parse("{\"v\":1,\"type\":\"model.status\",\"req\":0,"
+                             "\"capabilities\":[\"streaming\",1,{\"x\":2}]}",
+                             &msg, err, sizeof(err)) == VOXKIT_PROTO_OK &&
+              msg.caps_translate == 0,
+          "other capabilities are ignored");
+}
+
 int main(void) {
     test_roundtrip();
+    test_translate();
     test_models();
     test_socket();
     printf(failures ? "PROTOCOL TESTS FAILED (%d)\n" : "PROTOCOL TESTS OK\n",

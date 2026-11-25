@@ -9,6 +9,10 @@
  *
  * Older files used "space" (both spacing settings) and "hint_commit"; they
  * are read as space_letters + space_digits and english_hint_commit.
+ *
+ * `voice_key` and `voice_translate_key` are IBus-only (X11 keysym names,
+ * default Alt_R and Control_R). fcitx5 stores the same names in
+ * conf/voxkit.conf; macOS uses the 「快速鍵…」shortcuts window.
  */
 #ifndef CHEWING_PLUS_IBUS_PREFS_H_
 #define CHEWING_PLUS_IBUS_PREFS_H_

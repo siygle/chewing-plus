@@ -19,9 +19,18 @@
 | macOS（Apple Silicon） | `ChewingPlus-*-macos-arm64.pkg` |
 
 ```bash
-sudo pacman -U chewing-plus-fcitx5-*.pkg.tar.zst   # fcitx5
-sudo pacman -U chewing-plus-ibus-*.pkg.tar.zst     # IBus：裝完執行 ibus restart，在 IBus 設定加入「新酷音 Plus」
+# 若系統已有官方 libchewing / fcitx5-chewing，或舊的 *-plus 套件，不要用
+# `pacman -U --noconfirm`（衝突提示的預設是 N，升級會被略過）。請用：
+sudo packaging/release/install-arch.sh chewing-plus-fcitx5-*.pkg.tar.zst
+# 不要手動 `pacman -Rdd libchewing fcitx5-chewing …`：若已安裝
+# chewing-plus-*，那些名稱只是它的 provides，卸載會失敗。本機不用腳本時，
+# 請用沒有 --noconfirm 的 `pacman -U`，衝突提示答 y。
+# IBus：
+sudo packaging/release/install-arch.sh chewing-plus-ibus-*.pkg.tar.zst
+# 裝完執行 ibus restart，在 IBus 設定加入「新酷音 Plus」
 ```
+
+從套件庫 `pacman -Syu` 升級時，PKGBUILD 的 `replaces=` 會自動換成新酷音 Plus（預設答 Y）。
 
 macOS 套件尚未經 Apple 簽章，請對 `.pkg` 按右鍵 → 打開。詳細步驟見各版本的發布說明。
 
@@ -148,7 +157,7 @@ Ctrl+Shift+Space → GitHub
 ### 語音輸入
 語音由內附的 [voxkit](https://github.com/siygle/fcitx5-voxkit) 服務在本機辨識，錄音不會上傳：
 
-- **按住快捷鍵** 說話，放開後輸出文字（Linux 預設右 Alt，macOS 預設右 Option，可自訂）
+- **按住快捷鍵** 說話，放開後輸出文字（Linux 預設右 Alt，macOS 預設右 Option；fcitx5、IBus、macOS 都可以自訂）
 - 辨識結果會插入目前游標的位置，並轉成繁體中文
 - 會自動參考你自己加的詞，提高專有名詞的辨識率
 
@@ -161,6 +170,21 @@ Ctrl+Shift+Space → GitHub
 | macOS | 安裝時在「自訂」畫面勾選「啟用語音」，或之後從輸入法選單開啟 |
 
 第一次使用前要下載語音模型（約 850 MB），可在設定中操作。
+
+#### 語音翻譯（實驗）
+按住**翻譯快捷鍵**說中文，放開後輸入翻譯後的文字（預設翻成英文）。翻譯也在本機進行，
+用的是 [HY-MT1.5-1.8B](https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF)（約 1.1 GB，
+第一次用時自動下載；Tencent HY Community License，不適用於歐盟、英國與南韓）。
+
+翻譯**預設關閉**，要另外安裝翻譯外掛（Arch：`chewing-plus-translate`）：
+
+| 平台 | 開啟 | 快捷鍵 | 目標語言 |
+|---|---|---|---|
+| fcitx5 | 設定 → 附加元件 → Voxkit → `Voice translation` | 右 Ctrl（`TranslateHotkey`） | `TranslateTarget` |
+| IBus | 「新酷音 Plus」設定程式 → 「語音翻譯」 | 設定程式的「語音翻譯快捷鍵」（預設右 Ctrl，`ibus.conf` 的 `voice_translate_key`） | `~/.config/chewing-plus/ibus.conf` 的 `voice_translate_to` |
+| macOS | 輸入法選單 →「語音翻譯」 | 右 ⌘（「快速鍵…」可改） | 輸入法選單 →「語音翻譯成」 |
+
+翻譯失敗、模型還在下載或沒有外掛時，會改輸入原本的辨識結果並顯示原因。
 
 ## 自訂詞庫（fcitx5）
 

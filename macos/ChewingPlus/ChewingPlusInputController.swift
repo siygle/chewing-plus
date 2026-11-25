@@ -33,6 +33,15 @@ final class ChewingPlusInputController: IMKInputController {
     private var voiceActive: Bool { voiceState != .idle }
     private var voiceReq: UInt64 = 0
     private var voiceSource: DispatchSourceRead?
+    /// The shortcut that started the running round; only it ends the round.
+    private var voiceSetting = ShortcutSetting.voice
+    private var voiceTranslating = false
+    private var voiceStartedAt = Date.distantPast
+    /// Translate capability of the connected daemon: -1 not asked yet.
+    private var voiceCaps: Int32 = -1
+    /// Shorter presses are accidental taps (or the key used as a modifier
+    /// in a chord) and are cancelled instead of transcribed.
+    private static let voiceMinHold: TimeInterval = 0.25
     private var shortcutObserver: NSObjectProtocol?
     /// One candidate panel for the process. IMKServer keeps a raw pointer
     /// to the panel it last showed; a per-controller panel is freed with its
@@ -107,6 +116,21 @@ final class ChewingPlusInputController: IMKInputController {
                                   action: nil, keyEquivalent: "")
         initials.submenu = initialsMenu
         menu.addItem(initials)
+        let target = Settings.value("voice_translate_to") ?? "en"
+        let targetMenu = NSMenu(title: "語音翻譯成")
+        for (code, name) in Self.translateTargets {
+            let choice = NSMenuItem(title: name, action: #selector(pickTranslateTarget(_:)),
+                                    keyEquivalent: "")
+            choice.target = self
+            choice.representedObject = code
+            choice.state = code == target ? .on : .off
+            targetMenu.addItem(choice)
+        }
+        let targetItem = NSMenuItem(
+            title: "語音翻譯成：\(Self.translateTargets.first { $0.0 == target }?.1 ?? target)",
+            action: nil, keyEquivalent: "")
+        targetItem.submenu = targetMenu
+        menu.addItem(targetItem)
         let voice = NSMenuItem(title: "啟用語音", action: #selector(toggleVoice(_:)),
                                keyEquivalent: "")
         voice.target = self
@@ -138,6 +162,20 @@ final class ChewingPlusInputController: IMKInputController {
         Settings.set(key, Settings.isOn(key) ? "0" : "1")
         if let session { applyFeatures(session) }
         if key == "shift_toggle" && !Settings.isOn(key) { englishMode = false }
+    }
+
+    private static let translateTargets: [(String, String)] = [
+        ("en", "英文"), ("ja", "日文"), ("ko", "韓文"), ("zh-Hant", "繁體中文"),
+        ("zh-Hans", "簡體中文"), ("fr", "法文"), ("de", "德文"), ("es", "西班牙文"),
+        ("vi", "越南文"), ("th", "泰文"),
+    ]
+
+    @objc private func pickTranslateTarget(_ sender: Any?) {
+        let item = (sender as? [String: Any])?[kIMKCommandMenuItemName] as? NSMenuItem
+            ?? sender as? NSMenuItem
+        guard let code = item?.representedObject as? String else { return }
+        Settings.set("voice_translate_to", code)
+        if let session { applyFeatures(session) }
     }
 
     @objc private func pickInitialsMin(_ sender: Any?) {
@@ -410,18 +448,34 @@ final class ChewingPlusInputController: IMKInputController {
         return chewing_plus_get_view(session, &view) == 1 ? view.revision : 0
     }
 
-    /// Push-to-talk. Returns nil when the event is not the voice shortcut.
+    /// Push-to-talk. Returns nil when the event is not a voice shortcut.
+    /// The translate shortcut works the same way while 「語音翻譯」 is on.
+    private func voiceKey(_ event: NSEvent) -> Bool? {
+        if let consumed = talkKey(event, .voice) { return consumed }
+        if translateKeyEnabled, let consumed = talkKey(event, .translate) { return consumed }
+        return nil
+    }
+
+    private var translateKeyEnabled: Bool {
+        guard Settings.isOn("voice_translate"), let key = ShortcutSetting.translate.value else {
+            return false
+        }
+        return key != ShortcutSetting.voice.value
+    }
+
     /// A lone modifier talks while held; a combo starts on its key press and
     /// stops when the key or any of its modifiers is released.
-    private func voiceKey(_ event: NSEvent) -> Bool? {
-        guard let talk = ShortcutSetting.voice.value else { return nil }
+    private func talkKey(_ event: NSEvent, _ setting: ShortcutSetting) -> Bool? {
+        guard let talk = setting.value else { return nil }
+        // A round started by the other shortcut: this one is a plain key.
+        if voiceActive && voiceSetting != setting { return nil }
         if let down = talk.modifierDown(event) {
-            return down ? voiceStart() : voiceStop()
+            return down ? voiceStart(setting) : voiceStop()
         }
         if talk.isModifierOnly { return nil }
         if talk.matchesCombo(event) {
             if event.isARepeat || voiceActive { return true }
-            return voiceStart()
+            return voiceStart(setting)
         }
         // Only the first release of a combo stops; the other keys of the
         // combo come up later and must not send a second stop.
@@ -444,7 +498,8 @@ final class ChewingPlusInputController: IMKInputController {
     /// a combo fires on its key press.
     private func englishShortcut(_ event: NSEvent) -> Bool {
         guard Settings.isOn("english"), let key = ShortcutSetting.english.value,
-              key != ShortcutSetting.voice.value else { return false }
+              key != ShortcutSetting.voice.value,
+              !(translateKeyEnabled && key == ShortcutSetting.translate.value) else { return false }
         if !key.isModifierOnly { return key.matchesCombo(event) && !event.isARepeat }
         guard let down = key.modifierDown(event) else {
             if event.type == .keyDown || event.type == .flagsChanged {
@@ -536,8 +591,9 @@ final class ChewingPlusInputController: IMKInputController {
         IsSecureEventInputEnabled()
     }
 
-    private func voiceStart() -> Bool {
+    private func voiceStart(_ setting: ShortcutSetting = .voice) -> Bool {
         guard session != nil, !secure() else { return true }
+        let translate = setting == .translate
         if voxkit_client_fd(voice) < 0 {
             if voxkit_client_connect(voice, nil) != 0 {
                 HintWindow.shared.flash(VoiceAgent.enabled
@@ -547,19 +603,35 @@ final class ChewingPlusInputController: IMKInputController {
             }
             watchVoice()
         }
+        if translate {
+            // Once per connection; an older daemon has no capability and
+            // must never get mode=translate.
+            if voiceCaps < 0 { voiceCaps = voxkit_client_supports_translate(voice, 400) }
+            if voiceCaps == 0 {
+                HintWindow.shared.flash("語音服務版本太舊，不支援翻譯", client: lastClient)
+                return true
+            }
+        }
         voiceReq += 1
+        let target = Settings.value("voice_translate_to").flatMap { $0.isEmpty ? nil : $0 } ?? "en"
+        let mode: String? = translate ? "translate" : nil
+        let targetArg: String? = translate ? target : nil
         var line = [CChar](repeating: 0, count: 512)
         let wrote = line.withUnsafeMutableBufferPointer { buffer -> Int32 in
-            voxkit_proto_write_start(buffer.baseAddress, buffer.count, voiceReq,
-                                     "zh", "s2twp", nil, nil, 0)
+            voxkit_proto_write_start_mode(buffer.baseAddress, buffer.count, voiceReq,
+                                          "zh", "s2twp", nil, nil, 0, mode, targetArg)
         }
         if wrote > 0 {
             let sent = line.withUnsafeBufferPointer { buffer in
                 voxkit_client_send(voice, buffer.baseAddress)
             }
             if sent == 0 {
+                voiceSetting = setting
+                voiceTranslating = translate
+                voiceStartedAt = Date()
                 voiceState = .recording
-                HintWindow.shared.show("🎙 聆聽中…", client: lastClient)
+                HintWindow.shared.show(translate ? "🌐 翻譯聆聽中…" : "🎙 聆聽中…",
+                                       client: lastClient)
             } else {
                 closeVoice()
             }
@@ -571,9 +643,12 @@ final class ChewingPlusInputController: IMKInputController {
     /// readVoice() inserts it, as the IBus engine does with a GLib fd watch.
     private func voiceStop() -> Bool {
         guard voiceState == .recording else { return voiceActive }
+        if Date().timeIntervalSince(voiceStartedAt) < Self.voiceMinHold {
+            return voiceCancel()
+        }
         voiceState = .transcribing
         sendSimple("stop")
-        HintWindow.shared.show("辨識中…", client: lastClient)
+        HintWindow.shared.show(voiceTranslating ? "辨識並翻譯中…" : "辨識中…", client: lastClient)
         return true
     }
 
@@ -598,6 +673,7 @@ final class ChewingPlusInputController: IMKInputController {
         voiceSource = nil
         voxkit_client_close(voice)
         voiceState = .idle
+        voiceCaps = -1  // the next daemon may be a different version
     }
 
     private func readVoice() {
@@ -619,8 +695,14 @@ final class ChewingPlusInputController: IMKInputController {
                 voiceState = .idle
                 HintWindow.shared.show("", client: nil)
                 if let session {
+                    // A translation goes through the same insert path; the
+                    // daemon never applies the user dictionary to it.
                     chewing_plus_insert_text(session, chewing_plus_mac_message_text(msg))
                     publish(session)
+                }
+                if chewing_plus_mac_translate_mode(msg) != 0 && chewing_plus_mac_translated(msg) == 0 {
+                    HintWindow.shared.flash(Self.translateFallbackText(
+                        String(cString: chewing_plus_mac_translate_error(msg))), client: lastClient)
                 }
             case VOXKIT_MSG_PARTIAL:
                 HintWindow.shared.show(String(cString: chewing_plus_mac_message_tentative(msg)),
@@ -641,6 +723,15 @@ final class ChewingPlusInputController: IMKInputController {
             default:
                 break
             }
+        }
+    }
+
+    private static func translateFallbackText(_ reason: String) -> String {
+        switch reason {
+        case "model-downloading": return "翻譯模型下載中，已輸入原文"
+        case "plugin-missing": return "未安裝翻譯外掛，已輸入原文"
+        case "bad-target": return "不支援的翻譯語言，已輸入原文"
+        default: return "翻譯失敗，已輸入原文"
         }
     }
 

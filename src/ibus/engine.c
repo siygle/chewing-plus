@@ -19,7 +19,13 @@ typedef struct {
     uint64_t voice_req;
     int voice_active;
     int voice_failed;
-    uint64_t drawn; /* chewing_plus_view revision last drawn */
+    uint32_t voice_key;    /* keyval that started the running recording */
+    gint64 voice_since;    /* monotonic µs when that key went down */
+    int voice_translating; /* the running request is mode=translate */
+    int voice_caps;        /* translate capability: -1 not asked yet */
+    uint32_t dictation_keyval; /* from ibus.conf voice_key; default Alt_R */
+    uint32_t translate_keyval; /* from voice_translate_key; 0 if off */
+    uint64_t drawn;        /* chewing_plus_view revision last drawn */
     IBusPropList *props;
     IBusProperty *mode_prop; /* 中 / 英 in the IBus panel */
     int shift_toggle;
@@ -37,6 +43,7 @@ static int on_preceding_text(void *user, char *buf, size_t cap);
 G_DEFINE_TYPE(ChewingPlusEngine, chewing_plus_engine, IBUS_TYPE_ENGINE)
 
 static void refresh(ChewingPlusEngine *self);
+static void refresh_talk_keys(ChewingPlusEngine *self);
 
 static int last_shift_toggle = 0;
 
@@ -118,6 +125,7 @@ static void ensure_session(ChewingPlusEngine *self) {
     }
     chewing_plus_set_data_paths(self->session, emoji, "", english, "");
     apply_features(self->session);
+    refresh_talk_keys(self);
     {
         chewing_plus_callbacks cb;
         memset(&cb, 0, sizeof(cb));
@@ -283,6 +291,27 @@ static void voice_close(ChewingPlusEngine *self) {
     voice_stop_watch(self);
     voxkit_client_close(&self->voice);
     self->voice_active = 0;
+    self->voice_caps = -1; /* the next daemon may be a different version */
+}
+
+/* Shorter presses are accidental taps (or Right Alt/Ctrl used as a modifier
+ * in a chord) and are cancelled instead of transcribed. */
+#define VOICE_MIN_HOLD_US (250 * 1000)
+
+static const char *translate_fallback_text(const char *reason) {
+    if (!reason || !reason[0]) {
+        return "翻譯失敗，已輸入原文";
+    }
+    if (strcmp(reason, "model-downloading") == 0) {
+        return "翻譯模型下載中，已輸入原文";
+    }
+    if (strcmp(reason, "plugin-missing") == 0) {
+        return "未安裝翻譯外掛（chewing-plus-translate），已輸入原文";
+    }
+    if (strcmp(reason, "bad-target") == 0) {
+        return "不支援的翻譯語言，已輸入原文";
+    }
+    return "翻譯失敗，已輸入原文";
 }
 
 static void voice_arm(ChewingPlusEngine *self) {
@@ -299,9 +328,15 @@ static void voice_handle(ChewingPlusEngine *self, const voxkit_message *msg) {
         return;
     }
     if (msg->type == VOXKIT_MSG_FINAL && self->session) {
+        /* A translation goes through the same insert path; the daemon never
+         * applies the user dictionary to translated text. */
         chewing_plus_insert_text(self->session, msg->text);
         self->voice_active = 0;
         refresh(self);
+        if (strcmp(msg->mode, "translate") == 0 && !msg->translated) {
+            show_aux(IBUS_ENGINE(self),
+                     translate_fallback_text(msg->translate_error));
+        }
     } else if (msg->type == VOXKIT_MSG_PARTIAL) {
         show_aux(IBUS_ENGINE(self), msg->tentative);
     } else if (msg->type == VOXKIT_MSG_DISCARDED ||
@@ -336,7 +371,48 @@ static gboolean on_voice(gint fd, GIOCondition cond, gpointer user) {
     return TRUE;
 }
 
-static void voice_start(ChewingPlusEngine *self) {
+static const char *translate_target(ChewingPlusEngine *self) {
+    const char *target =
+        self->session
+            ? chewing_plus_get_setting(self->session, "voice_translate_to")
+            : NULL;
+    return target && target[0] ? target : "en";
+}
+
+static int translate_enabled(ChewingPlusEngine *self) {
+    const char *on = self->session ? chewing_plus_get_setting(self->session,
+                                                              "voice_translate")
+                                   : NULL;
+    return on && strcmp(on, "1") == 0;
+}
+
+/* voice_key / voice_translate_key in ibus.conf are X11 names, same as
+ * fcitx5's Hotkey / TranslateHotkey. Applied on focus (下次聚焦輸入框時生效).
+ */
+static void refresh_talk_keys(ChewingPlusEngine *self) {
+    chewing_plus_ibus_prefs prefs;
+    const char *name;
+    uint32_t key;
+    chewing_plus_ibus_prefs_load(&prefs);
+    name = chewing_plus_ibus_prefs_get(&prefs, "voice_key");
+    key = chewing_ibus_parse_modifier(name);
+    self->dictation_keyval =
+        chewing_ibus_modifier_usable(key) ? key : CHEWING_IBUS_VOICE_KEY;
+    self->translate_keyval = 0;
+    if (!translate_enabled(self)) {
+        return;
+    }
+    name = chewing_plus_ibus_prefs_get(&prefs, "voice_translate_key");
+    key = chewing_ibus_parse_modifier(name);
+    if (!key) {
+        key = CHEWING_IBUS_TRANSLATE_KEY;
+    }
+    if (chewing_ibus_modifier_usable(key) && key != self->dictation_keyval) {
+        self->translate_keyval = key;
+    }
+}
+
+static void voice_start(ChewingPlusEngine *self, int translate) {
     char line[2048];
     const char *convert = "s2twp";
     char **phrases = NULL;
@@ -355,6 +431,18 @@ static void voice_start(ChewingPlusEngine *self) {
         }
         voice_arm(self);
     }
+    if (translate) {
+        if (self->voice_caps < 0) {
+            /* Once per connection; an older daemon has no capability and
+             * must never get mode=translate. */
+            self->voice_caps =
+                voxkit_client_supports_translate(&self->voice, 400);
+        }
+        if (!self->voice_caps) {
+            show_aux(IBUS_ENGINE(self), "語音服務版本太舊，不支援翻譯");
+            return;
+        }
+    }
     self->voice_req++;
     if (self->session) {
         phrases = chewing_plus_user_phrases(self->session, &count);
@@ -365,14 +453,18 @@ static void voice_start(ChewingPlusEngine *self) {
             words[i] = phrases[i];
         }
     }
-    if (voxkit_proto_write_start(line, sizeof(line), self->voice_req, "zh",
-                                 convert, NULL, words, count) < 0 ||
+    if (voxkit_proto_write_start_mode(
+            line, sizeof(line), self->voice_req, "zh", convert, NULL, words,
+            count, translate ? "translate" : NULL,
+            translate ? translate_target(self) : NULL) < 0 ||
         voxkit_client_send(&self->voice, line) != 0) {
         show_aux(IBUS_ENGINE(self),
                  "語音尚未啟用：請到新酷音 Plus 設定打開「啟用語音」");
         voice_close(self);
     } else {
         self->voice_active = 1;
+        self->voice_translating = translate;
+        self->voice_since = g_get_monotonic_time();
     }
     g_free(words);
     chewing_plus_free_strings(phrases);
@@ -400,19 +492,33 @@ static gboolean process_key(IBusEngine *engine, guint keyval, guint keycode,
         return FALSE;
     }
     apply_sensitive(self);
-    decision = chewing_ibus_map_key(keyval, keycode, state, sensitive(engine),
-                                    self->voice_active);
-    if (decision.action == CHEWING_IBUS_KEY_VOICE_START) {
-        voice_start(self);
+    decision =
+        chewing_ibus_map_key_ex(keyval, keycode, state, sensitive(engine),
+                                self->voice_active ? self->voice_key : 0,
+                                self->dictation_keyval, self->translate_keyval);
+    if (decision.action == CHEWING_IBUS_KEY_VOICE_START ||
+        decision.action == CHEWING_IBUS_KEY_TRANSLATE_START) {
+        if (!self->voice_active) { /* else auto-repeat of the held key */
+            self->voice_key = keyval;
+            voice_start(self,
+                        decision.action == CHEWING_IBUS_KEY_TRANSLATE_START);
+        }
         return TRUE;
     }
     if (decision.action == CHEWING_IBUS_KEY_VOICE_STOP) {
-        voice_command(self, "stop");
+        if (g_get_monotonic_time() - self->voice_since < VOICE_MIN_HOLD_US) {
+            voice_command(self, "cancel");
+            show_aux(engine, "");
+        } else {
+            voice_command(self, "stop");
+        }
         return TRUE;
     }
-    if (decision.action == CHEWING_IBUS_KEY_VOICE_CANCEL) {
+    if (decision.cancel_voice) {
+        /* Typing while recording cancels the turn, and the key still goes
+         * where it was meant to (it used to be swallowed). */
         voice_command(self, "cancel");
-        return TRUE;
+        show_aux(engine, "");
     }
     if (decision.action != CHEWING_IBUS_KEY_TO_CORE) {
         return FALSE;
@@ -454,6 +560,7 @@ static void focus_in(IBusEngine *engine) {
     ensure_session(self);
     if (self->session) {
         apply_features(self->session);
+        refresh_talk_keys(self);
     }
     {
         /* Asks the client to send its surrounding text (spacing of English
@@ -527,6 +634,9 @@ static void candidate_clicked(IBusEngine *engine, guint index, guint button,
 
 static void init_engine(ChewingPlusEngine *self) {
     voxkit_client_init(&self->voice);
+    self->voice_caps = -1;
+    self->dictation_keyval = CHEWING_IBUS_VOICE_KEY;
+    self->translate_keyval = 0;
 }
 
 static void dispose_engine(GObject *object) {

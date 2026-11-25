@@ -7,6 +7,7 @@
 # macOS pkg), each with libchewing 0.14, the input method, voxkit and data:
 #   chewing-plus-fcitx5-*.pkg.tar.zst
 #   chewing-plus-ibus-*.pkg.tar.zst
+#   chewing-plus-translate-*.pkg.tar.zst   (optional translation plugin)
 #
 # Runs as root (CI container). makepkg runs as an unprivileged "builder".
 # CHEWING_PLUS_VERSION (e.g. v6.0.0) sets the package version.
@@ -40,6 +41,13 @@ CHEWING_PLUS_LIBCHEWING_SRC="$work/libchewing" \
     bash "$root/scripts/bundle-libchewing.sh" --fetch-only
 git clone -q "$VOXKIT_URL" "$work/fcitx5-voxkit"
 git -C "$work/fcitx5-voxkit" checkout -q --detach "$VOXKIT_COMMIT"
+# llama.cpp for the translation plugin, at the tag + commit voxkit pins.
+read -r LLAMA_TAG LLAMA_COMMIT < "$work/fcitx5-voxkit/daemon/mt-plugin/LLAMA_PIN"
+git clone -q --depth 1 --branch "$LLAMA_TAG" https://github.com/ggml-org/llama.cpp.git "$work/llama.cpp"
+if [[ $(git -C "$work/llama.cpp" rev-parse HEAD) != "$LLAMA_COMMIT" ]]; then
+    echo "llama.cpp $LLAMA_TAG is not $LLAMA_COMMIT" >&2
+    exit 1
+fi
 git -C "$root" archive --format=tar HEAD | (mkdir -p "$work/chewing" && tar -x -C "$work/chewing")
 mkdir -p "$work/bundle-build"
 cp "$here/PKGBUILD.bundle" "$work/bundle-build/PKGBUILD"
@@ -52,6 +60,7 @@ git config --system --add safe.directory '*'
     CHEWING_PLUS_SRC="$work/chewing" \
     CHEWING_PLUS_LIBCHEWING_SRC="$work/libchewing" \
     CHEWING_PLUS_VOXKIT_SRC="$work/fcitx5-voxkit" \
+    CHEWING_PLUS_LLAMA_SRC="$work/llama.cpp" \
     CHEWING_PLUS_PKGVER="$pkgver" \
     makepkg --noconfirm --cleanbuild)
 
@@ -100,6 +109,16 @@ test -x /usr/libexec/ibus-chewing-plus
 test -x /usr/libexec/ibus-setup-chewing-plus
 test -f /usr/share/chewing-plus/plus-chars.bin
 ldd /usr/libexec/ibus-chewing-plus | grep -q 'not found' && exit 1
+
+# Smoke test 3: the translation plugin installs next to either bundle and
+# exports only its C ABI (its static ggml must stay private).
+pacman -U --noconfirm "$out"/chewing-plus-translate-*.pkg.tar.zst
+test -f /usr/lib/voxkit/libvoxkit-mt.so
+ldd /usr/lib/voxkit/libvoxkit-mt.so | grep -q 'not found' && exit 1
+if nm -D --defined-only /usr/lib/voxkit/libvoxkit-mt.so | awk '{print $3}' | grep -v '^vk_mt_' | grep -q .; then
+    echo "libvoxkit-mt.so exports more than vk_mt_*" >&2
+    exit 1
+fi
 
 echo "packages in $out:"
 ls -l "$out"

@@ -62,6 +62,21 @@ chewing_plus_mac_active(const voxkit_message *message) {
     return message ? message->model : "";
 }
 
+/* Translation finals (fcitx5-voxkit translate mode). */
+static inline int
+chewing_plus_mac_translate_mode(const voxkit_message *message) {
+    return message && strcmp(message->mode, "translate") == 0;
+}
+
+static inline int chewing_plus_mac_translated(const voxkit_message *message) {
+    return message ? message->translated : 0;
+}
+
+static inline const char *
+chewing_plus_mac_translate_error(const voxkit_message *message) {
+    return message ? message->translate_error : "";
+}
+
 static inline voxkit_message chewing_plus_mac_blank_message(void) {
     voxkit_message message;
     memset(&message, 0, sizeof(message));
