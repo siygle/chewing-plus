@@ -130,6 +130,23 @@ struct Session {
     size_t replaceChars = 0;
     bool replaceReading = false;
     chewing_plus_callbacks cb{};
+    chewing_plus_preceding_text_fn precedingFn = nullptr;
+    void *precedingUser = nullptr;
+
+    // Application text before the cursor, "" when unknown or sensitive.
+    std::string applicationPrecedingText() {
+        if (sensitive || !precedingFn) {
+            return {};
+        }
+        char buf[64];
+        buf[0] = '\0';
+        int n = precedingFn(precedingUser, buf, sizeof(buf));
+        if (n <= 0) {
+            return {};
+        }
+        buf[sizeof(buf) - 1] = '\0';
+        return buf;
+    }
 
     std::string preedit;
     size_t cursor = 0;
@@ -924,6 +941,8 @@ chewing_plus_session *chewing_plus_new(const char *chewing_sys_path,
     session->opt.emojiPrefix = chewing_plus::EmojiPrefix::Parse(";;");
     session->opt.emojiDoubleTapMs = 300;
     session->englishTap.setWindowMs(300);
+    session->plus.setPrecedingText(
+        [session] { return session->applicationPrecedingText(); });
     session->applyOptions();
     session->applyEngine();
     chewing_set_candPerPage(raw, 10);
@@ -953,6 +972,16 @@ void chewing_plus_set_callbacks(chewing_plus_session *session,
         return;
     }
     S(session)->cb = callbacks ? *callbacks : chewing_plus_callbacks{};
+}
+
+void chewing_plus_set_preceding_text(chewing_plus_session *session,
+                                     chewing_plus_preceding_text_fn fn,
+                                     void *user) {
+    if (!session) {
+        return;
+    }
+    S(session)->precedingFn = fn;
+    S(session)->precedingUser = fn ? user : nullptr;
 }
 
 void chewing_plus_set_data_paths(chewing_plus_session *session,

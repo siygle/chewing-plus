@@ -74,6 +74,25 @@ void testAutoSpace() {
     check(chewing_plus::AutoSpace(in, false, false) == in, "auto space off");
 }
 
+void testNeedsSpaceBeforeEnglish() {
+    using chewing_plus::NeedsSpaceBeforeEnglish;
+    check(NeedsSpaceBeforeEnglish("你好"), "Han before English: space");
+    check(NeedsSpaceBeforeEnglish("abc你"), "only the last character counts");
+    check(NeedsSpaceBeforeEnglish("𠀀"), "Han extension B (4 bytes): space");
+    check(NeedsSpaceBeforeEnglish("ㄅ"), "Bopomofo: space");
+    check(NeedsSpaceBeforeEnglish("かな"), "kana: space");
+    check(!NeedsSpaceBeforeEnglish(""), "start of text: none");
+    check(!NeedsSpaceBeforeEnglish("你好 "), "after a space: none");
+    check(!NeedsSpaceBeforeEnglish("你好\n"), "after a newline: none");
+    check(!NeedsSpaceBeforeEnglish("hello"), "after English: none");
+    check(!NeedsSpaceBeforeEnglish("第5"), "after a digit: none");
+    check(!NeedsSpaceBeforeEnglish("你好，"), "after full-width comma: none");
+    check(!NeedsSpaceBeforeEnglish("你好。"), "after full-width stop: none");
+    check(!NeedsSpaceBeforeEnglish("「"), "after a corner bracket: none");
+    check(!NeedsSpaceBeforeEnglish("你\xe5"),
+          "truncated UTF-8: none, no crash");
+}
+
 void testEmojiForText() {
     auto emoji = chewing_plus::EmojiForText("今天開心");
     check(!emoji.empty() && emoji.front() == "今天開心😊",
@@ -261,6 +280,7 @@ int main() {
     testEmojiForText();
     testShortcodes();
     testEnglish();
+    testNeedsSpaceBeforeEnglish();
     testDoubleTap();
     testPhrases();
     testCompiledPhrases();

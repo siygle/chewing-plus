@@ -63,6 +63,12 @@ enum class Handled {
 class ChewingPlus {
 public:
     using Commit = std::function<void(const std::string &)>;
+    // Text right before the cursor in the application (at least the last
+    // character; empty when unknown). Only asked when the Chewing buffer has
+    // nothing before the cursor, so the frontend never needs to push it.
+    using PrecedingText = std::function<std::string()>;
+
+    void setPrecedingText(PrecedingText f) { precedingText_ = std::move(f); }
 
     void setOptions(const Options &o) { options_ = o; }
     const Options &options() const { return options_; }
@@ -147,7 +153,15 @@ private:
     void commitAround(ChewingContext *ctx, const std::string &middle,
                       const Commit &commit);
 
+    // Type English text at the cursor (via SYMBOL_MODE). With `separate`, a
+    // space goes first when a Chinese character precedes the cursor.
+    void insertAscii(ChewingContext *ctx, const std::string &text,
+                     const Commit &commit, bool separate);
+    // Last text before the cursor: the Chewing buffer, else the application.
+    std::string textBeforeCursor(ChewingContext *ctx) const;
+
     Options options_;
+    PrecedingText precedingText_;
     std::shared_ptr<const EmojiShortcodes> shortcodes_ =
         std::make_shared<EmojiShortcodes>();
     std::shared_ptr<const EnglishLexicon> lexicon_ =

@@ -147,6 +147,17 @@ bool Han(const std::string &c) {
     return (v >= 0x3400 && v <= 0x9fff) || (v >= 0xf900 && v <= 0xfaff) ||
            (v >= 0x20000 && v <= 0x323af);
 }
+// CJK letters that English should be set off from: Han, Bopomofo (and
+// extended), kana. Punctuation such as 。，」 is deliberately left out: it
+// already carries its own spacing.
+bool CjkLetter(const std::string &c) {
+    if (Han(c))
+        return true;
+    uint32_t v = Scalar(c);
+    return (v >= 0x3105 && v <= 0x312f) || (v >= 0x31a0 && v <= 0x31bf) ||
+           (v >= 0x3041 && v <= 0x3096) || (v >= 0x30a1 && v <= 0x30fa) ||
+           (v >= 0x31f0 && v <= 0x31ff);
+}
 bool Ascii(const std::string &c, bool letters, bool digits) {
     if (c.size() != 1)
         return false;
@@ -180,6 +191,16 @@ std::string AutoSpace(const std::string &text, bool letters, bool digits) {
         result += chars[i];
     }
     return result;
+}
+bool NeedsSpaceBeforeEnglish(const std::string &preceding) {
+    if (preceding.empty())
+        return false;
+    // Start of the last UTF-8 sequence.
+    size_t i = preceding.size() - 1;
+    while (i > 0 && (static_cast<unsigned char>(preceding[i]) & 0xC0) == 0x80)
+        --i;
+    const std::string last = preceding.substr(i);
+    return last.size() >= 2 && last.size() <= 4 && CjkLetter(last);
 }
 std::vector<std::string> EmojiForText(const std::string &text) {
     // Small curated Traditional Chinese defaults; no private/proprietary data.
