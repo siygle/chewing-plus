@@ -11,7 +11,7 @@
       "nav.features": "特色功能",
       "nav.arch": "架構與效能",
       "nav.download": "下載安裝",
-      "hero.badge": "v6.0.2 · 基於 libchewing 0.14",
+      "hero.badge": "v6.0.3 · 基於 libchewing 0.14",
       "hero.title": '為現代打字節奏打造的<span class="accent-text">新酷音 Plus</span>',
       "hero.subtitle":
         "免打聲調、邊打邊列字、字首注音展開、免切輸入法打英文、Emoji 短碼、即時計算機與 100% 離線本機語音。一份核心，橫跨 fcitx5、IBus 與 macOS。",
@@ -120,7 +120,7 @@
       "nav.features": "Features",
       "nav.arch": "Architecture",
       "nav.download": "Download",
-      "hero.badge": "v6.0.2 · Built on libchewing 0.14",
+      "hero.badge": "v6.0.3 · Built on libchewing 0.14",
       "hero.title": 'Traditional Chinese typing, <span class="accent-text">reimagined</span>',
       "hero.subtitle":
         "Toneless Bopomofo, live character picks, initial-only phrase expansion, inline English with smart casing, emoji shortcodes, instant calculator, and 100% offline voice dictation — one shared core across fcitx5, IBus, and macOS.",

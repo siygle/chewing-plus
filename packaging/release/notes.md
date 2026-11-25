@@ -1,5 +1,11 @@
 新酷音 Plus：在新酷音上加入 emoji、計算機、英文模式與本機語音輸入。基於 [fcitx/fcitx5-chewing](https://github.com/fcitx/fcitx5-chewing) 與 libchewing 0.14。功能說明請看 [README](https://github.com/siygle/chewing-plus#readme)。
 
+## 6.0.3
+
+- **修正 Omarchy 預設鍵盤選項下雙擊右 Shift 無效**：在 `shift:both_capslock_cancel` 下，右 Shift 放開時 keysym 會變成 Caps_Lock，快捷鍵對不到。改為同時以實體鍵碼辨識 Shift（右 Shift 62、左 Shift 50），單擊 Shift 與 Caps Lock 行為不變。
+- **雙擊間隔改用按鍵事件時間戳**：先前以 fcitx5 讀到事件的到達時間計時，合成器忙碌、按鍵一次送達時，一次快速雙擊會被誤判成超時。改用合成器附在事件上的時間戳（32 位元溢位以環繞相減處理；前端未附時間戳則仍用到達時間）。
+- **除錯日誌**：雙擊放開時以 `chewing` 類別記錄 hold、gap、window 與時間戳。fcitx5 5.1.23 請用 `fcitx5 --verbose=default=5,chewing=5`（`FCITX_LOG` 無效）。
+
 ## 6.0.2
 
 - **英文快速插入前後都加空白**：在中文後面用英文快速插入（預設雙擊 Shift）時，英文前面也會補上空白（例如「你好 GitHub」），避免中英相接。前面已是空白、英文、數字或標點則不加，避免疊兩個空白。
