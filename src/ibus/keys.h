@@ -24,19 +24,42 @@ enum {
     CHEWING_IBUS_KEY_TO_CORE,
     CHEWING_IBUS_KEY_VOICE_START,
     CHEWING_IBUS_KEY_VOICE_STOP,
-    CHEWING_IBUS_KEY_VOICE_CANCEL
+    /* No longer returned: a key pressed while recording now sets
+     * `cancel_voice` and is still handled (it used to be swallowed). */
+    CHEWING_IBUS_KEY_VOICE_CANCEL,
+    CHEWING_IBUS_KEY_TRANSLATE_START
+};
+
+/* Push-to-talk keys. Right Ctrl is the translate key; Right Shift is left
+ * to the English-mode double tap. */
+enum {
+    CHEWING_IBUS_VOICE_KEY = 0xffea,    /* Alt_R */
+    CHEWING_IBUS_TRANSLATE_KEY = 0xffe4 /* Control_R */
 };
 
 typedef struct chewing_ibus_decision {
     int action;
     chewing_plus_key_event event;
+    /* A recording is running and this key cancels it. The engine cancels,
+     * then treats the key as `action` says (core or application). */
+    int cancel_voice;
 } chewing_ibus_decision;
 
 /* Right Alt is push-to-talk, matching fcitx5-voxkit's default. A non-modifier
  * press while recording cancels the turn. `voice_active` is 1 after start
- * until stop or cancel. */
+ * until stop or cancel. Same as chewing_ibus_map_key_ex with the dictation
+ * key and translation off. */
 chewing_ibus_decision chewing_ibus_map_key(uint32_t keyval, uint32_t keycode,
                                            uint32_t state, int sensitive,
                                            int voice_active);
+
+/* `voice_key` is the keyval that started the running recording (0 when
+ * idle); only its release stops it. With `translate_enabled`, Right Ctrl
+ * held is push-to-translate (CHEWING_IBUS_KEY_TRANSLATE_START); otherwise
+ * Right Ctrl is an ordinary modifier. */
+chewing_ibus_decision chewing_ibus_map_key_ex(uint32_t keyval, uint32_t keycode,
+                                              uint32_t state, int sensitive,
+                                              uint32_t voice_key,
+                                              int translate_enabled);
 
 #endif

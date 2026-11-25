@@ -30,8 +30,35 @@ int main(void) {
     d = chewing_ibus_map_key(0xffea, 108, 0, 1, 0);
     check(d.action == CHEWING_IBUS_KEY_IGNORED, "no voice in a password field");
     d = chewing_ibus_map_key('a', 30, 0, 0, 1);
-    check(d.action == CHEWING_IBUS_KEY_VOICE_CANCEL,
-          "another key cancels the turn");
+    check(d.cancel_voice && d.action == CHEWING_IBUS_KEY_TO_CORE &&
+              d.event.ascii == 'a',
+          "typing while recording cancels and still types the key");
+    d = chewing_ibus_map_key(0xffe1, 50, 0, 0, 1);
+    check(!d.cancel_voice, "a modifier while recording does not cancel");
+
+    /* Translate key: Right Ctrl, only when translation is on. */
+    d = chewing_ibus_map_key_ex(0xffe4, 105, 0, 0, 0, 0);
+    check(d.action != CHEWING_IBUS_KEY_TRANSLATE_START,
+          "Right Ctrl is a plain modifier while translation is off");
+    d = chewing_ibus_map_key_ex(0xffe4, 105, 0, 0, 0, 1);
+    check(d.action == CHEWING_IBUS_KEY_TRANSLATE_START,
+          "Right Ctrl starts translation when on");
+    d = chewing_ibus_map_key_ex(0xffe4, 105, 0, 1, 0, 1);
+    check(d.action == CHEWING_IBUS_KEY_IGNORED,
+          "no translation in a password field");
+    d = chewing_ibus_map_key_ex(0xffe4, 105, 1u << 30, 0, 0xffe4, 1);
+    check(d.action == CHEWING_IBUS_KEY_VOICE_STOP,
+          "Right Ctrl release stops translation");
+    d = chewing_ibus_map_key_ex(0xffe4, 105, 1u << 30, 0, 0xffea, 1);
+    check(d.action != CHEWING_IBUS_KEY_VOICE_STOP,
+          "Right Ctrl release does not stop a dictation started by Right Alt");
+    d = chewing_ibus_map_key_ex(0xffea, 108, 1u << 30, 0, 0xffe4, 1);
+    check(d.action != CHEWING_IBUS_KEY_VOICE_STOP,
+          "Right Alt release does not stop a translation");
+    d = chewing_ibus_map_key_ex(0xffe2, 62, 0, 0, 0, 1);
+    check(d.action == CHEWING_IBUS_KEY_TO_CORE &&
+              d.event.key == CHEWING_PLUS_KEY_SHIFT_R,
+          "Right Shift stays with the core (English double tap)");
     d = chewing_ibus_map_key('A', 30, 1u << 0, 0, 0);
     check(d.event.mods & CHEWING_PLUS_MOD_SHIFT && d.event.ascii == 'A',
           "shift letter");

@@ -67,27 +67,42 @@ static int is_modifier(uint32_t keyval) {
 chewing_ibus_decision chewing_ibus_map_key(uint32_t keyval, uint32_t keycode,
                                            uint32_t state, int sensitive,
                                            int voice_active) {
+    return chewing_ibus_map_key_ex(keyval, keycode, state, sensitive,
+                                   voice_active ? CHEWING_IBUS_VOICE_KEY : 0,
+                                   0);
+}
+
+chewing_ibus_decision chewing_ibus_map_key_ex(uint32_t keyval, uint32_t keycode,
+                                              uint32_t state, int sensitive,
+                                              uint32_t voice_key,
+                                              int translate_enabled) {
     chewing_ibus_decision out;
     int release = (state & CHEWING_IBUS_RELEASE) != 0;
     uint32_t mods = 0;
     uint32_t shift;
+    int talk_key = keyval == CHEWING_IBUS_VOICE_KEY ||
+                   (translate_enabled && keyval == CHEWING_IBUS_TRANSLATE_KEY);
     memset(&out, 0, sizeof(out));
     out.event.time_ms = -1;
     out.event.keycode = (int32_t)keycode;
-    if (keyval == K_ALT_R) {
+    if (talk_key && (voice_key == 0 || voice_key == keyval)) {
         if (release) {
-            out.action = voice_active ? CHEWING_IBUS_KEY_VOICE_STOP
-                                      : CHEWING_IBUS_KEY_IGNORED;
-        } else if (!sensitive) {
-            out.action = CHEWING_IBUS_KEY_VOICE_START;
-        } else {
+            out.action = voice_key ? CHEWING_IBUS_KEY_VOICE_STOP
+                                   : CHEWING_IBUS_KEY_IGNORED;
+        } else if (sensitive && !voice_key) {
             out.action = CHEWING_IBUS_KEY_IGNORED;
+        } else {
+            /* While recording this is auto-repeat; the engine ignores it. */
+            out.action = keyval == CHEWING_IBUS_VOICE_KEY
+                             ? CHEWING_IBUS_KEY_VOICE_START
+                             : CHEWING_IBUS_KEY_TRANSLATE_START;
         }
         return out;
     }
-    if (voice_active && !release && !is_modifier(keyval)) {
-        out.action = CHEWING_IBUS_KEY_VOICE_CANCEL;
-        return out;
+    /* Typing while recording cancels the turn; the key itself still counts
+     * (it used to be swallowed). */
+    if (voice_key && !release && !is_modifier(keyval)) {
+        out.cancel_voice = 1;
     }
     if (state & CHEWING_IBUS_SHIFT) {
         mods |= CHEWING_PLUS_MOD_SHIFT;
