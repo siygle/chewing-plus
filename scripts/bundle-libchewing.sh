@@ -12,19 +12,19 @@
 #     -DCHEWING_PLUS_BUNDLE_LIBCHEWING=ON
 #     -DCHEWING_PLUS_LIBCHEWING_PREFIX=PREFIX
 # --static asks libchewing for libchewing.a and copies libchewing_capi.a
-#   (the Rust staticlib) beside it. v0.14.0-rc.1's own CMake refuses to
+#   (the Rust staticlib) beside it. v0.14.0-rc.2's own CMake refuses to
 #   generate that build (chewing_capi is missing from the export set); use
 #   --shared until upstream fixes it. -DCHEWING_PLUS_LIBCHEWING_STATIC=ON
 #   consumes a prefix that did install the archives.
 #
-# The pin is cmake/ChewingPlusLibchewing.cmake (v0.14.0-rc.1-17-gdad3241,
-# dad32411f66c15fc329938e4d65244ab920ac094).
+# The pin is cmake/ChewingPlusLibchewing.cmake (v0.14.0-rc.2,
+# 1bfcde9078f13b4d97aaa4b6a01cbd67687522e3).
 # Override the checkout with CHEWING_PLUS_LIBCHEWING_SRC.
 set -euo pipefail
 
-VERSION=0.14.0-rc.1-17-gdad3241
+VERSION=0.14.0-rc.2
 URL=https://codeberg.org/chewing/libchewing.git
-COMMIT=dad32411f66c15fc329938e4d65244ab920ac094
+COMMIT=1bfcde9078f13b4d97aaa4b6a01cbd67687522e3
 
 mode=shared
 prefix=
