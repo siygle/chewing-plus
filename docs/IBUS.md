@@ -55,3 +55,21 @@ cmake --build build
 ```
 
 fcitx5 keeps its config form and the same CLI. There is no Qt page.
+
+## Appearance
+
+The candidate window, preedit (when it is not embedded in the client) and
+auxiliary text (English hints, phrase suggestions, voice status such as
+「🎙 聆聽中」) are drawn by the IBus panel, not by this engine. There is no
+font-size setting in `ibus.conf` or the setup window. To enlarge them, open
+IBus Preferences → General → Font and Style, enable “Use custom font”, and
+pick a larger face (the custom-font default is `Sans 10`; with the option
+off, the panel uses the GTK font). Or:
+
+```bash
+gsettings set org.freedesktop.ibus.panel use-custom-font true
+gsettings set org.freedesktop.ibus.panel custom-font 'Sans 13'
+ibus restart
+```
+
+Schema: `org.freedesktop.ibus.panel` (`use-custom-font`, `custom-font`).
