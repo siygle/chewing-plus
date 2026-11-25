@@ -169,7 +169,7 @@ void testPlus(Instance *instance) {
         type("github");
         check(cand(0) == "GitHub", "github -> GitHub, got " + cand(0));
         key(Key(FcitxKey_space));
-        check(preedit() == "你好GitHub ",
+        check(preedit() == "你好 GitHub ",
               "English inserted into buffer, got [" + preedit() + "]");
         key(Key(FcitxKey_Return));
         check(committed == "你好 GitHub ",
