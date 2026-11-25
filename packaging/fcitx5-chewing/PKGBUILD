@@ -19,7 +19,7 @@ _src=$(realpath "$startdir/../..")
 _lc=$(realpath "$startdir/../libchewing/pkg/libchewing-plus")
 _vk=$(realpath -m "$startdir/../../../fcitx5-voxkit/packaging/pkg/fcitx5-voxkit")
 pkgver() {
-  echo "$(git -C "$_src" describe --tags --abbrev=0).plus.r$(git -C "$_src" rev-list --count HEAD).g$(git -C "$_src" rev-parse --short HEAD)"
+  echo "$(git -C "$_src" describe --tags --abbrev=0 | sed 's/^v//').plus.r$(git -C "$_src" rev-list --count HEAD).g$(git -C "$_src" rev-parse --short HEAD)"
 }
 build() {
   [[ -f $_lc/usr/lib/pkgconfig/chewing.pc ]] || { echo "build libchewing-plus first"; return 1; }

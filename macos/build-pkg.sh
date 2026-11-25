@@ -6,7 +6,7 @@
 #   macos/build-pkg.sh
 #
 # Output: macos/build/ChewingPlus.pkg
-# CHEWING_PLUS_VERSION sets the package and bundle version (default 6.0.1).
+# CHEWING_PLUS_VERSION sets the package and bundle version (default 6.0.2).
 set -euo pipefail
 export COPYFILE_DISABLE=1
 if [[ "$(uname)" != Darwin ]]; then
@@ -83,7 +83,7 @@ component="$root/macos/build/ChewingPlus-component.pkg"
 pkgbuild --root "$stage" \
     --component-plist "$plist" \
     --identifier im.chewing.plus.inputmethod \
-    --version "${CHEWING_PLUS_VERSION:-6.0.1}" \
+    --version "${CHEWING_PLUS_VERSION:-6.0.2}" \
     --scripts "$root/macos/pkg-scripts" \
     --install-location / \
     "$component"
@@ -118,7 +118,7 @@ strip_relocate "$component"
 voice_component="$root/macos/build/ChewingPlus-voice.pkg"
 pkgbuild --nopayload \
     --identifier im.chewing.plus.voice \
-    --version "${CHEWING_PLUS_VERSION:-6.0.1}" \
+    --version "${CHEWING_PLUS_VERSION:-6.0.2}" \
     --scripts "$root/macos/pkg-voice-scripts" \
     "$voice_component"
 strip_relocate "$voice_component"

@@ -1,5 +1,11 @@
 新酷音 Plus：在新酷音上加入 emoji、計算機、英文模式與本機語音輸入。基於 [fcitx/fcitx5-chewing](https://github.com/fcitx/fcitx5-chewing) 與 libchewing 0.14。功能說明請看 [README](https://github.com/siygle/chewing-plus#readme)。
 
+## 6.0.2
+
+- **英文快速插入前後都加空白**：在中文後面用英文快速插入（預設雙擊 Shift）時，英文前面也會補上空白（例如「你好 GitHub」），避免中英相接。前面已是空白、英文、數字或標點則不加，避免疊兩個空白。
+- **升級內附 libchewing**：釘選上游 `v0.14.0-rc.2`（`1bfcde90`）。詞庫資料更新至 v2026.11.22，使用者詞庫／歷史紀錄內部實作調整，並新增選項 `chewing.keep_invalid_zhuyin`。
+- **文件**：組建所需 Rust 最低版本更正為 1.95（與上游一致）。
+
 ## 6.0.1
 
 - **修正免打聲調搭配使用者詞庫的選詞異常**：升級內附 `libchewing` 至上游最新 `v0.14.0-rc.1-17-gdad3241`（`dad32411`），修正開啟免打聲調時，若使用者詞庫（`user_dict.csv`）存有多字詞，輸入單一音節可能誤匹配成多字詞（例如 `ㄕㄜˋ` 直接變成「設計」）的問題。
