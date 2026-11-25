@@ -273,6 +273,7 @@ final class ChewingPlusInputController: IMKInputController {
         var callbacks = chewing_plus_callbacks(commit: chewCommit, updated: nil, user: userPtr)
         commitHook = callbacks
         chewing_plus_set_callbacks(taken, &callbacks)
+        chewing_plus_set_preceding_text(taken, chewPrecedingText, userPtr)
     }
 
     /// Commit what is being typed and hand the session back.
@@ -296,6 +297,7 @@ final class ChewingPlusInputController: IMKInputController {
         }
         var empty = chewing_plus_callbacks(commit: nil, updated: nil, user: nil)
         chewing_plus_set_callbacks(session, &empty)
+        chewing_plus_set_preceding_text(session, nil, nil)   // user pointer dies with us
         self.session = nil
         SessionPool.shared.checkIn(session)
     }
@@ -327,6 +329,22 @@ final class ChewingPlusInputController: IMKInputController {
 
     fileprivate func insertCommitted(_ text: String) {
         lastClient?.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+    }
+
+    /// The few characters before the insertion point, so the core can tell
+    /// whether English quick insert follows Chinese. Marked text (the
+    /// composition, which the core is about to replace) is not "before".
+    fileprivate func textBeforeCursor() -> String {
+        guard let client = lastClient else { return "" }
+        let marked = client.markedRange()
+        var location = client.selectedRange().location
+        if marked.location != NSNotFound && marked.length > 0 {
+            location = marked.location
+        }
+        guard location != NSNotFound, location > 0 else { return "" }
+        let from = max(0, location - 4)   // up to two surrogate pairs
+        let range = NSRange(location: from, length: location - from)
+        return client.attributedSubstring(from: range)?.string ?? ""
     }
 
     /// Draw the core's view: marked text, hint line, suggestions, candidates.
@@ -713,6 +731,20 @@ private func chewCommit(user: UnsafeMutableRawPointer?, utf8: UnsafePointer<CCha
     guard let user, let utf8 else { return }
     let controller = Unmanaged<ChewingPlusInputController>.fromOpaque(user).takeUnretainedValue()
     controller.insertCommitted(String(cString: utf8))
+}
+
+private func chewPrecedingText(user: UnsafeMutableRawPointer?,
+                               buf: UnsafeMutablePointer<CChar>?, cap: Int) -> Int32 {
+    guard let user, let buf, cap > 1 else { return 0 }
+    let controller = Unmanaged<ChewingPlusInputController>.fromOpaque(user).takeUnretainedValue()
+    var bytes = Array(controller.textBeforeCursor().utf8)
+    if bytes.count > cap - 1 {
+        bytes = Array(bytes.suffix(cap - 1))
+        while let first = bytes.first, first & 0xC0 == 0x80 { bytes.removeFirst() }
+    }
+    for (i, b) in bytes.enumerated() { buf[i] = CChar(bitPattern: b) }
+    buf[bytes.count] = 0
+    return Int32(bytes.count)
 }
 
 private extension Optional where Wrapped == String {

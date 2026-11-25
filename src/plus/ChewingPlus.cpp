@@ -133,12 +133,30 @@ void ChewingPlus::refreshPanel(ChewingContext *ctx) {
 // SYMBOL_MODE: the Chinese around it stays editable and nothing is committed
 // early. When the buffer is empty Chewing passes the characters straight
 // through as commits, which are forwarded.
-static void InsertAscii(ChewingContext *ctx, const std::string &text,
-                        const ChewingPlus::Commit &commit) {
+std::string ChewingPlus::textBeforeCursor(ChewingContext *ctx) const {
+    std::string head = splitBuffer(ctx).first;
+    if (!head.empty()) {
+        return head;
+    }
+    // Nothing composed before the cursor: whatever precedes it was committed
+    // already, and only the application knows.
+    return precedingText_ ? precedingText_() : std::string();
+}
+
+void ChewingPlus::insertAscii(ChewingContext *ctx, const std::string &text,
+                              const Commit &commit, bool separate) {
+    std::string typed = text;
+    // Chinese then English: separate them. After a space, English, a
+    // symbol or at the start nothing is added, so no double spaces (the
+    // trailing space of the previous English word counts as a space).
+    if (separate && !typed.empty() && typed.front() != ' ' &&
+        NeedsSpaceBeforeEnglish(textBeforeCursor(ctx))) {
+        typed.insert(typed.begin(), ' ');
+    }
     int mode = chewing_get_ChiEngMode(ctx);
     chewing_set_ChiEngMode(ctx, SYMBOL_MODE);
     std::string out;
-    for (char c : text) {
+    for (char c : typed) {
         chewing_handle_Default(ctx, c);
         if (chewing_commit_Check(ctx)) {
             out += Str(chewing_commit_String(ctx));
@@ -154,7 +172,7 @@ bool ChewingPlus::toggleEnglish(ChewingContext *ctx, const Commit &commit) {
     if (panel_.kind == Panel::Kind::English) {
         std::string word = lexicon_->canonical(panel_.input);
         closePanel();
-        InsertAscii(ctx, word, commit);
+        insertAscii(ctx, word, commit, true);
         return true;
     }
     if (!options_.english || panel_.active() ||
@@ -172,7 +190,7 @@ bool ChewingPlus::toggleEnglish(ChewingContext *ctx, const Commit &commit) {
         overwrites_ = 0;
         overwriteFlags_.clear();
         lastZuinLen_ = 0;
-        InsertAscii(ctx, word + " ", commit);
+        insertAscii(ctx, word + " ", commit, true);
         return true;
     }
     std::string keys;
@@ -206,11 +224,11 @@ Handled ChewingPlus::onKey(ChewingContext *ctx, char ascii, bool ctrl,
             if (isReturn) {
                 std::string word = in;
                 closePanel();
-                InsertAscii(ctx, word, commit);
+                insertAscii(ctx, word, commit, true);
             } else if (isSpace) {
                 std::string word = lexicon_->canonical(in);
                 closePanel();
-                InsertAscii(ctx, word.empty() ? word : word + " ", commit);
+                insertAscii(ctx, word.empty() ? word : word + " ", commit, true);
             } else if (isBackspace) {
                 if (in.empty()) {
                     closePanel();
@@ -334,7 +352,7 @@ void ChewingPlus::insertDictation(ChewingContext *ctx, const std::string &text,
     const bool ascii = std::all_of(
         text.begin(), text.end(), [](char c) { return c >= 0x20 && c < 0x7f; });
     if (ascii) {
-        InsertAscii(ctx, text, commit);
+        insertAscii(ctx, text, commit, false);
     } else {
         commitAround(ctx, text, commit);
     }
@@ -349,7 +367,7 @@ void ChewingPlus::select(ChewingContext *ctx, int i, const Commit &commit) {
     switch (panel_.kind) {
     case Panel::Kind::English:
         closePanel();
-        InsertAscii(ctx, value, commit);
+        insertAscii(ctx, value, commit, true);
         break;
     case Panel::Kind::Calculator:
         closePanel();

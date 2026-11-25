@@ -161,6 +161,26 @@ chewing_plus_set_callbacks(chewing_plus_session *session,
                            const chewing_plus_callbacks *callbacks);
 
 /*
+ * Text before the cursor in the application, for the English quick insert
+ * (Shift Shift, Ctrl+Shift+Space): when Chinese precedes the cursor the core
+ * puts a space before the English word, as it already does after it.
+ *
+ * The core calls `fn` only when it needs the answer and the Chewing buffer
+ * has nothing before the cursor (otherwise it reads the buffer itself), and
+ * never while the session is sensitive. `fn` writes up to `cap - 1` bytes of
+ * UTF-8 ending at the cursor (the last few characters are enough; do not cut
+ * a character in half), NUL-terminates, and returns the byte count. Return 0
+ * when the client has no surrounding text or the position is unknown: the
+ * core then adds nothing. Pass NULL to remove it. A frontend whose `user`
+ * pointer can die before the session must remove it first.
+ */
+typedef int (*chewing_plus_preceding_text_fn)(void *user, char *buf,
+                                              size_t cap);
+CHEWING_PLUS_API void
+chewing_plus_set_preceding_text(chewing_plus_session *session,
+                                chewing_plus_preceding_text_fn fn, void *user);
+
+/*
  * Plus data files. Built-in files load first; user files override.
  * NULL leaves that path unchanged. Pass "" to clear a path.
  * Enabling a feature reloads the files that are currently set.

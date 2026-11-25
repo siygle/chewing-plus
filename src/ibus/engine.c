@@ -32,6 +32,7 @@ typedef struct {
 static IBusEngineClass *parent_class = NULL;
 
 static void on_commit(void *user, const char *utf8);
+static int on_preceding_text(void *user, char *buf, size_t cap);
 
 G_DEFINE_TYPE(ChewingPlusEngine, chewing_plus_engine, IBUS_TYPE_ENGINE)
 
@@ -123,6 +124,7 @@ static void ensure_session(ChewingPlusEngine *self) {
         cb.commit = on_commit;
         cb.user = self;
         chewing_plus_set_callbacks(self->session, &cb);
+        chewing_plus_set_preceding_text(self->session, on_preceding_text, self);
     }
 }
 
@@ -231,6 +233,41 @@ static void on_commit(void *user, const char *utf8) {
     IBusText *text = ibus_text_new_from_string(utf8 ? utf8 : "");
     ibus_engine_commit_text(IBUS_ENGINE(self), text);
     g_object_unref(text);
+}
+
+/* Text before the cursor from the client's surrounding text (when the client
+ * sends it), for spacing English quick insert after Chinese. */
+static int on_preceding_text(void *user, char *buf, size_t cap) {
+    ChewingPlusEngine *self = user;
+    IBusText *text = NULL;
+    guint cursor = 0;
+    guint anchor = 0;
+    const gchar *str;
+    const gchar *end;
+    const gchar *start;
+    size_t len;
+
+    if (!buf || cap < 2) {
+        return 0;
+    }
+    ibus_engine_get_surrounding_text(IBUS_ENGINE(self), &text, &cursor,
+                                     &anchor);
+    str = text ? ibus_text_get_text(text) : NULL;
+    if (!str || cursor == 0 || cursor > g_utf8_strlen(str, -1)) {
+        return 0;
+    }
+    end = g_utf8_offset_to_pointer(str, cursor); /* cursor counts characters */
+    start = end;
+    while (start > str && (size_t)(end - start) + 4 < cap) {
+        start = g_utf8_prev_char(start);
+    }
+    len = (size_t)(end - start);
+    if (len >= cap) {
+        return 0;
+    }
+    memcpy(buf, start, len);
+    buf[len] = '\0';
+    return (int)len;
 }
 
 static gboolean on_voice(gint fd, GIOCondition cond, gpointer user);
@@ -417,6 +454,15 @@ static void focus_in(IBusEngine *engine) {
     ensure_session(self);
     if (self->session) {
         apply_features(self->session);
+    }
+    {
+        /* Asks the client to send its surrounding text (spacing of English
+         * quick insert); the answer arrives later. */
+        IBusText *surrounding = NULL;
+        guint cursor = 0;
+        guint anchor = 0;
+        ibus_engine_get_surrounding_text(engine, &surrounding, &cursor,
+                                         &anchor);
     }
     self->shift_toggle = last_shift_toggle;
     apply_sensitive(self);

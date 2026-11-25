@@ -309,6 +309,42 @@ void OnCommit(void *user, const char *utf8) {
     }
 }
 
+// Text before the cursor from the client's surrounding text, for the spacing
+// of English quick insert. The core asks only when it needs it.
+int OnPrecedingText(void *user, char *buf, size_t cap) {
+    auto *engine = static_cast<ChewingEngine *>(user);
+    auto *ic = engine->currentContext();
+    if (!ic || !buf || cap < 2) {
+        return 0;
+    }
+    const auto &surrounding = ic->surroundingText();
+    if (!surrounding.isValid()) {
+        return 0;
+    }
+    const std::string &text = surrounding.text();
+    // The cursor counts code points; find its byte offset.
+    size_t end = 0;
+    for (size_t n = 0; n < surrounding.cursor(); ++n) {
+        if (end >= text.size()) {
+            return 0; // Cursor past the text: stale or broken.
+        }
+        ++end;
+        while (end < text.size() &&
+               (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80) {
+            ++end;
+        }
+    }
+    size_t start = end > cap - 1 ? end - (cap - 1) : 0;
+    while (start < end &&
+           (static_cast<unsigned char>(text[start]) & 0xC0) == 0x80) {
+        ++start; // Do not start in the middle of a character.
+    }
+    const size_t len = end - start;
+    std::memcpy(buf, text.data() + start, len);
+    buf[len] = '\0';
+    return static_cast<int>(len);
+}
+
 } // namespace
 
 ChewingEngine::ChewingEngine(Instance *instance) : instance_(instance) {
@@ -322,6 +358,7 @@ ChewingEngine::ChewingEngine(Instance *instance) : instance_(instance) {
         cb.commit = OnCommit;
         cb.user = this;
         chewing_plus_set_callbacks(session_.get(), &cb);
+        chewing_plus_set_preceding_text(session_.get(), OnPrecedingText, this);
     }
     reloadConfig();
 #ifdef CHEWING_WITH_VOXKIT

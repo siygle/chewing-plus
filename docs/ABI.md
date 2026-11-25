@@ -141,6 +141,29 @@ Detecting the field stays in the frontend (fcitx `PasswordOrSensitive`, IBus
 IM). The frontend should also reset the session when the client changes, the
 same way fcitx does.
 
+## English quick insert: spacing
+
+English quick insert (double Shift, Ctrl+Shift+Space) puts a space after the
+word. When Chinese precedes the cursor it also puts one before. The core looks
+at the last character before the cursor: the Chewing buffer if it has text
+there, otherwise the application. For the application a frontend registers
+
+```c
+typedef int (*chewing_plus_preceding_text_fn)(void *user, char *buf, size_t cap);
+void chewing_plus_set_preceding_text(chewing_plus_session *session,
+                                     chewing_plus_preceding_text_fn fn, void *user);
+```
+
+`fn` writes the UTF-8 text that ends at the cursor (a few characters are
+enough) and returns its length, or 0 when unknown. It is called only when
+needed and never while the session is sensitive. A space goes in only after a
+Han, Bopomofo or kana character; not after whitespace, English, digits,
+punctuation (full width included) or at the start of the text. Without the
+hook only Chinese in the Chewing buffer is detected. fcitx5 uses surrounding
+text, IBus `ibus_engine_get_surrounding_text`, macOS
+`markedRange`/`selectedRange` + `attributedSubstring`. Dictation
+(`chewing_plus_insert_text`) is unchanged.
+
 ## Voice hook
 
 This ABI does not record audio. A frontend that already has a transcript calls:
