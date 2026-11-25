@@ -863,7 +863,7 @@ int main(void) {
 
     check(chewing_plus_abi_version() == CHEWING_PLUS_ABI_VERSION,
           "ABI version");
-    check(strcmp(chewing_plus_libchewing_pin(), "0.14.0-rc.1-17-gdad3241") == 0,
+    check(strcmp(chewing_plus_libchewing_pin(), "0.14.0-rc.2") == 0,
           "libchewing pin");
     check(chewing_plus_key(NULL, NULL) == 0, "NULL session is a no-op");
 

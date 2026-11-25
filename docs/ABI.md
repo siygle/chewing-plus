@@ -193,4 +193,4 @@ The C ABI and `ChewingPlus` are LGPL-2.1-or-later. `PlusFeatures`,
 `PlusEmoji`, `PlusEnglish` and `PlusDoubleTap` are MIT. The gemoji shortcodes
 and the SCOWL word list keep the notices in `data/LICENSE.gemoji` and
 `data/LICENSE.scowl`. libchewing is LGPL-2.1-or-later; the pin is
-`CHEWING_PLUS_LIBCHEWING_PIN` (`0.14.0-rc.1-17-gdad3241`).
+`CHEWING_PLUS_LIBCHEWING_PIN` (`0.14.0-rc.2`).
