@@ -1,11 +1,9 @@
 # Pinned libchewing for chewing-plus.
 # Commit 1bfcde9078f13b4d97aaa4b6a01cbd67687522e3 (v0.14.0-rc.2).
-# Source: https://github.com/siygle/libchewing (our fork; branch plus/0.14.0-rc.2, tag v0.14.0-rc.2).
-# The fork is identical to upstream https://codeberg.org/chewing/libchewing at this commit.
-# The data submodule still comes from https://codeberg.org/chewing/libchewing-data.
+# Source: https://codeberg.org/chewing/libchewing
 set(CHEWING_PLUS_LIBCHEWING_VERSION "0.14.0-rc.2")
 set(CHEWING_PLUS_LIBCHEWING_TAG "v0.14.0-rc.2")
-set(CHEWING_PLUS_LIBCHEWING_URL "https://github.com/siygle/libchewing")
+set(CHEWING_PLUS_LIBCHEWING_URL "https://codeberg.org/chewing/libchewing")
 set(CHEWING_PLUS_LIBCHEWING_COMMIT "1bfcde9078f13b4d97aaa4b6a01cbd67687522e3")
 
 option(CHEWING_PLUS_BUNDLE_LIBCHEWING

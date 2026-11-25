@@ -23,7 +23,7 @@
 set -euo pipefail
 
 VERSION=0.14.0-rc.2
-URL=https://github.com/siygle/libchewing.git
+URL=https://codeberg.org/chewing/libchewing.git
 COMMIT=1bfcde9078f13b4d97aaa4b6a01cbd67687522e3
 
 mode=shared
