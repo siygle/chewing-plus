@@ -47,6 +47,30 @@ int main(void) {
               d.event.key == CHEWING_PLUS_KEY_SHIFT_L &&
               (d.event.mods & CHEWING_PLUS_MOD_RELEASE),
           "Left Shift release reaches the core");
+    /* xkb shift:both_capslock_cancel: Shift release arrives as Caps_Lock. */
+    d = chewing_ibus_map_key(0xffe5, 62, (1u << 30) | 1u, 0, 0);
+    check(d.action == CHEWING_IBUS_KEY_TO_CORE &&
+              d.event.key == CHEWING_PLUS_KEY_SHIFT_R &&
+              (d.event.mods & CHEWING_PLUS_MOD_RELEASE),
+          "Right Shift release as Caps_Lock (X11 62) is SHIFT_R");
+    d = chewing_ibus_map_key(0xffe5, 54, (1u << 30) | 1u, 0, 0);
+    check(d.action == CHEWING_IBUS_KEY_TO_CORE &&
+              d.event.key == CHEWING_PLUS_KEY_SHIFT_R &&
+              (d.event.mods & CHEWING_PLUS_MOD_RELEASE),
+          "Right Shift release as Caps_Lock (evdev 54) is SHIFT_R");
+    d = chewing_ibus_map_key(0xffe5, 50, (1u << 30) | 1u, 0, 0);
+    check(d.action == CHEWING_IBUS_KEY_TO_CORE &&
+              d.event.key == CHEWING_PLUS_KEY_SHIFT_L &&
+              (d.event.mods & CHEWING_PLUS_MOD_RELEASE),
+          "Left Shift release as Caps_Lock (X11 50) is SHIFT_L");
+    d = chewing_ibus_map_key(0xffe5, 42, (1u << 30) | 1u, 0, 0);
+    check(d.action == CHEWING_IBUS_KEY_TO_CORE &&
+              d.event.key == CHEWING_PLUS_KEY_SHIFT_L &&
+              (d.event.mods & CHEWING_PLUS_MOD_RELEASE),
+          "Left Shift release as Caps_Lock (evdev 42) is SHIFT_L");
+    d = chewing_ibus_map_key(0xffe5, 66, 1u << 30, 0, 0);
+    check(d.action == CHEWING_IBUS_KEY_IGNORED,
+          "Caps_Lock key (X11 66) is not treated as Shift");
     printf(failures ? "IBUS KEY TESTS FAILED (%d)\n" : "IBUS KEY TESTS OK\n",
            failures);
     return failures ? 1 : 0;

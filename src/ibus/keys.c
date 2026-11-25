@@ -22,11 +22,41 @@ enum {
     K_KP_ENTER = 0xff8d,
     K_SHIFT_L = 0xffe1,
     K_SHIFT_R = 0xffe2,
+    K_CAPS_LOCK = 0xffe5,
     K_CONTROL_L = 0xffe3,
     K_CONTROL_R = 0xffe4,
     K_ALT_L = 0xffe9,
     K_ALT_R = 0xffea
 };
+
+/* Physical Shift keys. IBus may report X11 keycodes (50/62, same as fcitx)
+ * or evdev codes (42/54) depending on the seat. Under the xkb option
+ * shift:both_capslock_cancel, the release keyval becomes Caps_Lock, so
+ * Shift is also recognized by keycode. */
+enum {
+    X11_SHIFT_L = 50,
+    X11_SHIFT_R = 62,
+    EVDEV_SHIFT_L = 42,
+    EVDEV_SHIFT_R = 54
+};
+
+static uint32_t shift_key(uint32_t keyval, uint32_t keycode) {
+    if (keyval == K_SHIFT_R) {
+        return CHEWING_PLUS_KEY_SHIFT_R;
+    }
+    if (keyval == K_SHIFT_L) {
+        return CHEWING_PLUS_KEY_SHIFT_L;
+    }
+    if (keyval == K_CAPS_LOCK) {
+        if (keycode == X11_SHIFT_R || keycode == EVDEV_SHIFT_R) {
+            return CHEWING_PLUS_KEY_SHIFT_R;
+        }
+        if (keycode == X11_SHIFT_L || keycode == EVDEV_SHIFT_L) {
+            return CHEWING_PLUS_KEY_SHIFT_L;
+        }
+    }
+    return 0;
+}
 
 static int is_modifier(uint32_t keyval) {
     return keyval == K_SHIFT_L || keyval == K_SHIFT_R ||
@@ -40,6 +70,7 @@ chewing_ibus_decision chewing_ibus_map_key(uint32_t keyval, uint32_t keycode,
     chewing_ibus_decision out;
     int release = (state & CHEWING_IBUS_RELEASE) != 0;
     uint32_t mods = 0;
+    uint32_t shift;
     memset(&out, 0, sizeof(out));
     out.event.time_ms = -1;
     out.event.keycode = (int32_t)keycode;
@@ -71,6 +102,12 @@ chewing_ibus_decision chewing_ibus_map_key(uint32_t keyval, uint32_t keycode,
         mods |= CHEWING_PLUS_MOD_RELEASE;
     }
     out.event.mods = mods;
+    shift = shift_key(keyval, keycode);
+    if (shift) {
+        out.event.key = shift;
+        out.action = CHEWING_IBUS_KEY_TO_CORE;
+        return out;
+    }
     if (keyval == K_BACKSPACE) {
         out.event.key = CHEWING_PLUS_KEY_BACKSPACE;
     } else if (keyval == K_TAB) {
@@ -97,10 +134,6 @@ chewing_ibus_decision chewing_ibus_map_key(uint32_t keyval, uint32_t keycode,
         out.event.key = CHEWING_PLUS_KEY_PAGE_DOWN;
     } else if (keyval == K_END) {
         out.event.key = CHEWING_PLUS_KEY_END;
-    } else if (keyval == K_SHIFT_R) {
-        out.event.key = CHEWING_PLUS_KEY_SHIFT_R;
-    } else if (keyval == K_SHIFT_L) {
-        out.event.key = CHEWING_PLUS_KEY_SHIFT_L;
     } else if (keyval == ' ') {
         out.event.key = CHEWING_PLUS_KEY_SPACE;
         out.event.ascii = ' ';

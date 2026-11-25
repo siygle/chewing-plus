@@ -9,6 +9,7 @@
  */
 #include "testdir.h"
 #include "testfrontend_public.h"
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <fcitx-config/rawconfig.h>
@@ -26,6 +27,7 @@
 #include <fcitx/inputpanel.h>
 #include <fcitx/instance.h>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace fcitx;
@@ -226,6 +228,76 @@ void testPlus(Instance *instance) {
         tapShift();
         check(preedit() == "[EN] ",
               "Right Shift x2 enters EN, got " + preedit());
+
+        // --- same double-tap when xkb reports the release as Caps_Lock
+        // (shift:both_capslock_cancel). Right Shift is X11 keycode 62.
+        reset();
+        auto tapShiftCaps = [&]() {
+            send(Key(FcitxKey_Shift_R, KeyState::NoState, 62));
+            send(Key(FcitxKey_Caps_Lock, KeyState::Shift, 62), true);
+        };
+        tapShiftCaps();
+        tapShiftCaps();
+        check(preedit() == "[EN] ",
+              "Right Shift x2 with Caps_Lock release enters EN, got " +
+                  preedit());
+
+        // --- one tap is not a toggle
+        reset();
+        tapShiftCaps();
+        check(preedit().find("[EN]") == std::string::npos,
+              "single Right Shift is not a toggle, got " + preedit());
+
+        // --- the Caps_Lock key itself (X11 66) is not a Shift double-tap
+        reset();
+        auto tapCaps = [&]() {
+            send(Key(FcitxKey_Caps_Lock, KeyState::NoState, 66));
+            send(Key(FcitxKey_Caps_Lock, KeyState::NoState, 66), true);
+        };
+        tapCaps();
+        tapCaps();
+        check(preedit().find("[EN]") == std::string::npos,
+              "Caps_Lock key does not enter EN, got " + preedit());
+
+        // --- the double-tap window uses the event timestamps, not the time
+        // fcitx5 happened to read the events (a busy compositor delivers
+        // queued keys late and in a burst).
+        auto stamped = [&](const Key &k, bool release, int time) {
+            KeyEvent ev(ic, k, release, time);
+            ic->keyEvent(ev);
+        };
+        auto tapAt = [&](int down, int up) {
+            stamped(Key(FcitxKey_Shift_R, KeyState::NoState, 62), false, down);
+            stamped(Key(FcitxKey_Caps_Lock, KeyState::Shift, 62), true, up);
+        };
+        // Slow stamps, instant arrival: not a double tap (hold 500ms).
+        reset();
+        tapAt(1000, 1060);
+        tapAt(1100, 1600);
+        check(preedit().find("[EN]") == std::string::npos,
+              "slow hold by stamp is not a toggle, got " + preedit());
+        // Slow stamps, instant arrival: gap 700ms.
+        reset();
+        tapAt(1000, 1060);
+        tapAt(1760, 1800);
+        check(preedit().find("[EN]") == std::string::npos,
+              "slow gap by stamp is not a toggle, got " + preedit());
+        // Fast stamps, but the events reach fcitx5 late (350ms > window).
+        reset();
+        stamped(Key(FcitxKey_Shift_R, KeyState::NoState, 62), false, 2000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+        stamped(Key(FcitxKey_Caps_Lock, KeyState::Shift, 62), true, 2060);
+        stamped(Key(FcitxKey_Shift_R, KeyState::NoState, 62), false, 2140);
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+        stamped(Key(FcitxKey_Caps_Lock, KeyState::Shift, 62), true, 2200);
+        check(preedit() == "[EN] ",
+              "late delivery, fast stamps still toggles, got " + preedit());
+        // The 32-bit stamp wraps.
+        reset();
+        tapAt(static_cast<int>(0xFFFFFFF0u), static_cast<int>(0xFFFFFFF8u));
+        tapAt(4, 10);
+        check(preedit() == "[EN] ",
+              "double tap across stamp wrap, got " + preedit());
 
         // --- emoji suggestion after phrase (開心 = d9 vup)
         reset();

@@ -9,6 +9,7 @@
 
 #include <chewing.h>
 #include <cstddef>
+#include <cstdint>
 #include <fcitx-config/configuration.h>
 #include <fcitx-config/enum.h>
 #include <fcitx-config/iniparser.h>
@@ -339,6 +340,10 @@ private:
     TrackableObjectReference<InputContext> ic_;
     KeyList englishToggleKeys_;
     std::vector<KeySym> englishDoubleTapSyms_;
+    // X11/fcitx keycodes for the same keys (Right Shift = 62, Left Shift
+    // = 50). Needed because xkb shift:both_capslock_cancel reports the
+    // release keysym as Caps_Lock.
+    std::vector<uint32_t> englishDoubleTapCodes_;
     // English double tap on a configurable modifier (the core only knows
     // Right Shift).
     bool tapPressed_ = false;
