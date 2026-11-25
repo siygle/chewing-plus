@@ -31,10 +31,10 @@ insert handler and the user's own phrases as vocabulary. Works with or without t
 ## libchewing pin
 
 This tree is built and tested against **libchewing 0.14**
-(`v0.14.0-rc.1-17-gdad3241`, commit `dad32411f66c15fc329938e4d65244ab920ac094`) from
+(`v0.14.0-rc.2`, commit `1bfcde9078f13b4d97aaa4b6a01cbd67687522e3`) from
 <https://codeberg.org/chewing/libchewing>. The same pin is in
 `cmake/ChewingPlusLibchewing.cmake` and `CHEWING_PLUS_LIBCHEWING_PIN`.
-Building that tag needs **Rust 1.85 or newer** (Cargo edition 2024), CMake
+Building that tag needs **Rust 1.95 or newer** (Cargo edition 2024), CMake
 3.27 or newer, and **git-lfs** (the dictionary sources are a submodule, and
 the language-model files are LFS objects). `scripts/bundle-libchewing.sh`
 clones the tag, checks out the submodule, and runs `git lfs pull`.
@@ -51,7 +51,7 @@ bash scripts/bundle-libchewing.sh --shared "$HOME/opt/libchewing-0.14"
 bash scripts/bundle-libchewing.sh --static "$HOME/opt/libchewing-0.14-static"
 ```
 
-`--static` is wired through, but **libchewing 0.14.0-rc.1's own CMake refuses
+`--static` is wired through, but **libchewing 0.14.0-rc.2's own CMake refuses
 to generate a static build**:
 
 ```
