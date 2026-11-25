@@ -82,14 +82,17 @@ struct Shortcut: Codable, Equatable {
     }
 }
 
-/// Saved shortcuts. Voice: hold to talk. English: tap twice (lone
-/// modifier) or press once (combo) to enter English mode / fill the hint.
+/// Saved shortcuts. Voice: hold to talk. Translate: hold to talk, the
+/// translation is typed (only while the 「語音翻譯」 setting is on). English:
+/// tap twice (lone modifier) or press once (combo) to enter English mode /
+/// fill the hint.
 enum ShortcutSetting: String, CaseIterable {
-    case voice, english
+    case voice, translate, english
 
     var title: String {
         switch self {
         case .voice: return "語音（按住說話）"
+        case .translate: return "語音翻譯（按住說話）"
         case .english: return "英文模式／填入英文提示"
         }
     }
@@ -97,6 +100,9 @@ enum ShortcutSetting: String, CaseIterable {
     var defaultValue: Shortcut? {
         switch self {
         case .voice: return Shortcut(keyCode: 61, modifiers: 0, isModifierOnly: true)    // 右 Option
+        // Right Command: Mac keyboards have no right Control, and Right
+        // Shift is the English double tap.
+        case .translate: return Shortcut(keyCode: 54, modifiers: 0, isModifierOnly: true) // 右 ⌘
         case .english: return Shortcut(keyCode: 60, modifiers: 0, isModifierOnly: true)  // 右 Shift
         }
     }
@@ -139,6 +145,10 @@ enum ShortcutSetting: String, CaseIterable {
         switch self {
         case .voice:
             return "按住 \(value.title) 說話，放開出字"
+        case .translate:
+            return Settings.isOn("voice_translate")
+                ? "按住 \(value.title) 說話，放開輸入譯文（\(Settings.value("voice_translate_to") ?? "en")）"
+                : "輸入法選單打開「語音翻譯」後才有作用"
         case .english:
             return value.isModifierOnly ? "連按兩下 \(value.title)" : "按一下 \(value.title)"
         }
@@ -248,7 +258,7 @@ final class ShortcutPreferences: NSObject {
     }
 
     private func build() {
-        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 260),
+        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 330),
                            styleMask: [.titled, .closable], backing: .buffered, defer: false)
         win.title = "新酷音 Plus 快速鍵"
         win.isReleasedWhenClosed = false
@@ -312,7 +322,15 @@ final class ShortcutPreferences: NSObject {
         }
         let voice = ShortcutSetting.voice.value
         let english = ShortcutSetting.english.value
-        warning.stringValue = voice != nil && voice == english
-            ? "語音和英文用了同一組快速鍵，英文會被停用。請換一組。" : ""
+        let translate = ShortcutSetting.translate.value
+        if voice != nil && voice == english {
+            warning.stringValue = "語音和英文用了同一組快速鍵，英文會被停用。請換一組。"
+        } else if translate != nil && translate == voice {
+            warning.stringValue = "語音和語音翻譯用了同一組快速鍵，翻譯會被停用。請換一組。"
+        } else if translate != nil && translate == english {
+            warning.stringValue = "語音翻譯和英文用了同一組快速鍵，英文會被停用。請換一組。"
+        } else {
+            warning.stringValue = ""
+        }
     }
 }
