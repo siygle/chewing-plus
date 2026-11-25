@@ -68,6 +68,21 @@ int64_t NowMs() {
         .count();
 }
 
+// Time of a key event in ms. Prefer the timestamp the compositor/server put
+// on the event: the moment fcitx5 happens to read it can be much later (a
+// busy compositor delivers queued keys in a burst), which would make a quick
+// tap look slow. The stamp is a wrapping 32-bit value; a frontend that sends
+// none (0) falls back to the arrival time.
+uint32_t EventMs(const KeyEvent &keyEvent) {
+    const auto stamp = static_cast<uint32_t>(keyEvent.time());
+    return stamp != 0 ? stamp : static_cast<uint32_t>(NowMs());
+}
+
+// Wrap-safe elapsed ms from `from` to `to`; negative when out of order.
+int64_t ElapsedMs(uint32_t from, uint32_t to) {
+    return static_cast<int32_t>(to - from);
+}
+
 std::string Str(const char *s) { return s ? s : ""; }
 
 // X11 / fcitx keycodes (linux evdev + 8). Under the common xkb option
@@ -744,7 +759,7 @@ bool ChewingEngine::englishShortcut(const KeyEvent &keyEvent, bool sensitive) {
     if (!englishDoubleTapSyms_.empty()) {
         const bool watched = IsDoubleTapKey(keyEvent, englishDoubleTapSyms_,
                                             englishDoubleTapCodes_);
-        const int64_t now = NowMs();
+        const uint32_t now = EventMs(keyEvent);
         const int64_t window = *config_.PlusEnglishDoubleTapMs;
         if (!watched) {
             tapPressed_ = false;
@@ -756,9 +771,17 @@ bool ChewingEngine::englishShortcut(const KeyEvent &keyEvent, bool sensitive) {
             tapDownMs_ = now;
         } else if (tapPressed_) {
             tapPressed_ = false;
-            if (now - tapDownMs_ > window) {
+            const int64_t hold = ElapsedMs(tapDownMs_, now);
+            const int64_t gap =
+                tapUpMs_ >= 0 ? ElapsedMs(tapUpMs_, tapDownMs_) : -1;
+            CHEWING_DEBUG()
+                << "double-tap release sym=" << keyEvent.rawKey().sym()
+                << " code=" << keyEvent.rawKey().code() << " hold=" << hold
+                << "ms gap=" << gap << "ms window=" << window
+                << "ms stamp=" << keyEvent.time();
+            if (hold < 0 || hold > window) {
                 tapUpMs_ = -1;
-            } else if (tapUpMs_ >= 0 && tapDownMs_ - tapUpMs_ <= window) {
+            } else if (tapUpMs_ >= 0 && gap >= 0 && gap <= window) {
                 tapUpMs_ = -1;
                 return chewing_plus_toggle_english(session_.get()) != 0;
             } else {
