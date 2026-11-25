@@ -32,7 +32,7 @@ insert handler and the user's own phrases as vocabulary. Works with or without t
 
 This tree is built and tested against **libchewing 0.14**
 (`v0.14.0-rc.2`, commit `1bfcde9078f13b4d97aaa4b6a01cbd67687522e3`) from
-<https://codeberg.org/chewing/libchewing>. The same pin is in
+<https://github.com/siygle/libchewing> (our fork of <https://codeberg.org/chewing/libchewing>; at this commit it is identical to upstream, branch `plus/0.14.0-rc.2`, tag `v0.14.0-rc.2`). The dictionary data is a submodule of that checkout and is still fetched from <https://codeberg.org/chewing/libchewing-data> with git-lfs. The same pin is in
 `cmake/ChewingPlusLibchewing.cmake` and `CHEWING_PLUS_LIBCHEWING_PIN`.
 Building that tag needs **Rust 1.95 or newer** (Cargo edition 2024), CMake
 3.27 or newer, and **git-lfs** (the dictionary sources are a submodule, and
