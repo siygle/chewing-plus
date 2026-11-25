@@ -89,7 +89,8 @@ void testNeedsSpaceBeforeEnglish() {
     check(!NeedsSpaceBeforeEnglish("你好，"), "after full-width comma: none");
     check(!NeedsSpaceBeforeEnglish("你好。"), "after full-width stop: none");
     check(!NeedsSpaceBeforeEnglish("「"), "after a corner bracket: none");
-    check(!NeedsSpaceBeforeEnglish("你\xe5"), "truncated UTF-8: none, no crash");
+    check(!NeedsSpaceBeforeEnglish("你\xe5"),
+          "truncated UTF-8: none, no crash");
 }
 
 void testEmojiForText() {

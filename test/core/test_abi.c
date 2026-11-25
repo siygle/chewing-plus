@@ -266,14 +266,16 @@ static void test_english_leading_space(void) {
     chewing_plus_set_spacing(session, 0, 0);
     chewing_plus_set_preceding_text(session, on_preceding, NULL);
 
-    /* Chinese in the buffer: the buffer decides, the application is not asked. */
+    /* Chinese in the buffer: the buffer decides, the application is not asked.
+     */
     reset();
     app_before = "abc";
     calls = app_before_calls;
     type_text("su3cl3");
     english_word("github", CHEWING_PLUS_KEY_RETURN);
     got = chewing_plus_take_commit(session);
-    check(strcmp(got, "你好 GitHub ") == 0, "buffer Chinese + English: space before");
+    check(strcmp(got, "你好 GitHub ") == 0,
+          "buffer Chinese + English: space before");
     check(app_before_calls == calls, "buffer decides: application not asked");
     if (strcmp(got, "你好 GitHub ") != 0) {
         fprintf(stderr, "  commit=[%s]\n", got);
@@ -286,7 +288,8 @@ static void test_english_leading_space(void) {
     english_word("github", 0);
     english_word("linux", CHEWING_PLUS_KEY_RETURN);
     got = chewing_plus_take_commit(session);
-    check(strcmp(got, "你 GitHub Linux ") == 0, "English after English: no double space");
+    check(strcmp(got, "你 GitHub Linux ") == 0,
+          "English after English: no double space");
     if (strcmp(got, "你 GitHub Linux ") != 0) {
         fprintf(stderr, "  commit=[%s]\n", got);
     }
@@ -297,7 +300,8 @@ static void test_english_leading_space(void) {
     app_before = "你好";
     english_word("github", 0);
     got = chewing_plus_take_commit(session);
-    check(strcmp(got, " GitHub ") == 0, "committed Chinese before: space before");
+    check(strcmp(got, " GitHub ") == 0,
+          "committed Chinese before: space before");
     if (strcmp(got, " GitHub ") != 0) {
         fprintf(stderr, "  commit=[%s]\n", got);
     }
@@ -306,7 +310,8 @@ static void test_english_leading_space(void) {
     app_before = "你好";
     chewing_plus_toggle_english(session);
     type_text("github");
-    tap(CHEWING_PLUS_KEY_RETURN, 0, 0); /* Return: typed text, no trailing space */
+    tap(CHEWING_PLUS_KEY_RETURN, 0,
+        0); /* Return: typed text, no trailing space */
     got = chewing_plus_take_commit(session);
     check(strcmp(got, " github") == 0, "Return: space before, none after");
 
@@ -317,18 +322,20 @@ static void test_english_leading_space(void) {
           "Bopomofo before: space before");
 
     {
-        static const char *no_space[] = {"",      "hello ", "hello", "你好 ",
-                                         "你好，", "你好。", "第5", "(",
-                                         "\n",    "\t"};
+        static const char *no_space[] = {"",       "hello ", "hello", "你好 ",
+                                         "你好，", "你好。", "第5",   "(",
+                                         "\n",     "\t"};
         size_t i;
         for (i = 0; i < sizeof(no_space) / sizeof(no_space[0]); i++) {
             reset();
             app_before = no_space[i];
             english_word("github", 0);
             got = chewing_plus_take_commit(session);
-            check(strcmp(got, "GitHub ") == 0, "no space before when preceded by non-Chinese");
+            check(strcmp(got, "GitHub ") == 0,
+                  "no space before when preceded by non-Chinese");
             if (strcmp(got, "GitHub ") != 0) {
-                fprintf(stderr, "  before=[%s] commit=[%s]\n", no_space[i], got);
+                fprintf(stderr, "  before=[%s] commit=[%s]\n", no_space[i],
+                        got);
             }
         }
     }
