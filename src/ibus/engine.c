@@ -23,6 +23,8 @@ typedef struct {
     gint64 voice_since;    /* monotonic µs when that key went down */
     int voice_translating; /* the running request is mode=translate */
     int voice_caps;        /* translate capability: -1 not asked yet */
+    uint32_t dictation_keyval; /* from ibus.conf voice_key; default Alt_R */
+    uint32_t translate_keyval; /* from voice_translate_key; 0 if off */
     uint64_t drawn;        /* chewing_plus_view revision last drawn */
     IBusPropList *props;
     IBusProperty *mode_prop; /* 中 / 英 in the IBus panel */
@@ -41,6 +43,7 @@ static int on_preceding_text(void *user, char *buf, size_t cap);
 G_DEFINE_TYPE(ChewingPlusEngine, chewing_plus_engine, IBUS_TYPE_ENGINE)
 
 static void refresh(ChewingPlusEngine *self);
+static void refresh_talk_keys(ChewingPlusEngine *self);
 
 static int last_shift_toggle = 0;
 
@@ -122,6 +125,7 @@ static void ensure_session(ChewingPlusEngine *self) {
     }
     chewing_plus_set_data_paths(self->session, emoji, "", english, "");
     apply_features(self->session);
+    refresh_talk_keys(self);
     {
         chewing_plus_callbacks cb;
         memset(&cb, 0, sizeof(cb));
@@ -382,6 +386,32 @@ static int translate_enabled(ChewingPlusEngine *self) {
     return on && strcmp(on, "1") == 0;
 }
 
+/* voice_key / voice_translate_key in ibus.conf are X11 names, same as
+ * fcitx5's Hotkey / TranslateHotkey. Applied on focus (下次聚焦輸入框時生效).
+ */
+static void refresh_talk_keys(ChewingPlusEngine *self) {
+    chewing_plus_ibus_prefs prefs;
+    const char *name;
+    uint32_t key;
+    chewing_plus_ibus_prefs_load(&prefs);
+    name = chewing_plus_ibus_prefs_get(&prefs, "voice_key");
+    key = chewing_ibus_parse_modifier(name);
+    self->dictation_keyval =
+        chewing_ibus_modifier_usable(key) ? key : CHEWING_IBUS_VOICE_KEY;
+    self->translate_keyval = 0;
+    if (!translate_enabled(self)) {
+        return;
+    }
+    name = chewing_plus_ibus_prefs_get(&prefs, "voice_translate_key");
+    key = chewing_ibus_parse_modifier(name);
+    if (!key) {
+        key = CHEWING_IBUS_TRANSLATE_KEY;
+    }
+    if (chewing_ibus_modifier_usable(key) && key != self->dictation_keyval) {
+        self->translate_keyval = key;
+    }
+}
+
 static void voice_start(ChewingPlusEngine *self, int translate) {
     char line[2048];
     const char *convert = "s2twp";
@@ -462,9 +492,10 @@ static gboolean process_key(IBusEngine *engine, guint keyval, guint keycode,
         return FALSE;
     }
     apply_sensitive(self);
-    decision = chewing_ibus_map_key_ex(
-        keyval, keycode, state, sensitive(engine),
-        self->voice_active ? self->voice_key : 0, translate_enabled(self));
+    decision =
+        chewing_ibus_map_key_ex(keyval, keycode, state, sensitive(engine),
+                                self->voice_active ? self->voice_key : 0,
+                                self->dictation_keyval, self->translate_keyval);
     if (decision.action == CHEWING_IBUS_KEY_VOICE_START ||
         decision.action == CHEWING_IBUS_KEY_TRANSLATE_START) {
         if (!self->voice_active) { /* else auto-repeat of the held key */
@@ -529,6 +560,7 @@ static void focus_in(IBusEngine *engine) {
     ensure_session(self);
     if (self->session) {
         apply_features(self->session);
+        refresh_talk_keys(self);
     }
     {
         /* Asks the client to send its surrounding text (spacing of English
@@ -603,6 +635,8 @@ static void candidate_clicked(IBusEngine *engine, guint index, guint button,
 static void init_engine(ChewingPlusEngine *self) {
     voxkit_client_init(&self->voice);
     self->voice_caps = -1;
+    self->dictation_keyval = CHEWING_IBUS_VOICE_KEY;
+    self->translate_keyval = 0;
 }
 
 static void dispose_engine(GObject *object) {

@@ -125,7 +125,7 @@ Ctrl+Shift+Space → GitHub
 ### 語音輸入
 語音由內附的 [voxkit](https://github.com/siygle/fcitx5-voxkit) 服務在本機辨識，錄音不會上傳：
 
-- **按住快捷鍵** 說話，放開後輸出文字（Linux 預設右 Alt，macOS 預設右 Option，可自訂）
+- **按住快捷鍵** 說話，放開後輸出文字（Linux 預設右 Alt，macOS 預設右 Option；fcitx5、IBus、macOS 都可以自訂）
 - 辨識結果會插入目前游標的位置，並轉成繁體中文
 - 會自動參考你自己加的詞，提高專有名詞的辨識率
 
@@ -149,7 +149,7 @@ Ctrl+Shift+Space → GitHub
 | 平台 | 開啟 | 快捷鍵 | 目標語言 |
 |---|---|---|---|
 | fcitx5 | 設定 → 附加元件 → Voxkit → `Voice translation` | 右 Ctrl（`TranslateHotkey`） | `TranslateTarget` |
-| IBus | 「新酷音 Plus」設定程式 → 「語音翻譯」 | 右 Ctrl | `~/.config/chewing-plus/ibus.conf` 的 `voice_translate_to` |
+| IBus | 「新酷音 Plus」設定程式 → 「語音翻譯」 | 設定程式的「語音翻譯快捷鍵」（預設右 Ctrl，`ibus.conf` 的 `voice_translate_key`） | `~/.config/chewing-plus/ibus.conf` 的 `voice_translate_to` |
 | macOS | 輸入法選單 →「語音翻譯」 | 右 ⌘（「快速鍵…」可改） | 輸入法選單 →「語音翻譯成」 |
 
 翻譯失敗、模型還在下載或沒有外掛時，會改輸入原本的辨識結果並顯示原因。

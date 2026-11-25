@@ -12,7 +12,8 @@ The fcitx5 addon is not part of this build.
 
 | Path | Role |
 |---|---|
-| `macos/ChewingPlus/ChewingPlusInputController.swift` | IMK controller: marked text, `IMKCandidates`, digit selection, English toggle via the core, secure input, Right Option push-to-talk |
+| `macos/ChewingPlus/ChewingPlusInputController.swift` | IMK controller: marked text, `IMKCandidates`, digit selection, English toggle via the core, secure input, push-to-talk / push-to-translate |
+| `macos/ChewingPlus/Shortcuts.swift` | 「快速鍵…」window: dictation (default Right Option), translation (default Right Command) and English (Right Shift) use the same recorder; warns if two of them collide |
 | `macos/ChewingPlus/Info.plist` | Bundle id `im.chewing.inputmethod.ChewingPlus`, IMK keys, microphone usage string |
 | `macos/ChewingPlus/main.swift` | `IMKServer` named `ChewingPlus_Connection` |
 | `macos/Voxkit/Info.plist` | Usage string for a helper bundle, if you wrap the daemon |

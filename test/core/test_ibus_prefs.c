@@ -48,11 +48,16 @@ int main(void) {
     chewing_plus_ibus_prefs_set(&saved, "shortcode_prefix", "``");
     chewing_plus_ibus_prefs_set(&saved, "emoji", "0");
     check(saved.count == 2 && is(&saved, "emoji", "0"), "set replaces");
+    chewing_plus_ibus_prefs_set(&saved, "voice_key", "Super_R");
+    chewing_plus_ibus_prefs_set(&saved, "voice_translate_key", "Alt_L");
     check(chewing_plus_ibus_prefs_save(&saved) == 0, "save");
     chewing_plus_ibus_prefs_load(&loaded);
     check(is(&loaded, "emoji", "0") && is(&loaded, "shortcode_prefix", "``") &&
               is(&loaded, "calculator", NULL),
           "file round trip, strings kept, absent stays absent");
+    check(is(&loaded, "voice_key", "Super_R") &&
+              is(&loaded, "voice_translate_key", "Alt_L"),
+          "voice_key and voice_translate_key round trip like any other string");
 
     /* A file written by 5.1.13-plus.3 and earlier. */
     old = fopen(path, "w");

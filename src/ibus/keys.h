@@ -53,13 +53,22 @@ chewing_ibus_decision chewing_ibus_map_key(uint32_t keyval, uint32_t keycode,
                                            uint32_t state, int sensitive,
                                            int voice_active);
 
-/* `voice_key` is the keyval that started the running recording (0 when
- * idle); only its release stops it. With `translate_enabled`, Right Ctrl
- * held is push-to-translate (CHEWING_IBUS_KEY_TRANSLATE_START); otherwise
- * Right Ctrl is an ordinary modifier. */
+/* `voice_held` is the keyval that started the running recording (0 when
+ * idle); only its release stops it. `dictation_key` is the configured
+ * push-to-talk key (X11 keyval; 0 means Alt_R). `translate_key` is the
+ * configured push-to-translate key; 0 turns translation off. If the two
+ * are the same, dictation wins. Shift_L/Shift_R are never talk keys
+ * (Right Shift is the English-mode double tap). */
 chewing_ibus_decision chewing_ibus_map_key_ex(uint32_t keyval, uint32_t keycode,
                                               uint32_t state, int sensitive,
-                                              uint32_t voice_key,
-                                              int translate_enabled);
+                                              uint32_t voice_held,
+                                              uint32_t dictation_key,
+                                              uint32_t translate_key);
+
+/* X11 keysym name ("Alt_R", "Control_R", "Super_L", ...) to a keyval, or
+ * 0 if it is not a lone modifier we accept. */
+uint32_t chewing_ibus_parse_modifier(const char *name);
+/* 0 for Shift_L/Shift_R (reserved for English) and for 0. */
+int chewing_ibus_modifier_usable(uint32_t keyval);
 
 #endif

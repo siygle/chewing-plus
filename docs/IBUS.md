@@ -14,7 +14,9 @@ ibus restart
 ```
 
 The component is `org.freedesktop.IBus.ChewingPlus`, engine name
-`chewing-plus`, language `zh_TW`. Right Alt is push-to-talk. It speaks
+`chewing-plus`, language `zh_TW`. The push-to-talk key is `voice_key` in
+`~/.config/chewing-plus/ibus.conf` (default `Alt_R`; the setup window has
+a dropdown). It speaks
 [VOXKIT_PROTOCOL.md](VOXKIT_PROTOCOL.md) version 1 to the existing voxkit
 daemon (`voxkit serve`). The daemon owns the microphone and the model. If it
 is not listening, the auxiliary text says so and normal Zhuyin still works.
@@ -22,13 +24,16 @@ A press shorter than 250 ms is cancelled instead of transcribed, and a key
 typed while recording cancels the recording and is still typed.
 
 With `voice_translate=1` in `~/.config/chewing-plus/ibus.conf` (the setup
-window's 「語音翻譯」 switch), Right Ctrl is push-to-translate: the engine
+window's 「語音翻譯」 switch), `voice_translate_key` (default `Control_R`,
+same dropdown as the dictation key) is push-to-translate: the engine
 checks once per connection that `model.status` lists the `translate`
 capability, then sends `start` with `mode=translate` and
 `target=voice_translate_to` (default `en`). A fallback final (no plugin,
 model still downloading, ...) inserts the original text and shows the reason
-in the auxiliary text. Right Ctrl is an ordinary modifier while the setting
-is off.
+in the auxiliary text. The translate key is an ordinary modifier while the
+setting is off. If the two keys are the same, dictation wins and the setup
+window warns. `Shift_L` / `Shift_R` are not accepted (Right Shift is the
+English-mode double tap).
 
 Plus features stay off unless `CHEWING_PLUS_IBUS_FEATURES` lists them
 (`emoji`, `calculator`, `space`, `shortcode`, `english`), matching the fcitx5
@@ -56,7 +61,10 @@ download progress, and can cancel, delete, select, and show disk use and
 daemon status. Those calls are the shared C client. Plus toggles
 (emoji, calculator, spacing, shortcode, English) are written to
 `$XDG_CONFIG_HOME/chewing-plus/ibus.conf`. The engine reads that file on
-focus. `CHEWING_PLUS_IBUS_FEATURES` still overrides the file when it is
+focus. The voice section also has dropdowns for `voice_key` (default
+`Alt_R`) and `voice_translate_key` (default `Control_R`); values are X11
+keysym names, the same ones fcitx5 writes to `conf/voxkit.conf`.
+`CHEWING_PLUS_IBUS_FEATURES` still overrides the file when it is
 set. `chewing-plus-models` remains for a terminal.
 
 ```bash
