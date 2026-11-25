@@ -38,6 +38,29 @@ macOS 套件尚未經 Apple 簽章，請對 `.pkg` 按右鍵 → 打開。詳細
 
 在密碼等敏感欄位中，所有 Plus 功能都會自動停用。
 
+### 候選視窗與提示字大小（Linux）
+
+候選字浮動視窗、組字／提示文字，以及語音狀態（例如「🎙 聆聽中」）都是由輸入法前端的介面繪製，不是新酷音 Plus 自己的視窗。專案裡沒有另外的字級設定，請直接調整前端的字型：
+
+**fcitx5：** 設定 → 附加元件 → 經典使用者介面 → 字型（預設 `Sans 10`）。也可以編輯 `~/.config/fcitx5/conf/classicui.conf`：
+
+```
+Font="Sans 13"
+```
+
+存檔後執行 `fcitx5-remote -r`，或重啟 fcitx5。若在 Wayland（例如 Hyprland）把字型調大後仍偏小，可在同一檔案把 `ForceWaylandDPI` 設成 `144` 或 `192`（`0` 表示不強制，沿用 96 DPI 再乘上螢幕縮放）。`EnableFractionalScale` 預設已開啟。`MenuFont` 只影響系統列選單，不會改候選視窗。
+
+**IBus：** IBus 偏好設定 → 通用 → 字型與風格 → 勾選「使用自訂字型」，再選較大的字型。未勾選時沿用系統 GTK 字型；自訂預設是 `Sans 10`。也可以：
+
+```
+gsettings set org.freedesktop.ibus.panel use-custom-font true
+gsettings set org.freedesktop.ibus.panel custom-font 'Sans 13'
+```
+
+然後執行 `ibus restart`。
+
+若應用程式把組字區嵌在文字框裡，那段文字的大小由該程式決定，不受上述設定影響；浮動區塊與提示字仍走前端介面。
+
 ## 功能
 
 ### 免打聲調
