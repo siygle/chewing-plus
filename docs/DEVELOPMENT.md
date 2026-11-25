@@ -119,6 +119,25 @@ export PKG_CONFIG_PATH=/tmp/lc-stage/lib/pkgconfig   # or the prefix above
 cmake -B build -G Ninja && cmake --build build
 ```
 
+The libchewing prefix's `chewing.pc` (`includedir`, `libdir`, and so on)
+must point at paths that exist in this build environment. If they do not
+(for example a host path copied into a chroot), pkg-config still reports
+the package, but the linker cannot find `-lchewing`. CMake then resolves
+`chewing` to this tree's addon MODULE target of the same name and reports
+a cyclic dependency. Fix the `.pc` paths, or set `PKG_CONFIG_SYSROOT_DIR`
+to a prefix that actually contains them. Do not rename the addon target.
+
+## Debug logging
+
+fcitx5 5.1.23 does not honour `FCITX_LOG`. Start with:
+
+```bash
+fcitx5 --verbose=default=5,chewing=5
+```
+
+The `chewing` category logs English double-tap decisions (hold, gap,
+window, and the event stamp) at debug level.
+
 ## Tests
 
 All tests run in an isolated HOME / XDG dirs, so the real `~/.local/share/chewing` is never read or migrated.
