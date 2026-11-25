@@ -70,6 +70,8 @@ struct H {
 
 const Key kAltR(FcitxKey_Alt_R);
 const Key kAltRUp(FcitxKey_Alt_R, KeyState::Alt);
+const Key kCtrlR(FcitxKey_Control_R);
+const Key kCtrlRUp(FcitxKey_Control_R, KeyState::Ctrl);
 
 bool tick(H &h) {
     const std::string text = std::getenv("FAKE_TEXT");
@@ -118,11 +120,43 @@ bool tick(H &h) {
     case 32: {
         check(h.committed == text,
               "half-typed ㄋㄧ dropped, got [" + h.committed + "]");
+        h.committed.clear();
+        // Voice translation (fcitx5-voxkit TranslateEnabled): the English
+        // result goes through the same chewing insert path.
+        RawConfig raw;
+        auto *voxkit = h.instance->addonManager().addon("voxkit", true);
+        voxkit->getConfig()->save(raw);
+        raw.setValueByPath("TranslateEnabled", "True");
+        raw.setValueByPath("TranslateTarget", "en");
+        voxkit->setConfig(raw);
+        h.type("su3cl3"); // 你好
+        h.send(kCtrlR);
+        break;
+    }
+    case 36:
+        h.send(kCtrlRUp, true);
+        break;
+    case 40:
+        check(h.committed == "你好[en] Nice weather today",
+              "translation inserted after the composition, got [" +
+                  h.committed + "]");
+        check(h.preedit().empty(), "buffer empty after the translation");
+        h.committed.clear();
+        h.send(kCtrlR);
+        break;
+    case 44:
+        h.send(kCtrlRUp, true);
+        break;
+    case 48: {
+        check(h.committed == "[en] Nice weather today",
+              "translation into an empty buffer, got [" + h.committed + "]");
         std::ifstream log(std::getenv("FAKE_LOG"));
         std::stringstream s;
         s << log.rdbuf();
         check(s.str().find("\"type\": \"start\"") != std::string::npos,
               "daemon received start requests");
+        check(s.str().find("\"mode\": \"translate\"") != std::string::npos,
+              "daemon received a translate start");
         h.timer->setEnabled(false);
         std::printf(failures ? "CHEWING VOXKIT TESTS FAILED (%d)\n"
                              : "CHEWING VOXKIT TESTS OK\n",

@@ -4,12 +4,14 @@
 #
 #   chewing-plus-fcitx5   fcitx5 addon + fcitx5-voxkit module + voxkit daemon
 #   chewing-plus-ibus     IBus engine + setup window + voxkit daemon
+#   chewing-plus-translate  optional: voxkit's llama.cpp translation plugin
+#                           (/usr/lib/voxkit/libvoxkit-mt.so) for either one
 #
 # They replace the separate packages of 5.1.13-plus.1..4 (libchewing-plus,
 # fcitx5-chewing-plus, ibus-chewing-plus, fcitx5-voxkit). Both bundle the
 # same libchewing and voxkit files, so they conflict with each other.
 pkgbase=chewing-plus
-pkgname=(chewing-plus-fcitx5 chewing-plus-ibus)
+pkgname=(chewing-plus-fcitx5 chewing-plus-ibus chewing-plus-translate)
 pkgver=${CHEWING_PLUS_PKGVER:-6.0.3}
 pkgrel=1
 arch=(x86_64)
@@ -21,6 +23,8 @@ options=(!debug !lto)
 _src=${CHEWING_PLUS_SRC:?set by build-arch.sh}
 _lc=${CHEWING_PLUS_LIBCHEWING_SRC:?set by build-arch.sh}
 _vk=${CHEWING_PLUS_VOXKIT_SRC:?set by build-arch.sh}
+# llama.cpp at the commit in $_vk/daemon/mt-plugin/LLAMA_PIN.
+_llama=${CHEWING_PLUS_LLAMA_SRC:?set by build-arch.sh}
 
 build() {
   # libchewing 0.14 (pinned). Its CMake runs `git describe` in the source dir.
@@ -48,6 +52,14 @@ build() {
   TRANSCRIBE_CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_BMI2=ON -DGGML_AVX512=OFF" \
     cargo build --release --locked --manifest-path "$_vk/daemon/Cargo.toml" \
       --target-dir "$srcdir/cargo-target"
+  # Translation plugin: llama.cpp with its own static ggml, loaded by the
+  # daemon with dlopen only when someone translates. Same CPU floor.
+  cmake -S "$_vk/daemon/mt-plugin" -B "$srcdir/build-mt" -G Ninja \
+    -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
+    -DLLAMA_CPP_SOURCE_DIR="$_llama" \
+    -DGGML_NATIVE=OFF -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_F16C=ON -DGGML_AVX2=ON \
+    -DGGML_FMA=ON -DGGML_BMI2=ON -DGGML_AVX512=OFF
+  cmake --build "$srcdir/build-mt"
 
   # fcitx5 addon, built against the staged voxkit module. Its CMake config
   # names /usr/include outright, so the staged header dir is added too.
@@ -113,4 +125,15 @@ package_chewing-plus-ibus() {
   _install_common
   DESTDIR="$pkgdir" cmake --install "$srcdir/build-ibus"
   _strip_dev
+}
+
+package_chewing-plus-translate() {
+  pkgdesc="新酷音 Plus voice translation plugin for voxkit (llama.cpp; HY-MT1.5 model downloaded on first use)"
+  depends=(gcc-libs glibc)
+  optdepends=('chewing-plus-fcitx5: voxkit daemon and the Right Ctrl translate key'
+              'chewing-plus-ibus: voxkit daemon and the Right Ctrl translate key')
+  license=(MIT)
+  DESTDIR="$pkgdir" cmake --install "$srcdir/build-mt"
+  install -Dm644 "$_llama/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/llama.cpp-LICENSE"
+  install -Dm644 "$_vk/daemon/mt-plugin/LLAMA_PIN" "$pkgdir/usr/share/licenses/$pkgname/LLAMA_PIN"
 }

@@ -178,6 +178,12 @@ Do these in order. Stop at the first failure and note the exact message.
     macOS asks for microphone access for the helper. Allow it.
     Hold Right Option, say a short Traditional Chinese phrase, release.
     The text is inserted at the caret. The recording never leaves the Mac.
+    With 「語音翻譯」 on in the input menu, hold Right Command (the
+    「語音翻譯」 shortcut), speak, release: the translation into
+    「語音翻譯成」 (default English) is typed. Needs a voxkit with the
+    translate capability and libvoxkit-mt.dylib next to it; otherwise the
+    hint says why and the original text is typed. (The macOS plugin build is
+    not packaged yet.)
 12. `macos/uninstall.sh`. The input source disappears after the next login.
     Model files are still in Application Support.
 

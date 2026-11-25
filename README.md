@@ -139,6 +139,21 @@ Ctrl+Shift+Space → GitHub
 
 第一次使用前要下載語音模型（約 850 MB），可在設定中操作。
 
+#### 語音翻譯（實驗）
+按住**翻譯快捷鍵**說中文，放開後輸入翻譯後的文字（預設翻成英文）。翻譯也在本機進行，
+用的是 [HY-MT1.5-1.8B](https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF)（約 1.1 GB，
+第一次用時自動下載；Tencent HY Community License，不適用於歐盟、英國與南韓）。
+
+翻譯**預設關閉**，要另外安裝翻譯外掛（Arch：`chewing-plus-translate`）：
+
+| 平台 | 開啟 | 快捷鍵 | 目標語言 |
+|---|---|---|---|
+| fcitx5 | 設定 → 附加元件 → Voxkit → `Voice translation` | 右 Ctrl（`TranslateHotkey`） | `TranslateTarget` |
+| IBus | 「新酷音 Plus」設定程式 → 「語音翻譯」 | 右 Ctrl | `~/.config/chewing-plus/ibus.conf` 的 `voice_translate_to` |
+| macOS | 輸入法選單 →「語音翻譯」 | 右 ⌘（「快速鍵…」可改） | 輸入法選單 →「語音翻譯成」 |
+
+翻譯失敗、模型還在下載或沒有外掛時，會改輸入原本的辨識結果並顯示原因。
+
 ## 自訂詞庫（fcitx5）
 
 在 `~/.local/share/fcitx5-chewing/` 建立以下檔案：
