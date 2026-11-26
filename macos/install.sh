@@ -23,6 +23,10 @@ helper_dest="$home/Library/Application Support/ChewingPlus/voxkit"
 launch_dest="$home/Library/Application Support/ChewingPlus/voxkit-launch.sh"
 cp "$root/macos/voxkit-launch.sh" "$launch_dest"
 chmod 755 "$launch_dest"
+mt="${VOXKIT_MT_LIB:-$root/macos/build/voxkit-mt/libvoxkit-mt.dylib}"
+if [ -f "$mt" ]; then
+    cp "$mt" "$home/Library/Application Support/ChewingPlus/libvoxkit-mt.dylib"
+fi
 models="$root/macos/build/core/src/chewing-plus-models"
 if [ -x "$models" ]; then
     cp "$models" "$home/Library/Application Support/ChewingPlus/chewing-plus-models"

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Copy the daemon and the model CLI to the console user, then start the
-# agent. A missing binary makes the wrapper exit 0, so launchd does not
+# Copy the daemon, the translation plugin and the model CLI to the console
+# user, then start the agent. A missing binary makes the wrapper exit 0, so launchd does not
 # restart in a loop.
 set -euo pipefail
 user=$(stat -f '%Su' /dev/console)
@@ -18,6 +18,12 @@ if [[ -f "$payload/voxkit" ]]; then
     cp "$payload/voxkit" "$support/voxkit"
     chown "$user" "$support/voxkit"
     chmod 755 "$support/voxkit"
+fi
+# The translation plugin goes next to the daemon, where voxkit looks first.
+if [[ -f "$payload/libvoxkit-mt.dylib" ]]; then
+    cp "$payload/libvoxkit-mt.dylib" "$support/libvoxkit-mt.dylib"
+    chown "$user" "$support/libvoxkit-mt.dylib"
+    chmod 644 "$support/libvoxkit-mt.dylib"
 fi
 if [[ -f "$payload/chewing-plus-models" ]]; then
     cp "$payload/chewing-plus-models" "$support/chewing-plus-models"

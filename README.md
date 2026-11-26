@@ -176,7 +176,7 @@ Ctrl+Shift+Space → GitHub
 用的是 [HY-MT1.5-1.8B](https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF)（約 1.1 GB，
 第一次用時自動下載；Tencent HY Community License，不適用於歐盟、英國與南韓）。
 
-翻譯**預設關閉**，要另外安裝翻譯外掛（Arch：`chewing-plus-translate`）：
+翻譯**預設關閉**。Arch 要另外安裝翻譯外掛 `chewing-plus-translate`；macOS 的安裝檔已內含外掛：
 
 | 平台 | 開啟 | 快捷鍵 | 目標語言 |
 |---|---|---|---|

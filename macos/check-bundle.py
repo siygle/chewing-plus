@@ -139,6 +139,9 @@ def check_pkg(pkg):
         apps = [path for path in paths if path.rstrip("/").endswith("ChewingPlus.app")]
         if len(apps) != 1:
             errors.append("pkg payload has %d ChewingPlus.app entries" % len(apps))
+        plugin = "Library/Application Support/ChewingPlus/libvoxkit-mt.dylib"
+        if not any(plugin in path for path in paths):
+            errors.append("pkg payload is missing /" + plugin)
         if any("/._" in path or path.startswith("._") for path in paths):
             errors.append("pkg payload contains AppleDouble files")
     return errors

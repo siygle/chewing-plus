@@ -27,6 +27,13 @@ if [[ ! -x "$voxkit" ]]; then
     bash "$root/macos/build-voxkit.sh"
     voxkit="$root/macos/build/fcitx5-voxkit/daemon/target/release/voxkit"
 fi
+# Translation plugin (llama.cpp, CPU). Loaded by voxkit with dlopen only when
+# someone translates; the HY-MT model is downloaded on first use, not bundled.
+mt=${VOXKIT_MT_LIB:-"$root/macos/build/voxkit-mt/libvoxkit-mt.dylib"}
+if [[ ! -f "$mt" ]]; then
+    bash "$root/macos/build-voxkit-mt.sh"
+    mt="$root/macos/build/voxkit-mt/libvoxkit-mt.dylib"
+fi
 
 # Staging lives outside macos/build so the tree that produced the app is
 # not also inside the payload. Only one ChewingPlus.app is copied, at the
@@ -38,8 +45,10 @@ support="$stage/Library/Application Support/ChewingPlus"
 mkdir -p "$dest" "$support" "$root/macos/build"
 ditto --norsrc "$app" "$dest"
 ditto --norsrc "$voxkit" "$support/voxkit"
+ditto --norsrc "$mt" "$support/libvoxkit-mt.dylib"
 ditto --norsrc "$models" "$support/chewing-plus-models"
 chmod 755 "$support/voxkit" "$support/chewing-plus-models"
+chmod 644 "$support/libvoxkit-mt.dylib"
 find "$stage" -name '._*' -delete
 find "$stage" -name '.DS_Store' -delete
 if command -v dot_clean >/dev/null 2>&1; then
