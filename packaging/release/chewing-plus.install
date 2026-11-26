@@ -11,6 +11,33 @@ _voice_note() {
 MSG
 }
 
+_restart_note() {
+    cat <<'MSG'
+==> 新酷音 Plus：若語音服務正在執行，請重新啟動以套用更新：
+      systemctl --user restart voxkit.service
+    不重新啟動的話，舊的服務不會回報可用空間，模型視窗會顯示「可用空間 未知」，
+    且新功能要到重新啟動後才會生效。
+MSG
+}
+
+# pacman runs as root. When we can see the installing user's session,
+# try-restart their voxkit unit so the model window talks to a daemon
+# that reports free space. Failure is ignored; the note above still
+# tells the user what to run.
+_try_restart_voxkit() {
+    local user uid runtime
+    user="${SUDO_USER:-}"
+    [ -n "$user" ] && [ "$user" != root ] || return 0
+    uid=$(id -u "$user" 2>/dev/null) || return 0
+    runtime="/run/user/$uid"
+    [ -S "$runtime/bus" ] || return 0
+    if command -v runuser >/dev/null 2>&1; then
+        runuser -u "$user" -- env XDG_RUNTIME_DIR="$runtime"             systemctl --user try-restart voxkit.service >/dev/null 2>&1 || true
+    else
+        sudo -u "$user" -- env XDG_RUNTIME_DIR="$runtime"             systemctl --user try-restart voxkit.service >/dev/null 2>&1 || true
+    fi
+}
+
 post_install() {
     _voice_note
 }
@@ -20,4 +47,6 @@ post_upgrade() {
     if [ "$(vercmp "$2" 6.0.0)" -lt 0 ]; then
         _voice_note
     fi
+    _try_restart_voxkit
+    _restart_note
 }

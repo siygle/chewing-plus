@@ -45,6 +45,7 @@ struct App {
     GPtrArray *cards;
     unsigned ticks;
     guint timer;
+    guint notice_timeout;
 
     GtkWidget *window;
     GtkWidget *usage;
@@ -62,6 +63,7 @@ static App *UI;
 static void rebuild(App *app);
 static void refresh(App *app);
 static void update_cards(App *app);
+static void show_notice(App *app, const char *text, int error);
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -86,12 +88,29 @@ static int someone_busy(const App *app) {
     return transfer_busy(&app->transfer) || mm_job_running(&app->backend);
 }
 
+static gboolean hide_notice(gpointer user) {
+    App *app = user;
+    app->notice_timeout = 0;
+    show_notice(app, "", 0);
+    return G_SOURCE_REMOVE;
+}
+
 static void show_notice(App *app, const char *text, int error) {
+    if (app->notice_timeout) {
+        g_source_remove(app->notice_timeout);
+        app->notice_timeout = 0;
+    }
     gtk_label_set_text(GTK_LABEL(app->notice), text);
     gtk_widget_set_visible(app->notice, text[0] != '\0');
     if (error) {
         gtk_widget_remove_css_class(app->notice, "dim-label");
         gtk_widget_add_css_class(app->notice, "error");
+        if (text[0]) {
+            /* The in-use (and similar) errors used to stay until the
+             * window closed. Clear them after a short wait, or sooner
+             * on the next successful action / 重新整理. */
+            app->notice_timeout = g_timeout_add_seconds(8, hide_notice, app);
+        }
     } else {
         gtk_widget_remove_css_class(app->notice, "error");
         gtk_widget_add_css_class(app->notice, "dim-label");
@@ -297,7 +316,9 @@ static void update_card(App *app, Card *card) {
     gtk_widget_set_visible(card->verify, row->installed);
     gtk_widget_set_sensitive(card->verify, !busy);
     gtk_widget_set_visible(card->remove, row->installed && row->removable);
-    gtk_widget_set_sensitive(card->remove, !transferring);
+    /* Same as 檢查檔案 / 使用: a download or verify on any card
+     * disables delete on every card, including the one not transferring. */
+    gtk_widget_set_sensitive(card->remove, !busy);
 }
 
 static void update_cards(App *app) {
@@ -686,8 +707,6 @@ static void rebuild(App *app) {
 static void refresh(App *app) {
     mm_snapshot snap;
     char err[128];
-    char used[32];
-    char avail[32];
     char text[200];
     if (mm_list(&app->backend, &snap, err, sizeof(err)) != 0) {
         memset(&app->snap, 0, sizeof(app->snap));
@@ -705,9 +724,8 @@ static void refresh(App *app) {
     }
     app->snap = snap;
     app->have_snap = 1;
-    mm_format_bytes(used, sizeof(used), snap.store_bytes);
-    mm_format_bytes(avail, sizeof(avail), snap.free_bytes);
-    snprintf(text, sizeof(text), "已使用 %s · 可用空間 %s", used, avail);
+    mm_usage_text(snap.store_bytes, snap.free_bytes, snap.has_free_bytes, text,
+                  sizeof(text));
     gtk_label_set_text(GTK_LABEL(app->usage), text);
     gtk_widget_remove_css_class(app->dot, snap.online ? "warning" : "success");
     gtk_widget_add_css_class(app->dot, snap.online ? "success" : "warning");
@@ -877,6 +895,10 @@ static void shutdown_app(GApplication *gapp, gpointer user) {
     if (app->timer) {
         g_source_remove(app->timer);
         app->timer = 0;
+    }
+    if (app->notice_timeout) {
+        g_source_remove(app->notice_timeout);
+        app->notice_timeout = 0;
     }
     mm_close(&app->backend);
 }

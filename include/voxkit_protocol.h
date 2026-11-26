@@ -89,6 +89,7 @@ typedef struct voxkit_message {
     /* Model-manager extension ("model-manager" capability). */
     int caps_model_manager;
     uint64_t free_bytes; /* model.list/status: free space in the store */
+    int has_free_bytes;  /* 1 when the line carried free_bytes */
     char model_mt[64];   /* model.list/status: selected translation model */
     char result[16];     /* model.verify: ok | missing | corrupt */
 } voxkit_message;

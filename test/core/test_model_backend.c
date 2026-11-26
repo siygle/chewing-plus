@@ -276,7 +276,8 @@ static void check_snapshot(const mm_snapshot *snap, int online,
     check(snap->count == 3 && snap->online == online, what);
     snprintf(what, sizeof(what), "%s: store, used and free space", tag);
     check(strcmp(snap->store, "/tmp/fake-models") == 0 &&
-              snap->store_bytes == 1500 && snap->free_bytes == 9000000000ULL,
+              snap->store_bytes == 1500 && snap->free_bytes == 9000000000ULL &&
+              snap->has_free_bytes,
           what);
     snprintf(what, sizeof(what), "%s: selected speech and translation model",
              tag);
@@ -467,6 +468,92 @@ static void test_text(void) {
     check(mm_verify_text("corrupt", "M", out, sizeof(out)) == 1 &&
               strstr(out, "損毀") != NULL,
           "text: verify corrupt");
+    mm_usage_text(0, 0, 0, out, sizeof(out));
+    check(strstr(out, "已使用 0 B") != NULL && strstr(out, "未知") != NULL &&
+              strstr(out, "可用空間 0 B") == NULL,
+          "text: missing free space is 未知, not 0 B");
+    mm_usage_text(0, 0, 1, out, sizeof(out));
+    check(strstr(out, "可用空間 0 B") != NULL, "text: a reported zero is 0 B");
+    mm_usage_text(1500, 9000000000ULL, 1, out, sizeof(out));
+    check(strstr(out, "已使用 1.5 KB") != NULL &&
+              strstr(out, "可用空間 9.0 GB") != NULL,
+          "text: used and free space when reported");
+}
+
+static char *save_env(const char *key) {
+    const char *value = getenv(key);
+    return value ? strdup(value) : NULL;
+}
+
+static void restore_env(const char *key, char *saved) {
+    if (saved) {
+        setenv(key, saved, 1);
+        free(saved);
+    } else {
+        unsetenv(key);
+    }
+}
+
+static void test_daemon_env(const char *dir) {
+    char unit[256];
+    char *model;
+    char *store;
+    char *mt;
+    char *home;
+    FILE *f;
+    const char *path;
+
+    model = save_env("VOXKIT_MODEL");
+    store = save_env("VOXKIT_MODELS_DIR");
+    mt = save_env("VOXKIT_MT_MODEL");
+    home = save_env("HOME");
+
+    unsetenv("VOXKIT_MODEL");
+    unsetenv("VOXKIT_MODELS_DIR");
+    unsetenv("VOXKIT_MT_MODEL");
+    setenv("HOME", "/tmp/mm-home", 1);
+    mm_apply_daemon_env("/no/such/voxkit.service");
+    check(strcmp(getenv("VOXKIT_MODEL") ? getenv("VOXKIT_MODEL") : "",
+                 "qwen3-asr-0.6b") == 0,
+          "env: default preferred model matches the user unit");
+    path = getenv("VOXKIT_MODELS_DIR");
+    check(path && strcmp(path, "/tmp/mm-home/.local/share/voxkit/models") == 0,
+          "env: default store is ~/.local/share/voxkit/models");
+
+    unsetenv("VOXKIT_MODEL");
+    unsetenv("VOXKIT_MODELS_DIR");
+    snprintf(unit, sizeof(unit), "%s/voxkit.service", dir);
+    f = fopen(unit, "w");
+    if (!f) {
+        perror("unit");
+        failures++;
+        goto done;
+    }
+    fputs("[Service]\n"
+          "Environment=VOXKIT_MODEL=whisper-tiny\n"
+          "Environment=VOXKIT_MODELS_DIR=%h/.custom/models\n"
+          "Environment=VOXKIT_MT_MODEL=hy-mt1.5-1.8b\n",
+          f);
+    fclose(f);
+    mm_apply_daemon_env(unit);
+    check(strcmp(getenv("VOXKIT_MODEL"), "whisper-tiny") == 0,
+          "env: unit file sets the preferred model");
+    check(strcmp(getenv("VOXKIT_MODELS_DIR"), "/tmp/mm-home/.custom/models") ==
+              0,
+          "env: unit file %h is expanded in the store path");
+    check(strcmp(getenv("VOXKIT_MT_MODEL"), "hy-mt1.5-1.8b") == 0,
+          "env: unit file sets the translation model");
+
+    setenv("VOXKIT_MODEL", "already-set", 1);
+    mm_apply_daemon_env(unit);
+    check(strcmp(getenv("VOXKIT_MODEL"), "already-set") == 0,
+          "env: an existing value is not overwritten");
+
+done:
+    restore_env("VOXKIT_MODEL", model);
+    restore_env("VOXKIT_MODELS_DIR", store);
+    restore_env("VOXKIT_MT_MODEL", mt);
+    restore_env("HOME", home);
 }
 
 int main(void) {
@@ -490,6 +577,7 @@ int main(void) {
 
     test_protocol_fields();
     test_text();
+    test_daemon_env(dir);
     test_online(dir);
     test_offline(dir);
 

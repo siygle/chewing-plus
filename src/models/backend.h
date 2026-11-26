@@ -29,6 +29,7 @@ typedef struct mm_snapshot {
     char model_mt[64]; /* selected translation model */
     uint64_t store_bytes;
     uint64_t free_bytes;
+    int has_free_bytes; /* 0: an older daemon omitted it; do not show 0 B */
     voxkit_model_info rows[VOXKIT_MODELS_MAX];
     size_t count;
 } mm_snapshot;
@@ -111,6 +112,17 @@ mm_event_type mm_job_pump(mm_backend *backend, mm_event *event);
 
 /* Text for the window. */
 void mm_format_bytes(char *buf, size_t n, uint64_t bytes);
+/* Header line: used space and free space, or 「未知」 when free space was
+ * not reported (an older daemon, typically after a package upgrade
+ * before the user unit is restarted). */
+void mm_usage_text(uint64_t store_bytes, uint64_t free_bytes, int has_free,
+                   char *out, size_t n);
+/* Before running the offline `voxkit` command, fill in VOXKIT_MODELS_DIR,
+ * VOXKIT_MODEL and VOXKIT_MT_MODEL the way the user unit does, without
+ * overwriting a value already in the environment. `unit_path` NULL uses
+ * the installed unit, then the same compiled-in defaults as the package.
+ * This way the offline list shows the same selected model as the daemon. */
+void mm_apply_daemon_env(const char *unit_path);
 /* The notice for a refusal code (license-required, no-space, in-use, ...). */
 void mm_error_text(const char *code, const char *message, char *out, size_t n);
 /* verify result word -> notice. `corrupt` returns 1 (an error). */

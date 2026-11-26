@@ -109,9 +109,19 @@ static void test_model_manager(void) {
     check(voxkit_proto_parse(line, &msg, err, sizeof(err)) == VOXKIT_PROTO_OK,
           "manager list parses");
     check(msg.caps_model_manager && msg.caps_translate &&
-              msg.free_bytes == 5000 &&
+              msg.free_bytes == 5000 && msg.has_free_bytes &&
               strcmp(msg.model_mt, "hy-mt1.5-1.8b") == 0,
           "manager list summary");
+    check(voxkit_proto_parse("{\"v\":1,\"type\":\"model.list\","
+                             "\"store\":\"/s\",\"store_bytes\":12}",
+                             &msg, err, sizeof(err)) == VOXKIT_PROTO_OK &&
+              !msg.has_free_bytes && msg.free_bytes == 0,
+          "an older list without free_bytes is marked unreported");
+    check(voxkit_proto_parse("{\"v\":1,\"type\":\"model.list\","
+                             "\"free_bytes\":0}",
+                             &msg, err, sizeof(err)) == VOXKIT_PROTO_OK &&
+              msg.has_free_bytes && msg.free_bytes == 0,
+          "free_bytes:0 is reported as zero, not missing");
     check(voxkit_proto_parse_models(line, rows, VOXKIT_MODELS_MAX, &count, err,
                                     sizeof(err)) == VOXKIT_PROTO_OK &&
               count == 1,

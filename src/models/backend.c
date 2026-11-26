@@ -103,6 +103,9 @@ static pid_t spawn(char *const *argv, int *read_fd) {
         }
         close(fds[0]);
         close(fds[1]);
+        /* Same store and preferred models as the user unit, so the
+         * offline list matches what the daemon would show. */
+        mm_apply_daemon_env(NULL);
         execvp(argv[0], argv);
         _exit(127);
     }
@@ -291,6 +294,7 @@ static void fill_snapshot(mm_snapshot *out, const char *line, int online,
     copy_text(out->model_mt, sizeof(out->model_mt), summary.model_mt);
     out->store_bytes = summary.store_bytes;
     out->free_bytes = summary.free_bytes;
+    out->has_free_bytes = summary.has_free_bytes;
 }
 
 static int list_online(mm_backend *backend, mm_snapshot *out) {
@@ -656,6 +660,148 @@ void mm_format_bytes(char *buf, size_t n, uint64_t bytes) {
         snprintf(buf, n, "%.1f KB", (double)bytes / 1e3);
     } else {
         snprintf(buf, n, "%llu B", (unsigned long long)bytes);
+    }
+}
+
+void mm_usage_text(uint64_t store_bytes, uint64_t free_bytes, int has_free,
+                   char *out, size_t n) {
+    char used[32];
+    char avail[32];
+    mm_format_bytes(used, sizeof(used), store_bytes);
+    if (has_free) {
+        mm_format_bytes(avail, sizeof(avail), free_bytes);
+        snprintf(out, n, "已使用 %s · 可用空間 %s", used, avail);
+    } else {
+        snprintf(out, n, "已使用 %s · 可用空間 未知", used);
+    }
+}
+
+static void set_if_unset(const char *key, const char *value) {
+    const char *have = getenv(key);
+    if ((!have || !have[0]) && value && value[0]) {
+        setenv(key, value, 0);
+    }
+}
+
+static void expand_unit_value(char *dest, size_t n, const char *value) {
+    const char *home = getenv("HOME");
+    const char *s = value;
+    size_t used = 0;
+    if (!dest || n == 0) {
+        return;
+    }
+    dest[0] = '\0';
+    while (*s && used + 1 < n) {
+        if (s[0] == '%' && s[1] == 'h' && home && home[0]) {
+            size_t len = strlen(home);
+            if (used + len >= n) {
+                break;
+            }
+            memcpy(dest + used, home, len);
+            used += len;
+            dest[used] = '\0';
+            s += 2;
+            continue;
+        }
+        dest[used++] = *s++;
+        dest[used] = '\0';
+    }
+}
+
+/* One `Environment=KEY=VALUE` (or several KEY=VALUE on the same line). */
+static void apply_environment_line(const char *line) {
+    const char *p = line;
+    if (strncmp(p, "Environment=", 12) != 0) {
+        return;
+    }
+    p += 12;
+    while (*p) {
+        char key[128];
+        char raw[512];
+        char value[512];
+        const char *eq;
+        const char *end;
+        size_t key_n;
+        size_t val_n;
+        int quoted = 0;
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        if (*p == '\0' || *p == '\n' || *p == '#') {
+            break;
+        }
+        if (*p == '"' || *p == '\'') {
+            quoted = *p;
+            p++;
+        }
+        eq = strchr(p, '=');
+        if (!eq) {
+            break;
+        }
+        key_n = (size_t)(eq - p);
+        if (key_n == 0 || key_n >= sizeof(key)) {
+            break;
+        }
+        memcpy(key, p, key_n);
+        key[key_n] = '\0';
+        p = eq + 1;
+        if (quoted) {
+            end = p;
+            while (*end && *end != quoted) {
+                end++;
+            }
+        } else {
+            end = p;
+            while (*end && *end != ' ' && *end != '\t' && *end != '\n') {
+                end++;
+            }
+        }
+        val_n = (size_t)(end - p);
+        if (val_n >= sizeof(raw)) {
+            val_n = sizeof(raw) - 1;
+        }
+        memcpy(raw, p, val_n);
+        raw[val_n] = '\0';
+        expand_unit_value(value, sizeof(value), raw);
+        set_if_unset(key, value);
+        p = end;
+        if (quoted && *p == quoted) {
+            p++;
+        }
+    }
+}
+
+void mm_apply_daemon_env(const char *unit_path) {
+    const char *path = (unit_path && unit_path[0])
+                           ? unit_path
+                           : "/usr/lib/systemd/user/voxkit.service";
+    FILE *file = fopen(path, "r");
+    char line[1024];
+    char models[512];
+    const char *home;
+    const char *xdg;
+    if (file) {
+        while (fgets(line, sizeof(line), file)) {
+            apply_environment_line(line);
+        }
+        fclose(file);
+    }
+    /* Same defaults as the packaged user unit, if that file is missing
+     * or did not set these keys. */
+    set_if_unset("VOXKIT_MODEL", "qwen3-asr-0.6b");
+    if (getenv("VOXKIT_MODELS_DIR") && getenv("VOXKIT_MODELS_DIR")[0]) {
+        return;
+    }
+    xdg = getenv("XDG_DATA_HOME");
+    home = getenv("HOME");
+    /* The user unit pins %h/.local/share/voxkit/models (not $XDG_DATA_HOME),
+     * so prefer that when HOME is known. Fall back to XDG only then. */
+    if (home && home[0]) {
+        snprintf(models, sizeof(models), "%s/.local/share/voxkit/models", home);
+        set_if_unset("VOXKIT_MODELS_DIR", models);
+    } else if (xdg && xdg[0]) {
+        snprintf(models, sizeof(models), "%s/voxkit/models", xdg);
+        set_if_unset("VOXKIT_MODELS_DIR", models);
     }
 }
 

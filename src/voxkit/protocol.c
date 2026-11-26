@@ -413,6 +413,7 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
                 out->received = (uint64_t)num;
             } else if (strcmp(key, "free_bytes") == 0) {
                 out->free_bytes = (uint64_t)num;
+                out->has_free_bytes = 1;
             } else {
                 out->store_bytes = (uint64_t)num;
             }
