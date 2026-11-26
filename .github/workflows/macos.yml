@@ -23,11 +23,11 @@ jobs:
       - name: Protocol tests and IMK typecheck
         run: sh macos/typecheck.sh
   bundle:
-    # macos-latest (arm64) was failing to acquire a hosted runner
-    # ("capacity constraints"); macos-15 has been acquiring promptly
-    # and is also Apple Silicon, so the pkg stays arm64.
-    name: bundle app (macos-15)
-    runs-on: macos-15
+    # Runner availability flips: macos-15 was used when latest had no
+    # hosts, then latest started acquiring again while 15 stayed queued.
+    # Prefer macos-latest (Apple Silicon, same image we shipped earlier).
+    name: bundle app (macos-latest)
+    runs-on: macos-latest
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7
