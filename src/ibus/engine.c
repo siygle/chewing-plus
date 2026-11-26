@@ -19,13 +19,13 @@ typedef struct {
     uint64_t voice_req;
     int voice_active;
     int voice_failed;
-    uint32_t voice_key;    /* keyval that started the running recording */
-    gint64 voice_since;    /* monotonic µs when that key went down */
-    int voice_translating; /* the running request is mode=translate */
-    int voice_caps;        /* translate capability: -1 not asked yet */
+    uint32_t voice_key;        /* keyval that started the running recording */
+    gint64 voice_since;        /* monotonic µs when that key went down */
+    int voice_translating;     /* the running request is mode=translate */
+    int voice_caps;            /* translate capability: -1 not asked yet */
     uint32_t dictation_keyval; /* from ibus.conf voice_key; default Alt_R */
     uint32_t translate_keyval; /* from voice_translate_key; 0 if off */
-    uint64_t drawn;        /* chewing_plus_view revision last drawn */
+    uint64_t drawn;            /* chewing_plus_view revision last drawn */
     IBusPropList *props;
     IBusProperty *mode_prop; /* 中 / 英 in the IBus panel */
     int shift_toggle;
