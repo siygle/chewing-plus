@@ -1,5 +1,17 @@
 新酷音 Plus：在新酷音上加入 emoji、計算機、英文模式與本機語音輸入。基於 [fcitx/fcitx5-chewing](https://github.com/fcitx/fcitx5-chewing) 與 libchewing 0.14。功能說明請看 [README](https://github.com/siygle/chewing-plus#readme)。
 
+## 6.1.0
+
+- **實驗性語音翻譯**：按住翻譯鍵說話，用本機 HY-MT1.5 模型翻譯後送出。預設關閉；翻譯外掛是另外的選用套件 `chewing-plus-translate`。
+- **翻譯快捷鍵可自訂**：設定方式跟聽寫鍵一樣，fcitx5、IBus、macOS 都支援。預設 Linux 是右 Ctrl、macOS 是右 Cmd。跟聽寫鍵或右 Shift 衝突時會拒絕或警告。
+- **IBus**：錄音中不再吞掉其他按鍵；按住不到 250 ms 會取消。
+- **辨識模型備援**：偏好的 qwen3-asr-0.6b 不在時，改用已安裝的模型。
+- **翻譯模型不在時先送出原文**，並在背景下載。`voxkit translate` 同樣退回原文並以 exit 3 結束，加 `--wait` 時會等下載完再翻。
+- **英文句子含空格時整句送出**。
+- **Arch**：`replaces=` 涵蓋官方的 `libchewing` 和 `fcitx5-chewing`；修正 `install-arch.sh`。
+- **文件**：說明怎麼放大 Linux 的候選和提示視窗字型。
+- **已知限制**：macOS 的翻譯外掛還沒編譯驗證，也還沒打包；兩個模型都載入時記憶體約 2 GB；HY-MT 的授權排除歐盟、英國和南韓；譯文前面不會自動加空格。
+
 ## 6.0.3
 
 - **修正 Omarchy 預設鍵盤選項下雙擊右 Shift 無效**：在 `shift:both_capslock_cancel` 下，右 Shift 放開時 keysym 會變成 Caps_Lock，快捷鍵對不到。改為同時以實體鍵碼辨識 Shift（右 Shift 62、左 Shift 50），單擊 Shift 與 Caps Lock 行為不變。

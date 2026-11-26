@@ -12,7 +12,7 @@
 # same libchewing and voxkit files, so they conflict with each other.
 pkgbase=chewing-plus
 pkgname=(chewing-plus-fcitx5 chewing-plus-ibus chewing-plus-translate)
-pkgver=${CHEWING_PLUS_PKGVER:-6.0.3}
+pkgver=${CHEWING_PLUS_PKGVER:-6.1.0}
 pkgrel=1
 arch=(x86_64)
 url="https://github.com/siygle/chewing-plus"
