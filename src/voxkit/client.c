@@ -230,7 +230,8 @@ int voxkit_client_model_install(voxkit_client *client, uint64_t req,
 
 int voxkit_client_model_install_accept(voxkit_client *client, uint64_t req,
                                        const char *model, voxkit_message *reply,
-                                       int timeout_ms, char *err, size_t err_n) {
+                                       int timeout_ms, char *err,
+                                       size_t err_n) {
     char line[320];
     if (voxkit_proto_write_model_install_accept(line, sizeof(line), req,
                                                 model) < 0) {

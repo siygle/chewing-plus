@@ -867,7 +867,8 @@ static int parse_one_model(const char **pp, voxkit_model_info *info) {
         } else if (flag) {
             if (parse_bool(&p, flag) != 0) {
                 return -1;
-            }        } else if (skip_value(&p) != 0) {
+            }
+        } else if (skip_value(&p) != 0) {
             return -1;
         }
         p = skip(p);

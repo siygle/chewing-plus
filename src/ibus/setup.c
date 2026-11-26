@@ -194,8 +194,9 @@ static void refresh_list(void) {
         return;
     }
     memset(&summary, 0, sizeof(summary));
-    if (voxkit_client_model_list(&UI->voice, ++UI->req, rows, VOXKIT_MODELS_MAX, &count,
-                                 &summary, 1000, err, sizeof(err)) != 0) {
+    if (voxkit_client_model_list(&UI->voice, ++UI->req, rows, VOXKIT_MODELS_MAX,
+                                 &count, &summary, 1000, err,
+                                 sizeof(err)) != 0) {
         fail(err, "讀不到模型列表。");
         return;
     }

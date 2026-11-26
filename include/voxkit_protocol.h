@@ -88,9 +88,9 @@ typedef struct voxkit_message {
     int caps_translate;       /* model.status/list: "translate" capability */
     /* Model-manager extension ("model-manager" capability). */
     int caps_model_manager;
-    uint64_t free_bytes;      /* model.list/status: free space in the store */
-    char model_mt[64];        /* model.list/status: selected translation model */
-    char result[16];          /* model.verify: ok | missing | corrupt */
+    uint64_t free_bytes; /* model.list/status: free space in the store */
+    char model_mt[64];   /* model.list/status: selected translation model */
+    char result[16];     /* model.verify: ok | missing | corrupt */
 } voxkit_message;
 
 /* One catalog row from a model.list line. */
@@ -104,12 +104,12 @@ typedef struct voxkit_model_info {
     int active;
     /* Model-manager extension; empty or zero from an older daemon. */
     char title[128];
-    char purpose[8];      /* asr | mt | vad */
+    char purpose[8]; /* asr | mt | vad */
     char license[128];
     char restriction[512];
     uint64_t partial_bytes;
     uint64_t runtime_bytes;
-    int restricted;       /* needs license consent before download */
+    int restricted; /* needs license consent before download */
     int license_accepted;
     int recommended;
     int selectable;

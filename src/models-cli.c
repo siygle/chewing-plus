@@ -70,8 +70,8 @@ static int cmd_list(voxkit_client *client) {
     size_t count = 0;
     size_t i;
     char err[256] = "";
-    if (voxkit_client_model_list(client, 1, rows, VOXKIT_MODELS_MAX, &count, &msg, 1000, err,
-                                 sizeof(err)) != 0) {
+    if (voxkit_client_model_list(client, 1, rows, VOXKIT_MODELS_MAX, &count,
+                                 &msg, 1000, err, sizeof(err)) != 0) {
         return fail(err);
     }
     print_status(&msg);
@@ -108,14 +108,15 @@ static int cmd_install(voxkit_client *client, const char *id, int accept) {
     int spins = 0;
     int rc;
     memset(&msg, 0, sizeof(msg));
-    rc = accept ? voxkit_client_model_install_accept(client, 1, id, &msg,
-                                                         1000, err, sizeof(err))
-                    : voxkit_client_model_install(client, 1, id, &msg, 1000,
-                                                  err, sizeof(err));
+    rc = accept ? voxkit_client_model_install_accept(client, 1, id, &msg, 1000,
+                                                     err, sizeof(err))
+                : voxkit_client_model_install(client, 1, id, &msg, 1000, err,
+                                              sizeof(err));
     if (rc != 0) {
         if (!accept && strcmp(msg.code, "license-required") == 0) {
-            fprintf(stderr, "chewing-plus-models: %s\n"
-                            "re-run with --accept-license to accept it\n",
+            fprintf(stderr,
+                    "chewing-plus-models: %s\n"
+                    "re-run with --accept-license to accept it\n",
                     err);
             return 1;
         }
@@ -230,7 +231,8 @@ static int dispatch(voxkit_client *client, int argc, char **argv) {
     }
     if (strcmp(argv[1], "install") == 0 && argc >= 3) {
         return cmd_install(client, argv[2],
-                           argc >= 4 && strcmp(argv[3], "--accept-license") == 0);
+                           argc >= 4 &&
+                               strcmp(argv[3], "--accept-license") == 0);
     }
     if (strcmp(argv[1], "verify") == 0 && argc >= 3) {
         return cmd_verify(client, argv[2]);
