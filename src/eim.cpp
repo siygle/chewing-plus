@@ -18,6 +18,7 @@
 #include <fcitx-utils/key.h>
 #include <fcitx-utils/keysym.h>
 #include <fcitx-utils/log.h>
+#include <fcitx-utils/misc.h>
 #include <fcitx-utils/standardpaths.h>
 #include <fcitx-utils/textformatflags.h>
 #include <fcitx-utils/utf8.h>
@@ -431,6 +432,25 @@ ChewingEngine::ChewingEngine(Instance *instance) : instance_(instance) {
 #ifdef CHEWING_WITH_VOXKIT
     registerVoxkit();
 #endif
+    // Shown in the status area / input method menu while Chewing is the
+    // active input method, and only when the window is installed.
+    if (std::string_view(CHEWING_PLUS_MODEL_MANAGER).size() > 0) {
+        modelsAction_.setShortText(_("Voice Models..."));
+        modelsAction_.setLongText(_("Download, delete and choose the speech "
+                                    "recognition and translation models"));
+        modelsAction_.setIcon("audio-input-microphone");
+        modelsAction_.connect<SimpleAction::Activated>(
+            [](InputContext *) { ChewingEngine::openModelManager(); });
+        instance_->userInterfaceManager().registerAction("chewing-voice-models",
+                                                         &modelsAction_);
+    }
+}
+
+void ChewingEngine::openModelManager() {
+    const std::string program = CHEWING_PLUS_MODEL_MANAGER;
+    if (!program.empty()) {
+        startProcess({program});
+    }
 }
 
 #ifdef CHEWING_WITH_VOXKIT
@@ -671,6 +691,9 @@ void ChewingEngine::activate(const InputMethodEntry & /*entry*/,
     if (auto *action =
             instance_->userInterfaceManager().lookupAction("chttrans")) {
         ic->statusArea().addAction(StatusGroup::InputMethod, action);
+    }
+    if (std::string_view(CHEWING_PLUS_MODEL_MANAGER).size() > 0) {
+        ic->statusArea().addAction(StatusGroup::InputMethod, &modelsAction_);
     }
     if (!ic_.isNull() && ic_.get() != ic) {
         doReset(event);

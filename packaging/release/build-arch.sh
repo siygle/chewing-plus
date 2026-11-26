@@ -84,6 +84,10 @@ fi
 check_common() {
     test -f /usr/share/libchewing/static_dict.bin
     test -x /usr/bin/voxkit
+    # The 語音模型 window: program, launcher, and nothing missing at link time.
+    test -x /usr/bin/chewing-plus-model-manager
+    test -f /usr/share/applications/im.chewing.plus.model-manager.desktop
+    ldd /usr/bin/chewing-plus-model-manager | grep -q 'not found' && exit 1
     test -f /usr/lib/systemd/user/voxkit.service
     # Installed, not enabled for anyone.
     ! ls /etc/systemd/user/*/voxkit.service >/dev/null 2>&1

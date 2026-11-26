@@ -56,9 +56,13 @@ answers `ping`, `start`, `stop`, `model.status`, and `model.list`.
 
 `-DENABLE_IBUS_SETUP=ON` builds `ibus-setup-chewing-plus` and writes its
 path into the component `<setup>` entry. It needs `libadwaita-1` (GTK4).
-The engine does not link libadwaita. The window lists models, shows
-download progress, and can cancel, delete, select, and show disk use and
-daemon status. Those calls are the shared C client. Plus toggles
+The engine does not link libadwaita. Models are not managed here: the
+「語音模型…」 button opens `chewing-plus-model-manager` (`-DENABLE_MODEL_MANAGER=ON`),
+the same GTK4 window as the fcitx5 build and the macOS app, with separate
+speech recognition and translation sections, download / resume / cancel /
+use / verify / delete, and the license checkbox for HY-MT (the setup window
+used to show only a `license-required` error). It works with the daemon
+stopped, through `voxkit model ... --json`. Plus toggles
 (emoji, calculator, spacing, shortcode, English) are written to
 `$XDG_CONFIG_HOME/chewing-plus/ibus.conf`. The engine reads that file on
 focus. The voice section also has dropdowns for `voice_key` (default

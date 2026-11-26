@@ -86,7 +86,7 @@ jobs:
         with:
           path: fcitx5-chewing
           cmake-option: >-
-            -DENABLE_IBUS=ON -DENABLE_IBUS_SETUP=ON
+            -DENABLE_IBUS=ON -DENABLE_IBUS_SETUP=ON -DENABLE_MODEL_MANAGER=ON
         env:
           CHEWING_TEST_DATA: /usr/share/libchewing
       - name: Test

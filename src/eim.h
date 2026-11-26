@@ -18,6 +18,7 @@
 #include <fcitx-utils/i18n.h>
 #include <fcitx-utils/misc.h>
 #include <fcitx-utils/trackableobject.h>
+#include <fcitx/action.h>
 #include <fcitx/addonfactory.h>
 #include <fcitx/addoninstance.h>
 #include <fcitx/addonmanager.h>
@@ -150,6 +151,12 @@ FCITX_CONFIG_ENUM_NAME_WITH_I18N(SwitchInputMethodBehavior, N_("Clear"),
                                  N_("Commit current preedit"),
                                  N_("Commit default selection"))
 
+// Program the 語音模型 button launches (set by CMake when the window is
+// built; empty otherwise, and the button does nothing).
+#ifndef CHEWING_PLUS_MODEL_MANAGER
+#define CHEWING_PLUS_MODEL_MANAGER ""
+#endif
+
 FCITX_CONFIGURATION(
     ChewingConfig,
     OptionWithAnnotation<ChewingSelectionKey, ChewingSelectionKeyI18NAnnotation>
@@ -256,13 +263,20 @@ FCITX_CONFIGURATION(
     Option<std::string> VoiceModel{
         this, "VoiceModel",
         _("Voice: active model id (empty keeps the daemon's choice; "
-          "list, download, cancel, and delete with chewing-plus-models)"),
+          "download, delete, and choose models in the voice model window)"),
         ""};
     Option<std::string> VoiceModelStatus{
         this, "VoiceModelStatus",
         _("Voice: daemon, download state, store path, and disk use "
           "(refreshed when this dialog opens)"),
-        ""};);
+        ""};
+    // A button in the configuration dialog: opens the GTK 語音模型 window
+    // (speech recognition and translation models, license consent).
+    ExternalOption ModelManager{
+        this, "ModelManager",
+        _("Voice: model manager (download, delete, and choose speech "
+          "recognition and translation models)"),
+        CHEWING_PLUS_MODEL_MANAGER};);
 
 // All composition logic lives in libchewing-plus-core (chewing_plus.h), the
 // same C ABI the IBus engine and the macOS input method use. This class maps
@@ -311,6 +325,8 @@ public:
 
     chewing_plus_session *session() { return session_.get(); }
     InputContext *currentContext() { return ic_.get(); }
+    // The input method menu entry 「語音模型…」 (like the macOS menu item).
+    static void openModelManager();
 
 private:
     struct SessionDelete {
@@ -335,6 +351,7 @@ private:
     static bool voiceUnitEnabled();
     static void setVoiceUnit(bool on);
     Instance *instance_;
+    SimpleAction modelsAction_;
     ChewingConfig config_;
     std::unique_ptr<chewing_plus_session, SessionDelete> session_;
     TrackableObjectReference<InputContext> ic_;

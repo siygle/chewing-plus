@@ -3,7 +3,10 @@
 # the Plus data. Driven by packaging/release/build-arch.sh (CI).
 #
 #   chewing-plus-fcitx5   fcitx5 addon + fcitx5-voxkit module + voxkit daemon
+#                         + the 語音模型 window (menu entry, config button,
+#                         launcher)
 #   chewing-plus-ibus     IBus engine + setup window + voxkit daemon
+#                         + the 語音模型 window
 #   chewing-plus-translate  optional: voxkit's llama.cpp translation plugin
 #                           (/usr/lib/voxkit/libvoxkit-mt.so) for either one
 #
@@ -67,12 +70,13 @@ build() {
   CXXFLAGS="${CXXFLAGS} -I$vkinc" \
   cmake -S "$_src" -B "$srcdir/build-fcitx5" -G Ninja -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_BUILD_TYPE=Release -DENABLE_TEST=OFF -DENABLE_VOXKIT=ON \
+    -DENABLE_MODEL_MANAGER=ON \
     -DCMAKE_PREFIX_PATH="$stage;$srcdir/voxkit-stage/usr"
   cmake --build "$srcdir/build-fcitx5"
   # IBus engine and setup window (no fcitx5).
   cmake -S "$_src" -B "$srcdir/build-ibus" -G Ninja -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_BUILD_TYPE=Release -DENABLE_TEST=OFF -DCHEWING_PLUS_CORE_ONLY=ON \
-    -DENABLE_IBUS=ON -DENABLE_IBUS_SETUP=ON
+    -DENABLE_IBUS=ON -DENABLE_IBUS_SETUP=ON -DENABLE_MODEL_MANAGER=ON
   cmake --build "$srcdir/build-ibus"
 }
 
@@ -103,7 +107,8 @@ package_chewing-plus-fcitx5() {
   pkgdesc="新酷音 Plus for Fcitx5 (all-in-one: libchewing 0.14, Plus features, voxkit dictation)"
   # opencc: dictation output in Traditional Chinese (s2twp). Without it the
   # transcript stays Simplified.
-  depends=(fcitx5 json-c alsa-lib opencc gcc-libs glibc)
+  # libadwaita: the 語音模型 window (chewing-plus-model-manager, GTK4).
+  depends=(fcitx5 json-c alsa-lib opencc libadwaita gcc-libs glibc)
   provides=("libchewing=0.14.0" libchewing.so "fcitx5-chewing=${pkgver}"
             "fcitx5-voxkit=${pkgver}")
   conflicts=(libchewing fcitx5-chewing chewing-plus-ibus "${_old_packages[@]}")

@@ -196,3 +196,15 @@ msgstr "asdfzxcv89"
 #: src/eim.h:58
 msgid "dstnaeo789"
 msgstr "dstnaeo789"
+
+#: src/eim.cpp
+msgid "Voice Models..."
+msgstr "语音模型…"
+
+#: src/eim.cpp
+msgid "Download, delete and choose the speech recognition and translation models"
+msgstr "下载、删除并选用语音识别和翻译模型"
+
+#: src/eim.h
+msgid "Voice: model manager (download, delete, and choose speech recognition and translation models)"
+msgstr "语音：模型管理（下载、删除并选用语音识别和翻译模型）"

@@ -161,10 +161,30 @@ libchewing 0.14 data: set `CHEWING_TEST_DATA` to the directory that contains
 fcitx5's config dialog can store the active voice model id (`VoiceModel`)
 and shows daemon, download state, store path, and disk use in
 `VoiceModelStatus` when the dialog opens. It cannot draw a progress bar.
-`chewing-plus-models` does list, download, cancel, and delete. A richer
-fcitx page would be a custom widget inside fcitx5-configtool (Qt, the
-toolkit that program already uses) or a D-Bus page. Neither is in this
-tree.
+`chewing-plus-models` does list, download, cancel, and delete in a terminal.
+The graphical 「語音模型」 window is `chewing-plus-model-manager`
+(`ENABLE_MODEL_MANAGER=ON`, GTK4 + libadwaita; the packages build it). It is
+the Linux twin of the macOS SwiftUI window, see "Model manager window" below.
+fcitx5-configtool cannot host a custom page, so fcitx5 opens the window three
+ways: an `ExternalOption` button (「Voice: model manager」) in the Chewing
+configuration dialog, a 「語音模型…」 entry in the status area / input method
+menu while Chewing is active, and the 「新酷音 Plus 語音模型」 launcher
+(`im.chewing.plus.model-manager.desktop`).
+
+### Model manager window
+
+- `src/models/backend.c` (no GTK, unit-tested by `test/core/test_model_backend.c`):
+  asks the voxkit daemon (shared C client) and, when the socket is not there,
+  runs `voxkit model ... --json` (`VOXKIT_BIN` overrides the program). Both
+  paths are read with `voxkit_proto_parse*`, so the window sees one shape.
+- `src/models/window.c`: the window. Same layout as macOS: header with used and
+  free space and the service state, sections 「語音辨識模型」 (asr + vad) and
+  「翻譯模型」 (mt) each showing the selected model, one card per model with
+  download / resume / cancel / use / verify / delete (confirmation), and a
+  license checkbox that gates the download button of restricted models. The
+  daemon refuses deleting a model in use (`in-use`) and the notice says so.
+- `test/core/model-manager-smoke.sh` opens the window under `xvfb-run`
+  (registered with ctest only when `xvfb-run` exists).
 `plus-abi` passes its own temporary user-dictionary directory into
 `chewing_plus_new`. `testvoxkit` is built only when `ENABLE_VOXKIT` found
 `Fcitx5ModuleVoxkit`.
