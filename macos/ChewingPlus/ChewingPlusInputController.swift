@@ -95,7 +95,11 @@ final class ChewingPlusInputController: IMKInputController {
     override func menu() -> NSMenu! {
         let menu = NSMenu(title: "新酷音 Plus")
         for row in Settings.menuRows {
-            let item = NSMenuItem(title: row.label, action: #selector(toggleFeature(_:)),
+            var title = row.label
+            if row.key == "voice_translate", let key = ShortcutSetting.translate.value {
+                title += "（\(key.title)）"
+            }
+            let item = NSMenuItem(title: title, action: #selector(toggleFeature(_:)),
                                   keyEquivalent: "")
             item.target = self
             item.representedObject = row.key

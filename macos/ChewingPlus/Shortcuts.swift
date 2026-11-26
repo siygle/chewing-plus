@@ -141,14 +141,20 @@ enum ShortcutSetting: String, CaseIterable {
 
     /// How the shortcut is used, shown under the recorder.
     var usage: String {
-        guard let value else { return "已關閉" }
+        guard let value else {
+            return self == .translate
+                ? "已關閉。即使尚未開啟「語音翻譯」，也可以先在這裡設定快速鍵。"
+                : "已關閉"
+        }
         switch self {
         case .voice:
             return "按住 \(value.title) 說話，放開出字"
         case .translate:
-            return Settings.isOn("voice_translate")
-                ? "按住 \(value.title) 說話，放開輸入譯文（\(Settings.value("voice_translate_to") ?? "en")）"
-                : "輸入法選單打開「語音翻譯」後才有作用"
+            let target = Settings.value("voice_translate_to") ?? "en"
+            if Settings.isOn("voice_translate") {
+                return "按住 \(value.title) 說話，放開輸入譯文（\(target)）"
+            }
+            return "快速鍵已設定為 \(value.title)。請再到輸入法選單勾選「語音翻譯」後才會生效。"
         case .english:
             return value.isModifierOnly ? "連按兩下 \(value.title)" : "按一下 \(value.title)"
         }
@@ -258,8 +264,8 @@ final class ShortcutPreferences: NSObject {
     }
 
     private func build() {
-        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 330),
-                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 580, height: 520),
+                           styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         win.title = "新酷音 Plus 快速鍵"
         win.isReleasedWhenClosed = false
         let stack = NSStackView()
@@ -267,16 +273,22 @@ final class ShortcutPreferences: NSObject {
         stack.alignment = .leading
         stack.spacing = 14
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+        stack.translatesAutoresizingMaskIntoConstraints = false
 
         let intro = NSTextField(wrappingLabelWithString:
-            "點按鈕後按下快速鍵。可以是單一修飾鍵（例如右 ⌥），或組合鍵（例如 ⌃⌥Space）。組合鍵比較不會和系統或其他 App 的快速鍵衝突。")
-        intro.preferredMaxLayoutWidth = 480
+            "點按鈕後按下快速鍵。可以是單一修飾鍵（例如右 ⌥），或組合鍵（例如 ⌃⌥Space）。組合鍵比較不會和系統或其他 App 的快速鍵衝突。語音、語音翻譯、英文三組快速鍵都會顯示在下面，即使還沒開啟「語音翻譯」。")
+        intro.preferredMaxLayoutWidth = 520
         stack.addArrangedSubview(intro)
 
-        for setting in ShortcutSetting.allCases {
+        // Always show all three, including translation, even when the
+        // 「語音翻譯」 menu toggle is off. Do not rely on allCases order alone.
+        let rows: [ShortcutSetting] = [.voice, .translate, .english]
+        for setting in rows {
             let label = NSTextField(labelWithString: setting.title)
             label.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
-            label.widthAnchor.constraint(equalToConstant: 170).isActive = true
+            label.setContentCompressionResistancePriority(.required, for: .horizontal)
+            label.setContentCompressionResistancePriority(.required, for: .vertical)
+            label.widthAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
             let recorder = ShortcutRecorder(frame: .zero)
             recorder.widthAnchor.constraint(equalToConstant: 200).isActive = true
             recorder.onRecord = { [weak self] value in
@@ -289,17 +301,33 @@ final class ShortcutPreferences: NSObject {
             reset.identifier = NSUserInterfaceItemIdentifier(setting.rawValue)
             let row = NSStackView(views: [label, recorder, off, reset])
             row.spacing = 8
-            let note = NSTextField(labelWithString: "")
+            row.setContentCompressionResistancePriority(.required, for: .vertical)
+            let note = NSTextField(wrappingLabelWithString: "")
             note.textColor = .secondaryLabelColor
             note.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+            note.preferredMaxLayoutWidth = 520
+            note.setContentCompressionResistancePriority(.required, for: .vertical)
             stack.addArrangedSubview(row)
             stack.addArrangedSubview(note)
             recorders[setting] = recorder
             notes[setting] = note
         }
         warning.textColor = .systemRed
+        warning.preferredMaxLayoutWidth = 520
+        warning.setContentCompressionResistancePriority(.required, for: .vertical)
         stack.addArrangedSubview(warning)
-        win.contentView = stack
+
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.drawsBackground = false
+        scroll.documentView = stack
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            stack.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+        ])
+        win.contentView = scroll
         window = win
     }
 
@@ -316,7 +344,7 @@ final class ShortcutPreferences: NSObject {
     }
 
     private func refresh() {
-        for setting in ShortcutSetting.allCases {
+        for setting in [ShortcutSetting.voice, .translate, .english] {
             recorders[setting]?.shortcut = setting.value
             notes[setting]?.stringValue = setting.usage
         }

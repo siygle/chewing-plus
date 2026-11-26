@@ -70,7 +70,7 @@ if [[ "$apps" != 1 ]]; then
     echo "payload has $apps ChewingPlus.app bundles; expected 1" >&2
     exit 1
 fi
-ver=${CHEWING_PLUS_VERSION:-}
+ver=${CHEWING_PLUS_VERSION:-6.1.0}
 if [[ -n "$ver" ]]; then
     # CFBundleShortVersionString allows at most three components.
     short=$(printf '%s' "$ver" | cut -d. -f1-3)
