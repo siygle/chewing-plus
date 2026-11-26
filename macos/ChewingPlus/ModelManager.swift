@@ -431,10 +431,19 @@ struct ModelManagerView: View {
                 .padding(16)
             Divider()
             ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(model.rows) { row in
-                        ModelCard(row: row, model: model)
-                    }
+                VStack(alignment: .leading, spacing: 24) {
+                    modelSection(
+                        title: "語音辨識模型",
+                        subtitle: selectedLine(
+                            in: speechRows,
+                            empty: "尚未選擇語音辨識模型"),
+                        rows: speechRows)
+                    modelSection(
+                        title: "翻譯模型",
+                        subtitle: selectedLine(
+                            in: translateRows,
+                            empty: "尚未選擇翻譯模型"),
+                        rows: translateRows)
                 }
                 .padding(16)
             }
@@ -449,6 +458,43 @@ struct ModelManagerView: View {
             }
         }
         .frame(minWidth: 560, minHeight: 480)
+    }
+
+    /// Speech recognition and VAD together; translation in its own section.
+    private var speechRows: [ModelRow] {
+        model.rows.filter { $0.purpose != "mt" }
+    }
+
+    private var translateRows: [ModelRow] {
+        model.rows.filter { $0.purpose == "mt" }
+    }
+
+    private func selectedLine(in rows: [ModelRow], empty: String) -> String {
+        guard let row = rows.first(where: { $0.active }) else { return empty }
+        if row.installed {
+            return "目前使用：\(row.title)"
+        }
+        return "目前選擇：\(row.title)（尚未下載）"
+    }
+
+    @ViewBuilder
+    private func modelSection(title: String, subtitle: String,
+                              rows: [ModelRow]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.title3).bold()
+                Text(subtitle).font(.callout).foregroundColor(.secondary)
+            }
+            if rows.isEmpty {
+                Text("這個版本沒有這類模型。")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(rows) { row in
+                    ModelCard(row: row, model: model)
+                }
+            }
+        }
     }
 
     private var header: some View {

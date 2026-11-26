@@ -19,7 +19,7 @@ The fcitx5 addon is not part of this build.
 | `macos/Voxkit/Info.plist` | Usage string for a helper bundle, if you wrap the daemon |
 | `macos/launchd/im.chewing.plus.voxkit.plist` | User agent. `__HOME__` is replaced by `install.sh` |
 | `macos/build-voxkit.sh` | Clone fcitx5-voxkit at `packaging/release/voxkit-pin` (the same commit the Linux release uses) and `cargo build --release --locked` |
-| `macos/ChewingPlus/ModelManager.swift` | SwiftUI 「語音模型」 window: one card per model (purpose, size, memory, license, status, progress; download / resume / cancel / delete / use / verify), license checkbox for restricted models, store usage and free space; falls back to `voxkit model … --json` when the daemon is off |
+| `macos/ChewingPlus/ModelManager.swift` | SwiftUI 「語音模型」 window: sections 「語音辨識模型」 (asr + vad) and 「翻譯模型」 (mt), each showing the currently selected model; one card per model (purpose, size, memory, license, status, progress; download / resume / cancel / delete / use / verify), license checkbox for restricted models, store usage and free space; falls back to `voxkit model … --json` when the daemon is off |
 | `macos/ModelsLauncher/` | 「新酷音 Plus 語音模型」 in /Applications: runs `ChewingPlus --models` (the window alone, with a Dock icon) |
 | `macos/build-app.sh` | On macOS: bundle libchewing 0.14, build the core, emit `ChewingPlus.app` |
 | `macos/build-pkg.sh` | Unsigned `.pkg` (ad-hoc signature on the `.app` when `codesign` exists) |
@@ -185,9 +185,11 @@ Do these in order. Stop at the first failure and note the exact message.
     「語音翻譯成」 (default English) is typed. Needs a voxkit with the
     translate capability and libvoxkit-mt.dylib next to it (the pkg
     installs both in `~/Library/Application Support/ChewingPlus/`);
-    otherwise the hint says why and the original text is typed. The first
-    translation commits the original text and downloads the HY-MT model
-    (about 1.1 GB, shown as 「翻譯模型下載中」); later ones are translated.
+    otherwise the hint says why and the original text is typed. Open
+    「語音模型…」, agree to the HY-MT license and download the translation
+    model (about 1.1 GB) first; without consent the hint is 「請先在語音模型
+    同意…」 and the original text is typed. 「語音翻譯」 in the input menu is
+    off by default.
 12. `macos/uninstall.sh`. The input source disappears after the next login.
     Model files are still in Application Support.
 
