@@ -23,9 +23,7 @@ jobs:
       - name: Protocol tests and IMK typecheck
         run: sh macos/typecheck.sh
   bundle:
-    # Runner availability flips: macos-15 was used when latest had no
-    # hosts, then latest started acquiring again while 15 stayed queued.
-    # Prefer macos-latest (Apple Silicon, same image we shipped earlier).
+    # Apple Silicon. Typecheck also runs on macos-15 as a second image.
     name: bundle app (macos-latest)
     runs-on: macos-latest
     continue-on-error: true

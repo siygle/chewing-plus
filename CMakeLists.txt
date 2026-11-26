@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.6)
-project(fcitx5-chewing VERSION 6.1.0)
+project(fcitx5-chewing VERSION 6.1.1)
 
 option(CHEWING_PLUS_CORE_ONLY
        "Build libchewing-plus-core and its tests without fcitx" OFF)

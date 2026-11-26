@@ -33,7 +33,7 @@ app="$root/macos/build/ChewingPlus.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Frameworks" "$app/Contents/Resources/libchewing"
 cp "$root/macos/ChewingPlus/Info.plist" "$app/Contents/Info.plist"
-ver=${CHEWING_PLUS_VERSION:-6.1.0}
+ver=${CHEWING_PLUS_VERSION:-6.1.1}
 short=$(printf '%s' "$ver" | cut -d. -f1-3)
 /usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $MACOSX_DEPLOYMENT_TARGET" \
     "$app/Contents/Info.plist"

@@ -174,7 +174,8 @@ Ctrl+Shift+Space → GitHub
 #### 語音翻譯（實驗）
 按住**翻譯快捷鍵**說中文，放開後輸入翻譯後的文字（預設翻成英文）。翻譯也在本機進行，
 用的是 [HY-MT1.5-1.8B](https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF)（約 1.1 GB，
-第一次用時自動下載；Tencent HY Community License，不適用於歐盟、英國與南韓）。
+Tencent HY Community License，不適用於歐盟、英國與南韓）。使用前請在「語音模型…」
+同意授權並下載；未同意時會先送出原文。
 
 翻譯**預設關閉**。Arch 要另外安裝翻譯外掛 `chewing-plus-translate`；macOS 的安裝檔已內含外掛：
 
