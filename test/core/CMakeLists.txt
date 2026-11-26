@@ -44,3 +44,19 @@ endif()
 
 add_test(NAME plus-core COMMAND test_plus_core)
 add_test(NAME plus-abi COMMAND test_plus_abi)
+
+add_executable(test_model_backend test_model_backend.c)
+target_link_libraries(test_model_backend PRIVATE chewing-plus-models-backend
+                      Threads::Threads)
+set_target_properties(test_model_backend PROPERTIES
+    C_STANDARD 99 C_STANDARD_REQUIRED ON)
+add_test(NAME model-backend COMMAND test_model_backend)
+
+if(ENABLE_MODEL_MANAGER)
+    find_program(XVFB_RUN xvfb-run)
+    if(XVFB_RUN)
+        add_test(NAME model-manager-smoke
+                 COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/model-manager-smoke.sh
+                         $<TARGET_FILE:chewing-plus-model-manager>)
+    endif()
+endif()

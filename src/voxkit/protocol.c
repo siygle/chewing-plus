@@ -824,6 +824,8 @@ static int parse_one_model(const char **pp, voxkit_model_info *info) {
             text = info->title, text_n = sizeof(info->title);
         } else if (strcmp(key, "purpose") == 0) {
             text = info->purpose, text_n = sizeof(info->purpose);
+        } else if (strcmp(key, "source") == 0) {
+            text = info->source, text_n = sizeof(info->source);
         } else if (strcmp(key, "license") == 0) {
             text = info->license, text_n = sizeof(info->license);
         } else if (strcmp(key, "restriction") == 0) {
@@ -848,6 +850,10 @@ static int parse_one_model(const char **pp, voxkit_model_info *info) {
             flag = &info->recommended;
         } else if (strcmp(key, "selectable") == 0) {
             flag = &info->selectable;
+            info->has_selectable = 1;
+        } else if (strcmp(key, "removable") == 0) {
+            flag = &info->removable;
+            info->has_removable = 1;
         } else if (strcmp(key, "downloading") == 0) {
             flag = &info->downloading;
         }

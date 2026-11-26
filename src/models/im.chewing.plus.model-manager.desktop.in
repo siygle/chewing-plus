@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Chewing Plus Voice Models
+Name[zh_TW]=新酷音 Plus 語音模型
+Name[zh_CN]=新酷音 Plus 语音模型
+Comment=Download, choose and delete speech recognition and translation models
+Comment[zh_TW]=下載、選用與刪除語音辨識和翻譯模型
+Exec=@CMAKE_INSTALL_FULL_BINDIR@/chewing-plus-model-manager
+Icon=audio-input-microphone
+Terminal=false
+Categories=Settings;GTK;
+Keywords=chewing;新酷音;voice;speech;model;語音;翻譯;
+StartupNotify=true

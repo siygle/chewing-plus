@@ -8,6 +8,9 @@ option(CHEWING_PLUS_CORE_SHARED
 option(ENABLE_IBUS "Build the native IBus engine" OFF)
 option(ENABLE_IBUS_SETUP
        "Build the libadwaita IBus setup program (requires ENABLE_IBUS)" OFF)
+option(ENABLE_MODEL_MANAGER
+       "Build the GTK4/libadwaita 語音模型 window (chewing-plus-model-manager)"
+       OFF)
 option(ENABLE_TEST "Build Test" On)
 option(ENABLE_COVERAGE "Build the project with gcov support (Need ENABLE_TEST=On)" Off)
 

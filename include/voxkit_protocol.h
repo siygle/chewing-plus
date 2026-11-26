@@ -114,6 +114,13 @@ typedef struct voxkit_model_info {
     int recommended;
     int selectable;
     int downloading;
+    /* "store" for a model this user can delete, otherwise where a shared
+     * read-only copy was found. Empty from an older daemon. */
+    char source[16];
+    int removable;
+    /* 1 when the line carried the key; an older daemon omits them. */
+    int has_removable;
+    int has_selectable;
 } voxkit_model_info;
 
 /* Room for a whole catalog in one model.list call. */

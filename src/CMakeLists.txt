@@ -21,6 +21,38 @@ set_target_properties(chewing-plus-models PROPERTIES
     RUNTIME_OUTPUT_NAME chewing-plus-models)
 install(TARGETS chewing-plus-models RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}")
 
+# Toolkit-free half of the 語音模型 window (daemon or `voxkit model --json`).
+add_library(chewing-plus-models-backend STATIC models/backend.c)
+target_link_libraries(chewing-plus-models-backend PUBLIC voxkit-protocol)
+target_include_directories(chewing-plus-models-backend PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/models")
+set_target_properties(chewing-plus-models-backend PROPERTIES
+    C_STANDARD 99 C_STANDARD_REQUIRED ON POSITION_INDEPENDENT_CODE ON)
+
+# The window itself: GTK4 + libadwaita, linked only here. Opened from the
+# fcitx5 configuration page, the IBus setup window, and its own launcher.
+if(ENABLE_MODEL_MANAGER)
+    pkg_check_modules(ModelManagerAdw REQUIRED libadwaita-1>=1.5)
+    add_executable(chewing-plus-model-manager models/window.c)
+    target_include_directories(chewing-plus-model-manager PRIVATE
+        ${ModelManagerAdw_INCLUDE_DIRS})
+    target_compile_options(chewing-plus-model-manager PRIVATE
+        ${ModelManagerAdw_CFLAGS_OTHER})
+    target_link_directories(chewing-plus-model-manager PRIVATE
+        ${ModelManagerAdw_LIBRARY_DIRS})
+    target_link_libraries(chewing-plus-model-manager PRIVATE
+        chewing-plus-models-backend ${ModelManagerAdw_LIBRARIES})
+    set_target_properties(chewing-plus-model-manager PROPERTIES
+        C_STANDARD 11 C_STANDARD_REQUIRED ON
+        RUNTIME_OUTPUT_NAME chewing-plus-model-manager)
+    install(TARGETS chewing-plus-model-manager
+            RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    configure_file(models/im.chewing.plus.model-manager.desktop.in
+                   im.chewing.plus.model-manager.desktop @ONLY)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/im.chewing.plus.model-manager.desktop"
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+endif()
+
 set(_core_type STATIC)
 if(CHEWING_PLUS_CORE_SHARED)
     set(_core_type SHARED)
@@ -105,6 +137,11 @@ if(NOT CHEWING_PLUS_CORE_ONLY)
 #Plus sources use C++ 20(std::string::starts_with).The addon includes
 #ChewingPlus.h, so it needs the same standard.
     set_target_properties(chewing PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+    if(ENABLE_MODEL_MANAGER)
+        # The configuration button and the menu entry launch this program.
+        target_compile_definitions(chewing PRIVATE
+            CHEWING_PLUS_MODEL_MANAGER=\"${CMAKE_INSTALL_FULL_BINDIR}/chewing-plus-model-manager\")
+    endif()
     target_compile_definitions(chewing PRIVATE FCITX_GETTEXT_DOMAIN=\"fcitx5-chewing\")
     fcitx5_add_i18n_definition(TARGETS chewing)
     install(TARGETS chewing DESTINATION "${CMAKE_INSTALL_LIBDIR}/fcitx5")
@@ -173,6 +210,9 @@ if(ENABLE_IBUS)
             "${CMAKE_CURRENT_SOURCE_DIR}/ibus" ${Adw_INCLUDE_DIRS})
         target_compile_options(ibus-setup-chewing-plus PRIVATE
             ${Adw_CFLAGS_OTHER})
+        # The 「語音模型…」 button launches the model window.
+        target_compile_definitions(ibus-setup-chewing-plus PRIVATE
+            CHEWING_PLUS_MODEL_MANAGER_PATH=\"${CMAKE_INSTALL_FULL_BINDIR}/chewing-plus-model-manager\")
         target_link_libraries(ibus-setup-chewing-plus PRIVATE
             chewing-plus-ibus-prefs chewing-plus-core voxkit-protocol
             ${Adw_LIBRARIES})
