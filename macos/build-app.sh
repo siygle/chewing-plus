@@ -65,11 +65,11 @@ xcrun swiftc -O -emit-executable \
     -Xlinker -lchewing \
     -Xlinker -lc++ \
     -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
-    -framework Cocoa -framework InputMethodKit -framework Carbon \
+    -framework Cocoa -framework InputMethodKit -framework Carbon -framework SwiftUI \
     -o "$app/Contents/MacOS/ChewingPlus" \
     "$root/macos/ChewingPlus/main.swift" \
     "$root/macos/ChewingPlus/ChewingPlusInputController.swift" \
-    "$root/macos/ChewingPlus/ModelPreferences.swift" \
+    "$root/macos/ChewingPlus/ModelManager.swift" \
     "$root/macos/ChewingPlus/Shortcuts.swift"
 
 install_name_tool -add_rpath @executable_path/../Frameworks \

@@ -57,6 +57,18 @@ int voxkit_client_model_remove(voxkit_client *client, uint64_t req,
 int voxkit_client_model_select(voxkit_client *client, uint64_t req,
                                const char *model, voxkit_message *reply,
                                int timeout_ms, char *err, size_t err_n);
+/* model.install with license consent (restricted models such as HY-MT). */
+int voxkit_client_model_install_accept(voxkit_client *client, uint64_t req,
+                                       const char *model, voxkit_message *reply,
+                                       int timeout_ms, char *err, size_t err_n);
+/* Starts a background re-hash; poll model.progress (state "verifying",
+ * then "done" with message ok | missing | corrupt). */
+int voxkit_client_model_verify(voxkit_client *client, uint64_t req,
+                               const char *model, voxkit_message *reply,
+                               int timeout_ms, char *err, size_t err_n);
+/* The raw JSON of the last line read (for frontends that decode it
+ * themselves, such as the macOS model window). */
+const char *voxkit_client_last_line(const voxkit_client *client);
 int voxkit_client_model_status(voxkit_client *client, uint64_t req,
                                voxkit_message *reply, int timeout_ms, char *err,
                                size_t err_n);

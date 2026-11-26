@@ -48,7 +48,8 @@ typedef enum voxkit_msg_type {
     VOXKIT_MSG_MODEL_CANCEL,
     VOXKIT_MSG_MODEL_REMOVE,
     VOXKIT_MSG_MODEL_SELECT,
-    VOXKIT_MSG_MODEL_STATUS
+    VOXKIT_MSG_MODEL_STATUS,
+    VOXKIT_MSG_MODEL_VERIFY /* "model-manager" capability */
 } voxkit_msg_type;
 
 /* Flat view of one JSON object. Strings are UTF-8 and NUL-terminated.
@@ -85,6 +86,11 @@ typedef struct voxkit_message {
     char source[4096];        /* final: the transcript before translation */
     int translated;           /* final: 1 when `text` is a translation */
     int caps_translate;       /* model.status/list: "translate" capability */
+    /* Model-manager extension ("model-manager" capability). */
+    int caps_model_manager;
+    uint64_t free_bytes;      /* model.list/status: free space in the store */
+    char model_mt[64];        /* model.list/status: selected translation model */
+    char result[16];          /* model.verify: ok | missing | corrupt */
 } voxkit_message;
 
 /* One catalog row from a model.list line. */
@@ -96,7 +102,22 @@ typedef struct voxkit_model_info {
     uint64_t size_on_disk;
     int installed;
     int active;
+    /* Model-manager extension; empty or zero from an older daemon. */
+    char title[128];
+    char purpose[8];      /* asr | mt | vad */
+    char license[128];
+    char restriction[512];
+    uint64_t partial_bytes;
+    uint64_t runtime_bytes;
+    int restricted;       /* needs license consent before download */
+    int license_accepted;
+    int recommended;
+    int selectable;
+    int downloading;
 } voxkit_model_info;
+
+/* Room for a whole catalog in one model.list call. */
+#define VOXKIT_MODELS_MAX 32
 
 /* Parse one line. A trailing newline is optional. `err` may be NULL. */
 int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
@@ -131,6 +152,11 @@ int voxkit_proto_write_model_install(char *buf, size_t n, uint64_t req,
 int voxkit_proto_write_model_remove(char *buf, size_t n, uint64_t req,
                                     const char *model);
 int voxkit_proto_write_model_select(char *buf, size_t n, uint64_t req,
+                                    const char *model);
+/* model.install with accept_license:true (the user ticked the checkbox). */
+int voxkit_proto_write_model_install_accept(char *buf, size_t n, uint64_t req,
+                                            const char *model);
+int voxkit_proto_write_model_verify(char *buf, size_t n, uint64_t req,
                                     const char *model);
 
 /* Fill `out[0..*count)` from a model.list line. `count` may be NULL.

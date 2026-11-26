@@ -19,7 +19,8 @@ The fcitx5 addon is not part of this build.
 | `macos/Voxkit/Info.plist` | Usage string for a helper bundle, if you wrap the daemon |
 | `macos/launchd/im.chewing.plus.voxkit.plist` | User agent. `__HOME__` is replaced by `install.sh` |
 | `macos/build-voxkit.sh` | Clone fcitx5-voxkit at `packaging/release/voxkit-pin` (the same commit the Linux release uses) and `cargo build --release --locked` |
-| `macos/ChewingPlus/ModelPreferences.swift` | AppKit window: list, download, cancel, delete, select, disk use, daemon status |
+| `macos/ChewingPlus/ModelManager.swift` | SwiftUI 「語音模型」 window: one card per model (purpose, size, memory, license, status, progress; download / resume / cancel / delete / use / verify), license checkbox for restricted models, store usage and free space; falls back to `voxkit model … --json` when the daemon is off |
+| `macos/ModelsLauncher/` | 「新酷音 Plus 語音模型」 in /Applications: runs `ChewingPlus --models` (the window alone, with a Dock icon) |
 | `macos/build-app.sh` | On macOS: bundle libchewing 0.14, build the core, emit `ChewingPlus.app` |
 | `macos/build-pkg.sh` | Unsigned `.pkg` (ad-hoc signature on the `.app` when `codesign` exists) |
 | `macos/sign.sh` | Developer ID if `APPLE_SIGN_ID` is set, otherwise ad-hoc `codesign -` |

@@ -228,6 +228,33 @@ int voxkit_client_model_install(voxkit_client *client, uint64_t req,
                      err, err_n);
 }
 
+int voxkit_client_model_install_accept(voxkit_client *client, uint64_t req,
+                                       const char *model, voxkit_message *reply,
+                                       int timeout_ms, char *err, size_t err_n) {
+    char line[320];
+    if (voxkit_proto_write_model_install_accept(line, sizeof(line), req,
+                                                model) < 0) {
+        return -1;
+    }
+    return roundtrip(client, line, VOXKIT_MSG_MODEL_PROGRESS, reply, timeout_ms,
+                     err, err_n);
+}
+
+int voxkit_client_model_verify(voxkit_client *client, uint64_t req,
+                               const char *model, voxkit_message *reply,
+                               int timeout_ms, char *err, size_t err_n) {
+    char line[256];
+    if (voxkit_proto_write_model_verify(line, sizeof(line), req, model) < 0) {
+        return -1;
+    }
+    return roundtrip(client, line, VOXKIT_MSG_MODEL_PROGRESS, reply, timeout_ms,
+                     err, err_n);
+}
+
+const char *voxkit_client_last_line(const voxkit_client *client) {
+    return client ? client->last_line : "";
+}
+
 int voxkit_client_model_progress(voxkit_client *client, uint64_t req,
                                  voxkit_message *reply, int timeout_ms,
                                  char *err, size_t err_n) {

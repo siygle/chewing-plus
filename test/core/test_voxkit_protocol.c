@@ -86,6 +86,63 @@ static void test_roundtrip(void) {
           "unknown type rejected");
 }
 
+static void test_model_manager(void) {
+    char buf[320];
+    char err[128];
+    voxkit_message msg;
+    voxkit_model_info rows[VOXKIT_MODELS_MAX];
+    size_t count = 0;
+    const char *line =
+        "{\"capabilities\":[\"translate\",\"model-manager\"],\"daemon\":"
+        "\"offline\",\"free_bytes\":5000,\"model\":\"whisper-tiny\","
+        "\"model_mt\":\"hy-mt1.5-1.8b\",\"models\":[{\"active\":false,"
+        "\"blurb\":\"mt\",\"bytes\":1133080512,\"downloading\":true,"
+        "\"id\":\"hy-mt1.5-1.8b\",\"installed\":false,\"kind\":\"mt\","
+        "\"license\":\"Tencent HY Community License\",\"license_accepted\":"
+        "false,\"partial_bytes\":1000,\"purpose\":\"mt\",\"recommended\":"
+        "true,\"removable\":false,\"restricted\":true,\"restriction\":"
+        "\"不得在歐盟使用\",\"runtime_bytes\":1300000000,\"selectable\":true,"
+        "\"size_on_disk\":0,\"source\":\"\",\"title\":\"HY-MT1.5 "
+        "1.8B（翻譯）\"}],\"readonly_dirs\":[],\"req\":0,\"store\":\"/s\","
+        "\"store_bytes\":0,\"type\":\"model.list\",\"v\":1}";
+
+    check(voxkit_proto_parse(line, &msg, err, sizeof(err)) == VOXKIT_PROTO_OK,
+          "manager list parses");
+    check(msg.caps_model_manager && msg.caps_translate &&
+              msg.free_bytes == 5000 &&
+              strcmp(msg.model_mt, "hy-mt1.5-1.8b") == 0,
+          "manager list summary");
+    check(voxkit_proto_parse_models(line, rows, VOXKIT_MODELS_MAX, &count, err,
+                                    sizeof(err)) == VOXKIT_PROTO_OK &&
+              count == 1,
+          "manager rows");
+    check(strcmp(rows[0].purpose, "mt") == 0 && rows[0].restricted &&
+              !rows[0].license_accepted && rows[0].recommended &&
+              rows[0].selectable && rows[0].downloading &&
+              rows[0].partial_bytes == 1000 &&
+              rows[0].runtime_bytes == 1300000000ULL &&
+              strcmp(rows[0].restriction, "不得在歐盟使用") == 0 &&
+              strncmp(rows[0].title, "HY-MT1.5", 8) == 0,
+          "manager row fields");
+
+    check(voxkit_proto_write_model_install_accept(buf, sizeof(buf), 9,
+                                                  "hy-mt1.5-1.8b") > 0 &&
+              strstr(buf, "\"accept_license\":true}\n") != NULL,
+          "install accept writes");
+    check(voxkit_proto_write_model_verify(buf, sizeof(buf), 10, "silero-vad") >
+                  0 &&
+              voxkit_proto_parse(buf, &msg, err, sizeof(err)) ==
+                  VOXKIT_PROTO_OK &&
+              msg.type == VOXKIT_MSG_MODEL_VERIFY,
+          "verify round trip");
+    check(voxkit_proto_parse("{\"daemon\":\"offline\",\"model\":\"silero-vad\","
+                             "\"req\":0,\"result\":\"missing\",\"type\":"
+                             "\"model.verify\",\"v\":1}",
+                             &msg, err, sizeof(err)) == VOXKIT_PROTO_OK &&
+              strcmp(msg.result, "missing") == 0,
+          "verify result");
+}
+
 static void test_models(void) {
     char buf[256];
     char err[128];
@@ -214,6 +271,7 @@ int main(void) {
     test_roundtrip();
     test_translate();
     test_models();
+    test_model_manager();
     test_socket();
     printf(failures ? "PROTOCOL TESTS FAILED (%d)\n" : "PROTOCOL TESTS OK\n",
            failures);

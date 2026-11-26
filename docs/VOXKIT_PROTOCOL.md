@@ -143,6 +143,31 @@ process answered), `state` (`idle`, `downloading`, `done`, `error`,
 `model.select`. The next `start` that omits `model` uses that id.
 `model.status` is the same summary as `model.list` without the array.
 
+### Model manager extension (capability `model-manager`)
+
+fcitx5-voxkit `feature/model-manager` adds, without changing `v`:
+
+- `model.list` rows: `title`, `purpose` (`asr` | `mt` | `vad`), `license`,
+  `restricted`, `restriction`, `license_accepted`, `recommended`,
+  `runtime_bytes`, `partial_bytes`, `selectable`, `downloading`. The summary
+  adds `free_bytes`, `model_mt` (selected translation model) and
+  `readonly_dirs`. The C client reads them into `voxkit_model_info`; size
+  lists with `VOXKIT_MODELS_MAX` (32).
+- `model.install` takes `"accept_license":true`. A restricted model (HY-MT)
+  without recorded consent answers `error` `license-required`; consent is
+  recorded once in the store. Other errors: `no-space`, `busy`. Downloads
+  resume from the partial file.
+- `model.verify {model}` starts a re-hash; `model.progress` reports
+  `verifying`, then `done` with `message` `ok` | `missing` | `corrupt`.
+- `model.remove` unloads an idle loaded model first and answers `error`
+  `in-use` while a request is using it.
+- `model.select` also accepts a translation model.
+- A translate `final` may carry `translate_error:"license-required"`.
+
+Without a daemon, `voxkit model list|install|remove|verify|select ID --json`
+prints the same JSON objects with `"daemon":"offline"` (macOS uses this when
+the voice service is off).
+
 `chewing-plus-models` is the toolkit-free client for those commands.
 `include/voxkit_client.h` is the same client for the frontends.
 

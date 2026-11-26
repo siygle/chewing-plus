@@ -49,6 +49,16 @@ ditto --norsrc "$mt" "$support/libvoxkit-mt.dylib"
 ditto --norsrc "$models" "$support/chewing-plus-models"
 chmod 755 "$support/voxkit" "$support/chewing-plus-models"
 chmod 644 "$support/libvoxkit-mt.dylib"
+# 「新酷音 Plus 語音模型」 in /Applications: a script bundle that runs
+# ChewingPlus --models (the model window on its own, with a Dock icon).
+launcher="$stage/Applications/新酷音 Plus 語音模型.app"
+mkdir -p "$launcher/Contents/MacOS" "$launcher/Contents/Resources"
+ditto --norsrc "$root/macos/ModelsLauncher/Info.plist" "$launcher/Contents/Info.plist"
+ditto --norsrc "$root/macos/ModelsLauncher/chewing-plus-models-window" \
+    "$launcher/Contents/MacOS/chewing-plus-models-window"
+ditto --norsrc "$root/macos/ChewingPlus/chewing-plus.icns" \
+    "$launcher/Contents/Resources/chewing-plus.icns"
+chmod 755 "$launcher/Contents/MacOS/chewing-plus-models-window"
 find "$stage" -name '._*' -delete
 find "$stage" -name '.DS_Store' -delete
 if command -v dot_clean >/dev/null 2>&1; then
@@ -67,6 +77,9 @@ if [[ -n "$ver" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $short" \
         "$dest/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $ver" "$dest/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $short" \
+        "$launcher/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $ver" "$launcher/Contents/Info.plist"
 fi
 if command -v codesign >/dev/null 2>&1; then
     codesign --force --sign - "$dest" || true

@@ -305,6 +305,9 @@ static const char *translate_fallback_text(const char *reason) {
     if (strcmp(reason, "model-downloading") == 0) {
         return "翻譯模型下載中，已輸入原文";
     }
+    if (strcmp(reason, "license-required") == 0) {
+        return "請先在語音模型同意翻譯模型授權，已輸入原文";
+    }
     if (strcmp(reason, "plugin-missing") == 0) {
         return "未安裝翻譯外掛（chewing-plus-translate），已輸入原文";
     }

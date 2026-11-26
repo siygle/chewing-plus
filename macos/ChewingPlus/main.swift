@@ -60,6 +60,20 @@ if CommandLine.arguments.contains("--register") {
     exit(registerInputSource())
 }
 
+/// `ChewingPlus --models`: only the 「語音模型」 window, as a normal app with a
+/// Dock icon (the 「新酷音 Plus 語音模型」 launcher runs this). No IMKServer,
+/// so it never competes with the running input method.
+if CommandLine.arguments.contains("--models") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.regular)
+    ModelManagerWindow.shared.quitOnClose = true
+    DispatchQueue.main.async {
+        ModelManagerWindow.shared.show()
+    }
+    app.run()
+    exit(0)
+}
+
 let log = OSLog(subsystem: "im.chewing.inputmethod.ChewingPlus", category: "server")
 let server = IMKServer(name: connection, bundleIdentifier: bundleID)
 os_log("IMKServer %{public}@ for %{public}@: %{public}@", log: log, type: .default,

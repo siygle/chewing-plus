@@ -6,7 +6,8 @@
  *
  *   chewing-plus-models status
  *   chewing-plus-models list
- *   chewing-plus-models install ID
+ *   chewing-plus-models install ID [--accept-license]
+ *   chewing-plus-models verify ID
  *   chewing-plus-models progress
  *   chewing-plus-models cancel
  *   chewing-plus-models remove ID
@@ -64,22 +65,28 @@ static int cmd_status(voxkit_client *client) {
 }
 
 static int cmd_list(voxkit_client *client) {
-    voxkit_model_info rows[8];
+    voxkit_model_info rows[VOXKIT_MODELS_MAX];
     voxkit_message msg;
     size_t count = 0;
     size_t i;
     char err[256] = "";
-    if (voxkit_client_model_list(client, 1, rows, 8, &count, &msg, 1000, err,
+    if (voxkit_client_model_list(client, 1, rows, VOXKIT_MODELS_MAX, &count, &msg, 1000, err,
                                  sizeof(err)) != 0) {
         return fail(err);
     }
     print_status(&msg);
     for (i = 0; i < count; i++) {
-        printf("%s  %s  %s  %llu bytes  on_disk %llu%s\n", rows[i].id,
+        printf("%s  %s  %s  %llu bytes  on_disk %llu%s%s\n", rows[i].id,
                rows[i].kind, rows[i].installed ? "installed" : "not-installed",
                (unsigned long long)rows[i].bytes,
                (unsigned long long)rows[i].size_on_disk,
-               rows[i].active ? "  active" : "");
+               rows[i].active ? "  active" : "",
+               rows[i].restricted && !rows[i].license_accepted
+                   ? "  license-required"
+                   : "");
+        if (rows[i].restricted && !rows[i].license_accepted) {
+            printf("    %s\n", rows[i].restriction);
+        }
     }
     return 0;
 }
@@ -95,12 +102,23 @@ static int cmd_progress(voxkit_client *client) {
     return strcmp(msg.state, "error") == 0 ? 1 : 0;
 }
 
-static int cmd_install(voxkit_client *client, const char *id) {
+static int cmd_install(voxkit_client *client, const char *id, int accept) {
     voxkit_message msg;
     char err[256] = "";
     int spins = 0;
-    if (voxkit_client_model_install(client, 1, id, &msg, 1000, err,
-                                    sizeof(err)) != 0) {
+    int rc;
+    memset(&msg, 0, sizeof(msg));
+    rc = accept ? voxkit_client_model_install_accept(client, 1, id, &msg,
+                                                         1000, err, sizeof(err))
+                    : voxkit_client_model_install(client, 1, id, &msg, 1000,
+                                                  err, sizeof(err));
+    if (rc != 0) {
+        if (!accept && strcmp(msg.code, "license-required") == 0) {
+            fprintf(stderr, "chewing-plus-models: %s\n"
+                            "re-run with --accept-license to accept it\n",
+                    err);
+            return 1;
+        }
         return fail(err);
     }
     while (spins < 24 * 60 * 60) {
@@ -111,7 +129,8 @@ static int cmd_install(voxkit_client *client, const char *id) {
         printf("\r%s %s %llu / %llu   ", msg.model, msg.state,
                (unsigned long long)msg.received, (unsigned long long)msg.bytes);
         fflush(stdout);
-        if (strcmp(msg.state, "downloading") != 0) {
+        if (strcmp(msg.state, "downloading") != 0 &&
+            strcmp(msg.state, "verifying") != 0) {
             printf("\n");
             if (msg.message[0]) {
                 printf("%s\n", msg.message);
@@ -140,6 +159,33 @@ static int cmd_cancel(voxkit_client *client) {
     return 0;
 }
 
+static int cmd_verify(voxkit_client *client, const char *id) {
+    voxkit_message msg;
+    char err[256] = "";
+    int spins = 0;
+    if (voxkit_client_model_verify(client, 1, id, &msg, 1000, err,
+                                   sizeof(err)) != 0) {
+        return fail(err);
+    }
+    while (spins++ < 60 * 60 * 5) {
+        if (voxkit_client_model_progress(client, 2, &msg, 1000, err,
+                                         sizeof(err)) != 0) {
+            return fail(err);
+        }
+        if (strcmp(msg.state, "verifying") != 0) {
+            printf("%s %s\n", id, msg.message[0] ? msg.message : msg.state);
+            return strcmp(msg.message, "ok") == 0 ? 0 : 1;
+        }
+        {
+            struct timespec pause;
+            pause.tv_sec = 0;
+            pause.tv_nsec = 200000000L;
+            nanosleep(&pause, NULL);
+        }
+    }
+    return fail("timed out");
+}
+
 static int cmd_remove(voxkit_client *client, const char *id) {
     voxkit_message msg;
     char err[256] = "";
@@ -164,7 +210,8 @@ static int cmd_select(voxkit_client *client, const char *id) {
 
 static void usage(void) {
     fprintf(stderr, "usage: chewing-plus-models status|list|progress|cancel\n"
-                    "       chewing-plus-models install|remove|select ID\n"
+                    "       chewing-plus-models install ID [--accept-license]\n"
+                    "       chewing-plus-models verify|remove|select ID\n"
                     "       chewing-plus-models menu\n");
 }
 
@@ -182,7 +229,11 @@ static int dispatch(voxkit_client *client, int argc, char **argv) {
         return cmd_cancel(client);
     }
     if (strcmp(argv[1], "install") == 0 && argc >= 3) {
-        return cmd_install(client, argv[2]);
+        return cmd_install(client, argv[2],
+                           argc >= 4 && strcmp(argv[3], "--accept-license") == 0);
+    }
+    if (strcmp(argv[1], "verify") == 0 && argc >= 3) {
+        return cmd_verify(client, argv[2]);
     }
     if (strcmp(argv[1], "remove") == 0 && argc >= 3) {
         return cmd_remove(client, argv[2]);
@@ -216,7 +267,7 @@ static int menu(voxkit_client *client) {
             }
             id[strcspn(id, "\r\n")] = '\0';
             if (choice == '3') {
-                cmd_install(client, id);
+                cmd_install(client, id, 0);
             } else if (choice == '5') {
                 cmd_remove(client, id);
             } else {

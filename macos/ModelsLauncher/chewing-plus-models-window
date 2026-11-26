@@ -1,0 +1,9 @@
+#!/bin/sh
+# 「新酷音 Plus 語音模型」: opens the input method's model window on its own
+# (ChewingPlus --models). The input method itself is not involved.
+app="/Library/Input Methods/ChewingPlus.app/Contents/MacOS/ChewingPlus"
+if [ ! -x "$app" ]; then
+    osascript -e 'display alert "找不到新酷音 Plus" message "請重新安裝新酷音 Plus。"' >/dev/null 2>&1
+    exit 1
+fi
+exec "$app" --models

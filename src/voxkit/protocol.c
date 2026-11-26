@@ -272,6 +272,7 @@ static voxkit_msg_type type_from_name(const char *name) {
         {"model.remove", VOXKIT_MSG_MODEL_REMOVE},
         {"model.select", VOXKIT_MSG_MODEL_SELECT},
         {"model.status", VOXKIT_MSG_MODEL_STATUS},
+        {"model.verify", VOXKIT_MSG_MODEL_VERIFY},
     };
     size_t i;
     for (i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
@@ -322,6 +323,8 @@ const char *voxkit_proto_type_name(voxkit_msg_type type) {
         return "model.select";
     case VOXKIT_MSG_MODEL_STATUS:
         return "model.status";
+    case VOXKIT_MSG_MODEL_VERIFY:
+        return "model.verify";
     default:
         return "";
     }
@@ -397,7 +400,8 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
             }
             out->has_rms = 1;
         } else if (strcmp(key, "bytes") == 0 || strcmp(key, "received") == 0 ||
-                   strcmp(key, "store_bytes") == 0) {
+                   strcmp(key, "store_bytes") == 0 ||
+                   strcmp(key, "free_bytes") == 0) {
             double num = 0;
             if (parse_number(&p, &num) != 0 || num < 0) {
                 set_err(err, err_n, "bad size");
@@ -407,6 +411,8 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
                 out->bytes = (uint64_t)num;
             } else if (strcmp(key, "received") == 0) {
                 out->received = (uint64_t)num;
+            } else if (strcmp(key, "free_bytes") == 0) {
+                out->free_bytes = (uint64_t)num;
             } else {
                 out->store_bytes = (uint64_t)num;
             }
@@ -436,6 +442,8 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
                     }
                     if (strcmp(cap, "translate") == 0) {
                         out->caps_translate = 1;
+                    } else if (strcmp(cap, "model-manager") == 0) {
+                        out->caps_model_manager = 1;
                     }
                 } else if (skip_value(&p) != 0) {
                     set_err(err, err_n, "bad capability");
@@ -474,6 +482,10 @@ int voxkit_proto_parse(const char *line, voxkit_message *out, char *err,
                 copy_field(out->convert, sizeof(out->convert), value);
             } else if (strcmp(key, "model") == 0) {
                 copy_field(out->model, sizeof(out->model), value);
+            } else if (strcmp(key, "model_mt") == 0) {
+                copy_field(out->model_mt, sizeof(out->model_mt), value);
+            } else if (strcmp(key, "result") == 0) {
+                copy_field(out->result, sizeof(out->result), value);
             } else if (strcmp(key, "store") == 0) {
                 copy_field(out->store, sizeof(out->store), value);
             } else if (strcmp(key, "state") == 0) {
@@ -629,6 +641,31 @@ int voxkit_proto_write_model_install(char *buf, size_t n, uint64_t req,
     return write_model_id(buf, n, req, "model.install", model);
 }
 
+int voxkit_proto_write_model_install_accept(char *buf, size_t n, uint64_t req,
+                                            const char *model) {
+    int rc = write_model_id(buf, n, req, "model.install", model);
+    size_t used;
+    if (rc < 0) {
+        return rc;
+    }
+    /* Reopen the object: "...}\n" becomes "...,"accept_license":true}\n". */
+    used = strlen(buf);
+    if (used < 2 || buf[used - 1] != '\n' || buf[used - 2] != '}') {
+        return -1;
+    }
+    used -= 2;
+    buf[used] = '\0';
+    if (append(buf, n, &used, ",\"accept_license\":true}") != 0) {
+        return -1;
+    }
+    return finish(buf, n, used);
+}
+
+int voxkit_proto_write_model_verify(char *buf, size_t n, uint64_t req,
+                                    const char *model) {
+    return write_model_id(buf, n, req, "model.verify", model);
+}
+
 int voxkit_proto_write_model_remove(char *buf, size_t n, uint64_t req,
                                     const char *model) {
     return write_model_id(buf, n, req, "model.remove", model);
@@ -773,41 +810,64 @@ static int parse_one_model(const char **pp, voxkit_model_info *info) {
             return -1;
         }
         p = skip(p + 1);
+        char *text = NULL;
+        size_t text_n = 0;
+        uint64_t *number = NULL;
+        int *flag = NULL;
         if (strcmp(key, "id") == 0) {
-            if (parse_string(&p, info->id, sizeof(info->id)) != 0) {
-                return -1;
-            }
+            text = info->id, text_n = sizeof(info->id);
         } else if (strcmp(key, "kind") == 0) {
-            if (parse_string(&p, info->kind, sizeof(info->kind)) != 0) {
-                return -1;
-            }
+            text = info->kind, text_n = sizeof(info->kind);
         } else if (strcmp(key, "blurb") == 0) {
-            if (parse_string(&p, info->blurb, sizeof(info->blurb)) != 0) {
+            text = info->blurb, text_n = sizeof(info->blurb);
+        } else if (strcmp(key, "title") == 0) {
+            text = info->title, text_n = sizeof(info->title);
+        } else if (strcmp(key, "purpose") == 0) {
+            text = info->purpose, text_n = sizeof(info->purpose);
+        } else if (strcmp(key, "license") == 0) {
+            text = info->license, text_n = sizeof(info->license);
+        } else if (strcmp(key, "restriction") == 0) {
+            text = info->restriction, text_n = sizeof(info->restriction);
+        } else if (strcmp(key, "bytes") == 0) {
+            number = &info->bytes;
+        } else if (strcmp(key, "size_on_disk") == 0) {
+            number = &info->size_on_disk;
+        } else if (strcmp(key, "partial_bytes") == 0) {
+            number = &info->partial_bytes;
+        } else if (strcmp(key, "runtime_bytes") == 0) {
+            number = &info->runtime_bytes;
+        } else if (strcmp(key, "installed") == 0) {
+            flag = &info->installed;
+        } else if (strcmp(key, "active") == 0) {
+            flag = &info->active;
+        } else if (strcmp(key, "restricted") == 0) {
+            flag = &info->restricted;
+        } else if (strcmp(key, "license_accepted") == 0) {
+            flag = &info->license_accepted;
+        } else if (strcmp(key, "recommended") == 0) {
+            flag = &info->recommended;
+        } else if (strcmp(key, "selectable") == 0) {
+            flag = &info->selectable;
+        } else if (strcmp(key, "downloading") == 0) {
+            flag = &info->downloading;
+        }
+        if (text) {
+            /* Truncate long strings instead of failing the whole list. */
+            char big[2048];
+            if (parse_string(&p, big, sizeof(big)) != 0) {
                 return -1;
             }
-        } else if (strcmp(key, "bytes") == 0 ||
-                   strcmp(key, "size_on_disk") == 0) {
+            copy_field(text, text_n, big);
+        } else if (number) {
             double num = 0;
             if (parse_number(&p, &num) != 0 || num < 0) {
                 return -1;
             }
-            if (strcmp(key, "bytes") == 0) {
-                info->bytes = (uint64_t)num;
-            } else {
-                info->size_on_disk = (uint64_t)num;
-            }
-        } else if (strcmp(key, "installed") == 0 ||
-                   strcmp(key, "active") == 0) {
-            int flag = 0;
-            if (parse_bool(&p, &flag) != 0) {
+            *number = (uint64_t)num;
+        } else if (flag) {
+            if (parse_bool(&p, flag) != 0) {
                 return -1;
-            }
-            if (strcmp(key, "installed") == 0) {
-                info->installed = flag;
-            } else {
-                info->active = flag;
-            }
-        } else if (skip_value(&p) != 0) {
+            }        } else if (skip_value(&p) != 0) {
             return -1;
         }
         p = skip(p);

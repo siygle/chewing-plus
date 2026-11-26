@@ -49,6 +49,29 @@ jobs:
           sudo installer -pkg macos/build/ChewingPlus.pkg -target /
           "/Library/Input Methods/ChewingPlus.app/Contents/MacOS/ChewingPlus" --register
           xcrun swift macos/check-tis.swift im.chewing.inputmethod.ChewingPlus.Bopomofo
+      - name: Model manager smoke test (offline CLI and window)
+        run: |
+          support="$HOME/Library/Application Support/ChewingPlus"
+          vk="$support/voxkit"
+          [ -x "$vk" ] || vk=macos/build/fcitx5-voxkit/daemon/target/release/voxkit
+          export VOXKIT_MODELS_DIR="$RUNNER_TEMP/mm-models"
+          export VOXKIT_SOCKET="$RUNNER_TEMP/mm.sock"
+          "$vk" model list --json | tee "$RUNNER_TEMP/list.json"
+          grep -q '"model-manager"' "$RUNNER_TEMP/list.json"
+          grep -q '"restricted":true' "$RUNNER_TEMP/list.json"
+          # HY-MT is never downloaded without consent.
+          if "$vk" model install hy-mt1.5-1.8b --json > "$RUNNER_TEMP/consent.json"; then
+              echo "install without consent should fail"; exit 1
+          fi
+          grep -q '"license-required"' "$RUNNER_TEMP/consent.json"
+          "$vk" model verify silero-vad --json | grep -q '"missing"'
+          test -x "/Applications/新酷音 Plus 語音模型.app/Contents/MacOS/chewing-plus-models-window"
+          # The standalone window must start and stay up (no IMKServer).
+          "/Library/Input Methods/ChewingPlus.app/Contents/MacOS/ChewingPlus" --models &
+          pid=$!
+          sleep 5
+          kill -0 "$pid"
+          kill "$pid"
       - name: Translation smoke test (manual runs only)
         if: github.event_name == 'workflow_dispatch'
         run: |
@@ -65,7 +88,7 @@ jobs:
               export VOXKIT_MT_PLUGIN="$PWD/macos/build/voxkit-mt/libvoxkit-mt.dylib"
           fi
           export VOXKIT_MODELS_DIR="$RUNNER_TEMP/voxkit-models"
-          "$vk" translate --wait --target en \
+          "$vk" translate --wait --accept-license --target en \
               "今天天氣很好，我們去公園散步" | tee "$RUNNER_TEMP/translate.txt"
           test -s "$RUNNER_TEMP/translate.txt"
           grep -qi 'weather\|park' "$RUNNER_TEMP/translate.txt"

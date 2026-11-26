@@ -142,6 +142,9 @@ def check_pkg(pkg):
         plugin = "Library/Application Support/ChewingPlus/libvoxkit-mt.dylib"
         if not any(plugin in path for path in paths):
             errors.append("pkg payload is missing /" + plugin)
+        launcher = "Applications/新酷音 Plus 語音模型.app/Contents/MacOS/chewing-plus-models-window"
+        if not any(launcher in path for path in paths):
+            errors.append("pkg payload is missing the model window launcher /" + launcher)
         if any("/._" in path or path.startswith("._") for path in paths):
             errors.append("pkg payload contains AppleDouble files")
     return errors

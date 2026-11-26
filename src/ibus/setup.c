@@ -183,7 +183,7 @@ static void add_row(const voxkit_model_info *info) {
 }
 
 static void refresh_list(void) {
-    voxkit_model_info rows[8];
+    voxkit_model_info rows[VOXKIT_MODELS_MAX];
     voxkit_message summary;
     size_t count = 0;
     size_t i;
@@ -194,7 +194,7 @@ static void refresh_list(void) {
         return;
     }
     memset(&summary, 0, sizeof(summary));
-    if (voxkit_client_model_list(&UI->voice, ++UI->req, rows, 8, &count,
+    if (voxkit_client_model_list(&UI->voice, ++UI->req, rows, VOXKIT_MODELS_MAX, &count,
                                  &summary, 1000, err, sizeof(err)) != 0) {
         fail(err, "讀不到模型列表。");
         return;

@@ -209,7 +209,7 @@ final class ChewingPlusInputController: IMKInputController {
     }
 
     @objc private func openModels(_: Any?) {
-        ModelPreferences.shared.show()
+        ModelManagerWindow.shared.show()
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
@@ -729,6 +729,7 @@ final class ChewingPlusInputController: IMKInputController {
     private static func translateFallbackText(_ reason: String) -> String {
         switch reason {
         case "model-downloading": return "翻譯模型下載中，已輸入原文"
+        case "license-required": return "請先在「語音模型…」同意翻譯模型授權，已輸入原文"
         case "plugin-missing": return "未安裝翻譯外掛，已輸入原文"
         case "bad-target": return "不支援的翻譯語言，已輸入原文"
         default: return "翻譯失敗，已輸入原文"
