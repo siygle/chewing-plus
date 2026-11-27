@@ -1,5 +1,12 @@
 新酷音 Plus：在新酷音上加入 emoji、計算機、英文模式與本機語音輸入。基於 [fcitx/fcitx5-chewing](https://github.com/fcitx/fcitx5-chewing) 與 libchewing 0.14。功能說明請看 [README](https://github.com/siygle/chewing-plus#readme)。
 
+## 6.1.2
+
+- **Linux 語音模型視窗**：GTK4 + libadwaita，對齊 macOS。畫面分成「語音辨識模型」與「翻譯模型」兩區，可下載、續傳、取消、刪除、檢查與切換；HY-MT 等受限模型須先勾選同意授權。語音服務沒開時改走離線 CLI。
+- **怎麼開啟**：fcitx5 輸入法選單「語音模型…」、設定裡的模型管理按鈕，或應用程式「新酷音 Plus 語音模型」。IBus 設定程式也改從「語音模型…」打開同一個視窗。
+- **升級後可用空間**：舊的語音服務不會回報可用空間時，視窗顯示「可用空間 未知」而不是 0 B。安裝升級會嘗試重新啟動目前使用者的 voxkit；若沒有自動重啟，請執行 `systemctl --user restart voxkit.service`。
+- **其他修正**：刪除使用中模型的錯誤提示會在重新整理、下一個成功操作或數秒後消失；下載進行中時，其他卡片的「刪除」也會停用；離線管理模式的「目前選擇」與語音服務使用同一組設定。
+
 ## 6.1.1
 
 - **macOS 語音翻譯**：安裝檔內含翻譯外掛 `libvoxkit-mt.dylib`。使用前請在輸入法選單勾選「語音翻譯」，並在「語音模型…」同意 HY-MT 授權後下載模型。

@@ -22,19 +22,21 @@ MSG
 
 # pacman runs as root. When we can see the installing user's session,
 # try-restart their voxkit unit so the model window talks to a daemon
-# that reports free space. Failure is ignored; the note above still
-# tells the user what to run.
+# that reports free space. 0: the unit was restarted, or it was not
+# running. 1: we could not try, or systemctl failed — print the note.
 _try_restart_voxkit() {
     local user uid runtime
     user="${SUDO_USER:-}"
-    [ -n "$user" ] && [ "$user" != root ] || return 0
-    uid=$(id -u "$user" 2>/dev/null) || return 0
+    [ -n "$user" ] && [ "$user" != root ] || return 1
+    uid=$(id -u "$user" 2>/dev/null) || return 1
     runtime="/run/user/$uid"
-    [ -S "$runtime/bus" ] || return 0
+    [ -S "$runtime/bus" ] || return 1
     if command -v runuser >/dev/null 2>&1; then
-        runuser -u "$user" -- env XDG_RUNTIME_DIR="$runtime"             systemctl --user try-restart voxkit.service >/dev/null 2>&1 || true
+        runuser -u "$user" -- env XDG_RUNTIME_DIR="$runtime" \
+            systemctl --user try-restart voxkit.service >/dev/null 2>&1
     else
-        sudo -u "$user" -- env XDG_RUNTIME_DIR="$runtime"             systemctl --user try-restart voxkit.service >/dev/null 2>&1 || true
+        sudo -u "$user" -- env XDG_RUNTIME_DIR="$runtime" \
+            systemctl --user try-restart voxkit.service >/dev/null 2>&1
     fi
 }
 
@@ -47,6 +49,7 @@ post_upgrade() {
     if [ "$(vercmp "$2" 6.0.0)" -lt 0 ]; then
         _voice_note
     fi
-    _try_restart_voxkit
-    _restart_note
+    if ! _try_restart_voxkit; then
+        _restart_note
+    fi
 }
