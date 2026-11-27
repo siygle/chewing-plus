@@ -328,8 +328,7 @@ void testUserHistory() {
 
         h1.record(UserHistory::Kind::Phrase, "另一個詞", "ㄌㄧㄍㄘ", 2.0,
                   t0 + 120);
-        check(h1.saveIfDirty(t0 + 120, true),
-              "first process merges and saves");
+        check(h1.saveIfDirty(t0 + 120, true), "first process merges and saves");
 
         UserHistory h3;
         h3.load(path);
@@ -389,12 +388,12 @@ void testAdaptivePhrasesAndOverlay() {
           "live chars ㄋㄧ ranks 妳 first after use");
 
     // User overlay file formats: 3-col, full bopomofo, 2-col, 1-col.
-    std::string userFile = TempFile(
-        "# custom user phrases\n"
-        "生成式人工智慧\t5000\tㄕㄔㄕㄖㄍㄓㄏ\n"
-        "提示詞工程\t5000\tㄊㄧˊ ㄕˋ ㄘˊ ㄍㄨㄥ ㄔㄥˊ\n"
-        "輝達晶片\tㄏㄨㄟ ㄉㄚˊ ㄐㄧㄥ ㄆㄧㄢˋ\n"
-        "純補全詞條\n");
+    std::string userFile =
+        TempFile("# custom user phrases\n"
+                 "生成式人工智慧\t5000\tㄕㄔㄕㄖㄍㄓㄏ\n"
+                 "提示詞工程\t5000\tㄊㄧˊ ㄕˋ ㄘˊ ㄍㄨㄥ ㄔㄥˊ\n"
+                 "輝達晶片\tㄏㄨㄟ ㄉㄚˊ ㄐㄧㄥ ㄆㄧㄢˋ\n"
+                 "純補全詞條\n");
     PhraseIndex extra;
     check(extra.load(userFile, false, true) == 4,
           "user phrase file loads all 4 formats");

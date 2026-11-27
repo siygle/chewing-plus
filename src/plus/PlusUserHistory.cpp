@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -66,8 +67,7 @@ double UserHistory::decayCount(double count, int64_t lastUsedSec,
     if (lastUsedSec <= 0 || nowSec <= lastUsedSec) {
         return count;
     }
-    const double dtDays =
-        static_cast<double>(nowSec - lastUsedSec) / 86400.0;
+    const double dtDays = static_cast<double>(nowSec - lastUsedSec) / 86400.0;
     return count * std::exp2(-dtDays / kFreqHalfLifeDays);
 }
 
@@ -160,7 +160,8 @@ void UserHistory::loadFromFileLocked(const std::string &path, bool merge) {
             // Merge with another process's newer save: keep the fresher state
             // and higher decayed count.
             int64_t ref = std::max(it->second.lastUsedSec, ts);
-            double mine = decayCount(it->second.count, it->second.lastUsedSec, ref);
+            double mine =
+                decayCount(it->second.count, it->second.lastUsedSec, ref);
             double theirs = decayCount(count, ts, ref);
             it->second.count = std::min(std::max(mine, theirs), kMaxCount);
             it->second.lastUsedSec = ref;
@@ -260,10 +261,9 @@ void UserHistory::pruneLocked(std::unordered_map<std::string, Entry> &table,
         scored.emplace_back(s, k);
     }
     const size_t drop = table.size() - maxEntries;
-    std::nth_element(scored.begin(), scored.begin() + static_cast<long>(drop),
-                     scored.end(), [](const auto &a, const auto &b) {
-                         return a.first < b.first;
-                     });
+    std::nth_element(
+        scored.begin(), scored.begin() + static_cast<long>(drop), scored.end(),
+        [](const auto &a, const auto &b) { return a.first < b.first; });
     for (size_t i = 0; i < drop; ++i) {
         if (scored[i].first < 1e8) {
             table.erase(scored[i].second);

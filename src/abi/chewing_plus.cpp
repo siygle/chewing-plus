@@ -71,7 +71,8 @@ Utf8Char NextUtf8(std::string_view s, size_t i) {
     }
     if ((b0 & 0xE0) == 0xC0 && i + 1 < s.size()) {
         r.len = 2;
-        r.cp = ((b0 & 0x1Fu) << 6) | (static_cast<unsigned char>(s[i + 1]) & 0x3Fu);
+        r.cp = ((b0 & 0x1Fu) << 6) |
+               (static_cast<unsigned char>(s[i + 1]) & 0x3Fu);
         return r;
     }
     if ((b0 & 0xF0) == 0xE0 && i + 2 < s.size()) {
@@ -523,8 +524,9 @@ struct Session {
         }
         std::string buffer = BufferOf(c);
         std::string zuin = ZuinOf(c);
-        const auto *extra =
-            (userPhrases && userPhrases->size() > 0) ? userPhrases.get() : nullptr;
+        const auto *extra = (userPhrases && userPhrases->size() > 0)
+                                ? userPhrases.get()
+                                : nullptr;
         const auto *hist = activeHistory();
         const int64_t nowSec =
             hist ? chewing_plus::UserHistory::nowSeconds() : 0;
@@ -541,8 +543,8 @@ struct Session {
             // only on layouts that queue them, e.g. Hsu). Use the raw keys
             // recorded for the English hint when the reading does not grow.
             std::string initials = plus.typedInitials(c);
-            sugg = phrases->expand(initials, 9, initialsMin, extra, hist,
-                                   nowSec);
+            sugg =
+                phrases->expand(initials, 9, initialsMin, extra, hist, nowSec);
             replaceReading = !sugg.empty();
             if (!replaceReading) {
                 fillLiveChars(zuin, hist, nowSec);
