@@ -59,8 +59,7 @@ public:
     // Optional `extra` (user-supplied phrase file) and `history` (adaptive
     // usage frecency + libchewing user phrases) overlay on top of this index.
     std::vector<std::string> complete(const std::string &typed,
-                                      size_t limit = 9,
-                                      size_t minChars = 2,
+                                      size_t limit = 9, size_t minChars = 2,
                                       const PhraseIndex *extra = nullptr,
                                       const UserHistory *history = nullptr,
                                       int64_t nowSec = 0) const;
@@ -77,8 +76,7 @@ public:
     // Phrases whose syllables start with these Bopomofo symbols, in order
     // (ㄍㄒㄈㄘ). At least `minSyllables` symbols; highest ranked first.
     std::vector<std::string> expand(const std::string &initials,
-                                    size_t limit = 9,
-                                    size_t minSyllables = 2,
+                                    size_t limit = 9, size_t minSyllables = 2,
                                     const PhraseIndex *extra = nullptr,
                                     const UserHistory *history = nullptr,
                                     int64_t nowSec = 0) const;
@@ -99,8 +97,8 @@ private:
     std::vector<std::string>
     collect(bool byAbbr, std::string_view key, size_t limit,
             const std::function<bool(const PhraseIndex &, uint32_t)> &accept,
-            const PhraseIndex *extra, const UserHistory *history,
-            bool isChar, int64_t nowSec,
+            const PhraseIndex *extra, const UserHistory *history, bool isChar,
+            int64_t nowSec,
             const std::vector<std::string> *exclude = nullptr) const;
 
     const void *map_ = nullptr;

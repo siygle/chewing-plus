@@ -221,8 +221,8 @@ chewing_plus_set_user_phrases_path(chewing_plus_session *session,
 /* Persistence path for adaptive suggestion usage history (plus-usage.tsv).
  * Sessions in the same process share one in-memory store per path. Never
  * records while sensitive == 1. Pass "" to keep history in memory only. */
-CHEWING_PLUS_API void
-chewing_plus_set_usage_path(chewing_plus_session *session, const char *path);
+CHEWING_PLUS_API void chewing_plus_set_usage_path(chewing_plus_session *session,
+                                                  const char *path);
 /* Clear all learned suggestion weights in memory and remove the usage file. */
 CHEWING_PLUS_API void chewing_plus_clear_usage(chewing_plus_session *session);
 CHEWING_PLUS_API int
