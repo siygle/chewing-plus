@@ -11,11 +11,13 @@
 #include "PlusEnglish.h"
 #include "PlusFeatures.h"
 #include "PlusPhrases.h"
+#include "PlusUserHistory.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <string>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
 
@@ -272,6 +274,146 @@ void testPhrases() {
           "AllBopomofo");
 }
 
+void testUserHistory() {
+    using chewing_plus::UserHistory;
+    char path[] = "/tmp/chewing-plus-usage-XXXXXX";
+    int fd = mkstemp(path);
+    check(fd >= 0, "usage temp file");
+    if (fd >= 0) {
+        close(fd);
+        unlink(path);
+    }
+
+    const int64_t t0 = 1795000000;
+    {
+        UserHistory h;
+        h.load(path);
+        // Before learning: static freq 15000 beats 50.
+        check(h.score(UserHistory::Kind::Phrase, "中華民國", 15000, t0) >
+                  h.score(UserHistory::Kind::Phrase, "中華電信", 50, t0),
+              "static high freq starts higher");
+        // One explicit suggestion pick (+2.0) lifts 中華電信 above 中華民國.
+        h.record(UserHistory::Kind::Phrase, "中華電信", "ㄓㄏㄉㄒ", 2.0, t0);
+        check(h.score(UserHistory::Kind::Phrase, "中華電信", 50, t0) >
+                  h.score(UserHistory::Kind::Phrase, "中華民國", 15000, t0),
+              "one explicit pick lifts phrase above high-freq static phrase");
+        // After 30 days unused, recency and count decay smoothly back below.
+        const int64_t t30 = t0 + 30 * 86400;
+        check(h.score(UserHistory::Kind::Phrase, "中華電信", 50, t30) <
+                  h.score(UserHistory::Kind::Phrase, "中華民國", 15000, t30),
+              "unused phrase decays back below static high-freq after 30 days");
+        // Frequently used phrase (10 times) stays on top even after 30 days.
+        for (int i = 0; i < 10; ++i) {
+            h.record(UserHistory::Kind::Phrase, "中華電信", "ㄓㄏㄉㄒ", 1.0,
+                     t0 + i * 60);
+        }
+        check(h.score(UserHistory::Kind::Phrase, "中華電信", 50, t30) >
+                  h.score(UserHistory::Kind::Phrase, "中華民國", 15000, t30),
+              "frequently typed phrase stays higher after 30 days");
+        h.record(UserHistory::Kind::Char, "妳", "", 2.0, t0);
+        check(h.saveIfDirty(t0, true), "usage saves atomically");
+    }
+
+    // Reload from disk and verify persistence + multi-process merge.
+    {
+        UserHistory h1;
+        check(h1.load(path) >= 2, "usage reloads from disk");
+        check(h1.hasPhrase("中華電信"), "reloaded usage contains 中華電信");
+
+        UserHistory h2;
+        h2.load(path);
+        h2.record(UserHistory::Kind::Phrase, "新酷音測試", "ㄒㄎㄧㄘㄕ", 2.0,
+                  t0 + 100);
+        check(h2.saveIfDirty(t0 + 100, true), "second process saves");
+
+        h1.record(UserHistory::Kind::Phrase, "另一個詞", "ㄌㄧㄍㄘ", 2.0,
+                  t0 + 120);
+        check(h1.saveIfDirty(t0 + 120, true),
+              "first process merges and saves");
+
+        UserHistory h3;
+        h3.load(path);
+        check(h3.hasPhrase("新酷音測試") && h3.hasPhrase("另一個詞") &&
+                  h3.hasPhrase("中華電信"),
+              "multi-process merge preserves both processes' records");
+        h3.clear();
+        check(h3.empty(), "clear empties in-memory history");
+    }
+    struct stat st{};
+    check(stat(path, &st) != 0, "clear removes usage file on disk");
+}
+
+void testAdaptivePhrasesAndOverlay() {
+    using chewing_plus::PhraseIndex;
+    using chewing_plus::UserHistory;
+
+    PhraseIndex base;
+    check(base.load(PLUS_PHRASES_PATH) > 100000, "base phrases load");
+    base.finalize();
+    check(base.containsText("中華民國") && !base.containsText("不存在的詞組"),
+          "containsText binary search");
+
+    const int64_t t0 = 1795000000;
+    UserHistory hist;
+    auto before = base.complete("中華", 9, 2, nullptr, &hist, t0);
+    check(!before.empty() && before[0] == "中華民國",
+          "adaptive complete starts with 中華民國");
+    hist.record(UserHistory::Kind::Phrase, "中華電信", "", 2.0, t0);
+    auto after = base.complete("中華", 9, 2, nullptr, &hist, t0);
+    check(!after.empty() && after[0] == "中華電信",
+          "adaptive complete ranks 中華電信 first after use");
+    auto decayed = base.complete("中華", 9, 2, nullptr, &hist, t0 + 30 * 86400);
+    check(!decayed.empty() && decayed[0] == "中華民國",
+          "adaptive complete decays back to 中華民國 after 30 days");
+
+    // Imported libchewing user phrase surfaces in both complete and expand.
+    hist.importUserPhrases({{"中華新酷音", "ㄓㄏㄒㄎㄧ"}});
+    auto withImport = base.complete("中華", 9, 2, nullptr, &hist, t0);
+    check(std::find(withImport.begin(), withImport.end(), "中華新酷音") !=
+              withImport.end(),
+          "imported user phrase appears in completions");
+    auto expImport = base.expand("ㄓㄏㄒㄎㄧ", 9, 2, nullptr, &hist, t0);
+    check(!expImport.empty() && expImport[0] == "中華新酷音",
+          "imported user phrase appears in initials expansion");
+
+    // Live chars adaptive re-ranking keeps exact reading ahead of longer ones.
+    PhraseIndex chars;
+    check(chars.load(PLUS_CHARS_PATH, true) > 10000, "base chars load");
+    chars.finalize();
+    auto cBefore = chars.byReading("ㄋㄧ", 9, nullptr, &hist, t0);
+    check(!cBefore.empty() && cBefore[0] == "你",
+          "live chars ㄋㄧ starts with 你");
+    hist.record(UserHistory::Kind::Char, "妳", "", 2.0, t0);
+    auto cAfter = chars.byReading("ㄋㄧ", 9, nullptr, &hist, t0);
+    check(!cAfter.empty() && cAfter[0] == "妳",
+          "live chars ㄋㄧ ranks 妳 first after use");
+
+    // User overlay file formats: 3-col, full bopomofo, 2-col, 1-col.
+    std::string userFile = TempFile(
+        "# custom user phrases\n"
+        "生成式人工智慧\t5000\tㄕㄔㄕㄖㄍㄓㄏ\n"
+        "提示詞工程\t5000\tㄊㄧˊ ㄕˋ ㄘˊ ㄍㄨㄥ ㄔㄥˊ\n"
+        "輝達晶片\tㄏㄨㄟ ㄉㄚˊ ㄐㄧㄥ ㄆㄧㄢˋ\n"
+        "純補全詞條\n");
+    PhraseIndex extra;
+    check(extra.load(userFile, false, true) == 4,
+          "user phrase file loads all 4 formats");
+    extra.finalize();
+    auto uComp = base.complete("生成式", 9, 2, &extra, nullptr, t0);
+    check(!uComp.empty() && uComp[0] == "生成式人工智慧",
+          "user overlay completes 生成式人工智慧");
+    auto uComp1 = base.complete("純補", 9, 2, &extra, nullptr, t0);
+    check(!uComp1.empty() && uComp1[0] == "純補全詞條",
+          "1-col user overlay completes 純補全詞條");
+    auto uExp = base.expand("ㄊㄕㄘㄍㄔ", 9, 2, &extra, nullptr, t0);
+    check(!uExp.empty() && uExp[0] == "提示詞工程",
+          "full-bopomofo user overlay expands ㄊㄕㄘㄍㄔ");
+    auto uExp2 = base.expand("ㄏㄉㄐㄆ", 9, 2, &extra, nullptr, t0);
+    check(!uExp2.empty() && uExp2[0] == "輝達晶片",
+          "2-col user overlay expands ㄏㄉㄐㄆ");
+    unlink(userFile.c_str());
+}
+
 } // namespace
 
 int main() {
@@ -285,6 +427,8 @@ int main() {
     testPhrases();
     testCompiledPhrases();
     testDataCache();
+    testUserHistory();
+    testAdaptivePhrasesAndOverlay();
     std::printf(failures ? "CORE TESTS FAILED (%d)\n" : "CORE TESTS OK\n",
                 failures);
     return failures ? 1 : 0;

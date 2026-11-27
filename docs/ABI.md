@@ -29,6 +29,23 @@ phrase index ships compiled: `chewing-plus-compile-phrases` turns
 memory-maps it (no parsing at load, pages shared between processes). The
 text file still loads if passed instead.
 
+Frontends can also register a per-user phrase overlay and adaptive usage
+history file:
+
+```c
+chewing_plus_set_user_phrases_path(session, "/path/to/plus-phrases-user.txt");
+chewing_plus_set_usage_path(session, "/path/to/plus-usage.tsv");
+chewing_plus_clear_usage(session);
+```
+
+When `adaptive_suggestions` is enabled (default `"1"`) and `sensitive` is off,
+the core re-ranks phrase completions, initial-only expansions, and live
+character suggestions using decayed frequency + recency (Frecency), and imports
+phrases from `libchewing`'s user dictionary so custom phrases surface in
+suggestions too. `Shift+1..9` (by X11 keycode `10..18`) selects the active
+suggestion directly inside `chewing_plus_key()` when no candidate list or Plus
+panel is open.
+
 ## Session
 
 ```c

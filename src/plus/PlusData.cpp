@@ -63,6 +63,10 @@ Table<PhraseIndex> &PhraseTable() {
     static Table<PhraseIndex> t;
     return t;
 }
+std::map<std::string, std::weak_ptr<UserHistory>> &HistoryTable() {
+    static std::map<std::string, std::weak_ptr<UserHistory>> t;
+    return t;
+}
 
 template <typename T>
 size_t Live(Table<T> &table) {
@@ -107,6 +111,14 @@ std::shared_ptr<const PhraseIndex> phrases(const std::string &path) {
     });
 }
 
+std::shared_ptr<const PhraseIndex> userPhrases(const std::string &path) {
+    return Get(PhraseTable(), "user\n" + Stamp(path), [&](PhraseIndex &index) {
+        if (!path.empty())
+            index.load(path, false, true);
+        index.finalize();
+    });
+}
+
 std::shared_ptr<const PhraseIndex> chars(const std::string &path) {
     // Same table, distinct key: a text file loads differently here.
     return Get(PhraseTable(), "chars\n" + Stamp(path), [&](PhraseIndex &index) {
@@ -116,9 +128,33 @@ std::shared_ptr<const PhraseIndex> chars(const std::string &path) {
     });
 }
 
+std::shared_ptr<UserHistory> userHistory(const std::string &path) {
+    if (path.empty()) {
+        return std::make_shared<UserHistory>();
+    }
+    std::lock_guard<std::mutex> guard(Lock());
+    auto &table = HistoryTable();
+    if (auto it = table.find(path); it != table.end()) {
+        if (auto alive = it->second.lock()) {
+            return alive;
+        }
+    }
+    for (auto it = table.begin(); it != table.end();) {
+        it = it->second.expired() ? table.erase(it) : std::next(it);
+    }
+    auto made = std::make_shared<UserHistory>();
+    made->load(path);
+    table[path] = made;
+    return made;
+}
+
 size_t liveCount() {
     std::lock_guard<std::mutex> guard(Lock());
-    return Live(EnglishTable()) + Live(EmojiTable()) + Live(PhraseTable());
+    size_t hist = 0;
+    for (auto &[key, weak] : HistoryTable())
+        hist += !weak.expired();
+    return Live(EnglishTable()) + Live(EmojiTable()) + Live(PhraseTable()) +
+           hist;
 }
 
 } // namespace DataCache

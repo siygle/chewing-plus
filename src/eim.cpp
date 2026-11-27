@@ -606,15 +606,25 @@ void ChewingEngine::populateConfig() {
     set("easy_symbol", flag(*config_.EasySymbolInput));
 
     // Plus data: built-in files from the fcitx5 data dir, user files from
-    // ~/.local/share/fcitx5-chewing. The core shares them between sessions.
+    // ~/.local/share/chewing-plus (with backward-compatible fallback to
+    // ~/.local/share/fcitx5-chewing for emoji/english). The core shares them
+    // between sessions.
     const auto &sp = StandardPaths::global();
-    auto userDir = sp.userDirectory(StandardPathsType::Data) / "fcitx5-chewing";
+    auto dataHome = sp.userDirectory(StandardPathsType::Data);
+    auto legacyUserDir = dataHome / "fcitx5-chewing";
+    auto sharedUserDir = dataHome / "chewing-plus";
     auto builtIn = [&sp](const char *name) {
         return sp.locate(StandardPathsType::PkgData, name).string();
     };
-    const std::string emojiUser =
-        (userDir / "plus-emoji-shortcodes.txt").string();
-    const std::string englishUser = (userDir / "plus-english.txt").string();
+    auto pickUserFile = [&](const char *name) {
+        auto legacy = legacyUserDir / name;
+        if (std::filesystem::exists(legacy)) {
+            return legacy.string();
+        }
+        return (sharedUserDir / name).string();
+    };
+    const std::string emojiUser = pickUserFile("plus-emoji-shortcodes.txt");
+    const std::string englishUser = pickUserFile("plus-english.txt");
     chewing_plus_set_data_paths(
         s, builtIn("data/chewing-plus-emoji-shortcodes.txt").c_str(),
         emojiUser.c_str(), builtIn("data/chewing-plus-english.txt").c_str(),
@@ -666,12 +676,17 @@ void ChewingEngine::populateConfig() {
     set("english_hint_commit", flag(*config_.PlusEnglishHintCommit));
     chewing_plus_set_phrases_path(
         s, builtIn("data/chewing-plus-phrases.bin").c_str());
+    chewing_plus_set_user_phrases_path(
+        s, (sharedUserDir / "plus-phrases-user.txt").string().c_str());
+    chewing_plus_set_usage_path(
+        s, (sharedUserDir / "plus-usage.tsv").string().c_str());
     set("initials_min", std::to_string(*config_.PlusInitialsMin));
     set("fuzzy", flag(*config_.PlusFuzzy));
     chewing_plus_set_chars_path(s,
                                 builtIn("data/chewing-plus-chars.bin").c_str());
     set("live_chars", flag(*config_.PlusLiveChars));
     set("suggestions", flag(*config_.PlusSuggestions));
+    set("adaptive_suggestions", flag(*config_.PlusAdaptiveSuggestions));
     chewing_plus_reset(s);
 }
 
@@ -817,30 +832,6 @@ bool ChewingEngine::englishShortcut(const KeyEvent &keyEvent, bool sensitive) {
            chewing_plus_toggle_english(session_.get()) != 0;
 }
 
-// Shift+1..9 (by key position) picks a phrase suggestion while no candidate
-// list or Plus panel is open.
-bool ChewingEngine::pickSuggestion(const KeyEvent &keyEvent, InputContext *ic) {
-    if (keyEvent.isRelease()) {
-        return false;
-    }
-    const Key &raw = keyEvent.rawKey();
-    if (raw.states() != KeyState::Shift || raw.code() < 10 || raw.code() > 18) {
-        return false;
-    }
-    chewing_plus_view view;
-    if (!chewing_plus_get_view(session_.get(), &view) ||
-        view.candidate_count > 0 || view.panel != CHEWING_PLUS_PANEL_NONE) {
-        return false;
-    }
-    const int index = raw.code() - 10;
-    if (index >= view.suggestion_count) {
-        return false;
-    }
-    chewing_plus_select_suggestion(session_.get(), index);
-    updateUI(ic);
-    return true;
-}
-
 void ChewingEngine::keyEvent(const InputMethodEntry & /*entry*/,
                              KeyEvent &keyEvent) {
     auto *s = session_.get();
@@ -858,10 +849,6 @@ void ChewingEngine::keyEvent(const InputMethodEntry & /*entry*/,
     if (englishShortcut(keyEvent, sensitive)) {
         keyEvent.filterAndAccept();
         updateUI(ic);
-        return;
-    }
-    if (pickSuggestion(keyEvent, ic)) {
-        keyEvent.filterAndAccept();
         return;
     }
 

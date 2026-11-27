@@ -37,6 +37,9 @@ SETTING(english_hint_commit, BOOL, "0",
 SETTING(suggestions, BOOL, "0",
         "Phrase suggestions (completion and initials, Shift+1-9)",
         "詞語建議（自動完成、字首注音，⇧1–9 選取）")
+SETTING(adaptive_suggestions, BOOL, "1",
+        "Learn from typing habits to rank frequent phrases higher",
+        "學習常用字詞（自動調高常輸入字詞的提示權重）")
 SETTING(initials_min, INT, "2",
         "Initials needed before suggesting (2 or more)",
         "字首注音幾個以上開始建議")

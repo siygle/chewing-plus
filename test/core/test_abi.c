@@ -873,6 +873,178 @@ static void test_sensitive(void) {
     }
 }
 
+static void test_adaptive_and_shift_pick(const char *sys) {
+    char dir_tmpl[] = "/tmp/chewing-plus-adapt-XXXXXX";
+    char *dir = mkdtemp(dir_tmpl);
+    char usage_path[512];
+    char user_phrases_path[512];
+    char v4[512];
+    char csv[512];
+    FILE *f;
+    chewing_plus_session *saved = session;
+    chewing_plus_session *s1 = NULL;
+    chewing_plus_session *s2 = NULL;
+    chewing_plus_key_event ev;
+    int i, pick_idx = -1;
+    char picked[128] = "";
+    const char *got;
+
+    if (!dir) {
+        check(0, "adaptive temp dir");
+        return;
+    }
+    snprintf(usage_path, sizeof(usage_path), "%s/plus-usage.tsv", dir);
+    snprintf(user_phrases_path, sizeof(user_phrases_path),
+             "%s/plus-phrases-user.txt", dir);
+    snprintf(v4, sizeof(v4), "%s/v4", dir);
+    snprintf(csv, sizeof(csv), "%s/v4/user_dict.csv", dir);
+    mkdir(v4, 0700);
+    f = fopen(csv, "w");
+    if (f) {
+        fputs("超酷新詞,ㄔㄠ ㄎㄨˋ ㄒㄧㄣ ㄘˊ,0\n", f);
+        fclose(f);
+    }
+    f = fopen(user_phrases_path, "w");
+    if (f) {
+        fputs("提示詞工程\tㄊㄧˊ ㄕˋ ㄘˊ ㄍㄨㄥ ㄔㄥˊ\n", f);
+        fclose(f);
+    }
+
+    s1 = chewing_plus_new(sys, dir);
+    check(s1 != NULL, "adaptive session 1");
+    if (!s1) {
+        return;
+    }
+    session = s1;
+    check(strcmp(chewing_plus_get_setting(s1, "adaptive_suggestions"), "1") ==
+              0,
+          "adaptive_suggestions defaults to 1");
+    chewing_plus_set_setting(s1, "fuzzy", "0");
+    chewing_plus_set_phrases_path(s1, PLUS_PHRASES_PATH);
+    chewing_plus_set_user_phrases_path(s1, user_phrases_path);
+    chewing_plus_set_usage_path(s1, usage_path);
+    chewing_plus_set_setting(s1, "suggestions", "1");
+
+    /* 1. Legacy setter syncs settings map. */
+    chewing_plus_set_calculator(s1, 0);
+    check(strcmp(chewing_plus_get_setting(s1, "calculator"), "0") == 0,
+          "legacy setter updates get_setting");
+    chewing_plus_set_calculator(s1, 1);
+    check(strcmp(chewing_plus_get_setting(s1, "calculator"), "1") == 0,
+          "legacy setter updates get_setting back to 1");
+
+    /* 2. Imported libchewing user phrase + user overlay appear in initials. */
+    reset();
+    type_text("tdvh"); /* ㄔㄎㄒㄘ -> 超酷新詞 */
+    check(chewing_plus_suggestion_count(s1) >= 1 &&
+              strcmp(chewing_plus_suggestion(s1, 0), "超酷新詞") == 0,
+          "libchewing userphrase imported into initials suggestions");
+    /* Core Shift+1 picks suggestion directly via chewing_plus_key(). */
+    memset(&ev, 0, sizeof(ev));
+    ev.keycode = 10; /* X11 digit 1 */
+    ev.ascii = '!';
+    ev.mods = CHEWING_PLUS_MOD_SHIFT;
+    ev.time_ms = clock_ms;
+    clock_ms += 20;
+    check(chewing_plus_key(s1, &ev) == 1, "core handles Shift+1 suggestion");
+    got = chewing_plus_take_commit(s1);
+    check(strcmp(got, "超酷新詞") == 0, "Shift+1 commits 超酷新詞");
+
+    reset();
+    type_text("wghet"); /* ㄊㄕㄘㄍㄔ -> 提示詞工程 */
+    check(chewing_plus_suggestion_count(s1) >= 1 &&
+              strcmp(chewing_plus_suggestion(s1, 0), "提示詞工程") == 0,
+          "user phrase overlay expands 提示詞工程");
+
+    /* 3. Adaptive ranking: pick a non-first 中華 completion via Shift+N. */
+    reset();
+    type_text("5j/ cj86"); /* ㄓㄨㄥ ㄏㄨㄚˊ -> 中華 */
+    check(chewing_plus_suggestion_count(s1) >= 2 &&
+              strcmp(chewing_plus_suggestion(s1, 0), "中華民國") == 0,
+          "中華 starts with 中華民國");
+    for (i = 1; i < chewing_plus_suggestion_count(s1); i++) {
+        const char *cand = chewing_plus_suggestion(s1, i);
+        if (cand && strcmp(cand, "中華民國") != 0) {
+            pick_idx = i;
+            snprintf(picked, sizeof(picked), "%s", cand);
+            break;
+        }
+    }
+    check(pick_idx >= 1, "found second 中華 suggestion to boost");
+    if (pick_idx >= 1) {
+        memset(&ev, 0, sizeof(ev));
+        ev.keycode = 10 + pick_idx;
+        ev.mods = CHEWING_PLUS_MOD_SHIFT;
+        ev.time_ms = clock_ms;
+        clock_ms += 20;
+        check(chewing_plus_key(s1, &ev) == 1, "Shift+N picks non-first item");
+        got = chewing_plus_take_commit(s1);
+        check(strcmp(got, picked) == 0, "Shift+N commits picked phrase");
+
+        /* Immediately ranks #1 on next query. */
+        reset();
+        type_text("5j/ cj86");
+        check(chewing_plus_suggestion_count(s1) >= 1 &&
+                  strcmp(chewing_plus_suggestion(s1, 0), picked) == 0,
+              "picked phrase promoted to #1 immediately");
+
+        /* Turning adaptive_suggestions off reverts to static order. */
+        chewing_plus_set_setting(s1, "adaptive_suggestions", "0");
+        check(chewing_plus_suggestion_count(s1) >= 1 &&
+                  strcmp(chewing_plus_suggestion(s1, 0), "中華民國") == 0,
+              "adaptive off reverts to static order");
+        chewing_plus_set_setting(s1, "adaptive_suggestions", "1");
+        check(chewing_plus_suggestion_count(s1) >= 1 &&
+                  strcmp(chewing_plus_suggestion(s1, 0), picked) == 0,
+              "adaptive back on restores promoted phrase");
+    }
+
+    /* 4. Sensitive mode never records usage. */
+    chewing_plus_set_sensitive(s1, 1);
+    reset();
+    type_text("su3cl3");
+    tap(CHEWING_PLUS_KEY_RETURN, 0, 0);
+    chewing_plus_set_sensitive(s1, 0);
+
+    /* Flush and free session 1; verify persistence in session 2. */
+    chewing_plus_flush(s1, CHEWING_PLUS_FLUSH_CLEAR);
+    chewing_plus_free(s1);
+
+    /* Confirm sensitive commit ("你好") was NOT written to plus-usage.tsv. */
+    {
+        char buf[4096] = "";
+        f = fopen(usage_path, "r");
+        if (f) {
+            size_t nread = fread(buf, 1, sizeof(buf) - 1, f);
+            buf[nread] = '\0';
+            fclose(f);
+        }
+        check(strstr(buf, "\t你好\t") == NULL,
+              "sensitive mode commit not persisted to usage file");
+    }
+
+    s2 = chewing_plus_new(sys, dir);
+    check(s2 != NULL, "adaptive session 2");
+    if (s2) {
+        session = s2;
+        chewing_plus_set_setting(s2, "fuzzy", "0");
+        chewing_plus_set_phrases_path(s2, PLUS_PHRASES_PATH);
+        chewing_plus_set_usage_path(s2, usage_path);
+        chewing_plus_set_setting(s2, "suggestions", "1");
+        reset();
+        type_text("5j/ cj86");
+        check(picked[0] && chewing_plus_suggestion_count(s2) >= 1 &&
+                  strcmp(chewing_plus_suggestion(s2, 0), picked) == 0,
+              "promoted phrase persists across sessions");
+        chewing_plus_clear_usage(s2);
+        check(chewing_plus_suggestion_count(s2) >= 1 &&
+                  strcmp(chewing_plus_suggestion(s2, 0), "中華民國") == 0,
+              "clear_usage resets order to static");
+        chewing_plus_free(s2);
+    }
+    session = saved;
+}
+
 int main(void) {
     const char *sys = find_sys_path();
     char user_tmpl[] = "/tmp/chewing-plus-abi-XXXXXX";
@@ -942,6 +1114,7 @@ int main(void) {
     test_fuzzy_user_dict(sys);
     test_emoji_candidate();
     test_sensitive();
+    test_adaptive_and_shift_pick(sys);
 
     chewing_plus_free(session);
     printf(failures ? "ABI TESTS FAILED (%d)\n" : "ABI TESTS OK\n", failures);

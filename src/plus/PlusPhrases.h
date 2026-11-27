@@ -19,6 +19,8 @@
 
 namespace chewing_plus {
 
+class UserHistory;
+
 // Either the text format (parsed and sorted in memory) or the compiled
 // format from writeCompiled() (memory-mapped read-only: nothing parsed,
 // pages shared between processes). load() tells them apart by the header.
@@ -34,7 +36,12 @@ public:
     //
     // `readings`: the third column is a whole toneless reading (好 ㄏㄠ,
     // data/plus-chars.txt) instead of one initial per character.
-    size_t load(const std::string &path, bool readings = false);
+    // `userFile`: also accepts simplified user formats:
+    //   - "phrase<TAB>freq<TAB>full bopomofo syllables"
+    //   - "phrase<TAB>bopomofo" (default freq 500)
+    //   - "phrase" (prefix completion only, default freq 500)
+    size_t load(const std::string &path, bool readings = false,
+                bool userFile = false);
     void clear();
     size_t size() const;
     bool compiled() const { return map_ != nullptr; }
@@ -44,23 +51,37 @@ public:
     // index is safe to share between sessions (lookups do not write).
     void finalize() { sortIfNeeded(); }
 
-    // Phrases that start with `typed` and are longer, most frequent first.
+    // True if `phrase` exists as an exact entry in this index.
+    bool containsText(std::string_view phrase) const;
+
+    // Phrases that start with `typed` and are longer, highest ranked first.
     // `typed` must be at least `minChars` characters (UTF-8 code points).
+    // Optional `extra` (user-supplied phrase file) and `history` (adaptive
+    // usage frecency + libchewing user phrases) overlay on top of this index.
     std::vector<std::string> complete(const std::string &typed,
                                       size_t limit = 9,
-                                      size_t minChars = 2) const;
+                                      size_t minChars = 2,
+                                      const PhraseIndex *extra = nullptr,
+                                      const UserHistory *history = nullptr,
+                                      int64_t nowSec = 0) const;
 
     // Entries whose reading starts with `typed` (a partly typed syllable:
-    // ㄋ -> 你 年 您, ㄋㄧ -> 你 妳 尼), most frequent first. For an index
+    // ㄋ -> 你 年 您, ㄋㄧ -> 你 妳 尼), highest ranked first. For an index
     // loaded with readings = true.
     std::vector<std::string> byReading(const std::string &typed,
-                                       size_t limit = 9) const;
+                                       size_t limit = 9,
+                                       const PhraseIndex *extra = nullptr,
+                                       const UserHistory *history = nullptr,
+                                       int64_t nowSec = 0) const;
 
     // Phrases whose syllables start with these Bopomofo symbols, in order
-    // (ㄍㄒㄈㄘ). At least `minSyllables` symbols; most frequent first.
+    // (ㄍㄒㄈㄘ). At least `minSyllables` symbols; highest ranked first.
     std::vector<std::string> expand(const std::string &initials,
                                     size_t limit = 9,
-                                    size_t minSyllables = 2) const;
+                                    size_t minSyllables = 2,
+                                    const PhraseIndex *extra = nullptr,
+                                    const UserHistory *history = nullptr,
+                                    int64_t nowSec = 0) const;
 
 private:
     struct Phrase {
@@ -77,7 +98,10 @@ private:
     const uint32_t *order(bool byAbbr) const;
     std::vector<std::string>
     collect(bool byAbbr, std::string_view key, size_t limit,
-            const std::function<bool(uint32_t)> &accept) const;
+            const std::function<bool(const PhraseIndex &, uint32_t)> &accept,
+            const PhraseIndex *extra, const UserHistory *history,
+            bool isChar, int64_t nowSec,
+            const std::vector<std::string> *exclude = nullptr) const;
 
     const void *map_ = nullptr;
     size_t mapSize_ = 0;

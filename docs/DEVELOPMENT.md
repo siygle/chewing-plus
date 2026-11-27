@@ -8,11 +8,12 @@
   The plugin locates system data via `static_dict.bin` first, then the old `tsi.dat`.
 - Plus code lives in `libchewing-plus-core` (`src/plus/`, no fcitx headers):
   - `ChewingPlus.*`: panels (calculator, emoji shortcode, English), hint tracking, dictation insert
+  - `PlusPhrases.*`, `PlusUserHistory.*`, `PlusData.*`: mmap phrase/char indexes, user phrase overlay, Frecency adaptive ranking, and process-wide `DataCache`
   - `PlusFeatures.*`, `PlusEmoji.*`, `PlusEnglish.*`, `PlusDoubleTap.h`: shared with fcitx5-mcbopomofo-plus
-  - `src/abi/chewing_plus.cpp` and `include/chewing_plus.h`: stable C ABI for later IBus / macOS frontends ([ABI.md](ABI.md))
-- The fcitx5 addon links that library and still calls the C++ class. Behavior for fcitx users is unchanged.
-- All options default off and are disabled in password/sensitive fields.
-- Cross-platform plan, including voice options that are **not** implemented yet: [CROSS_PLATFORM.md](CROSS_PLATFORM.md).
+  - `src/abi/chewing_plus.cpp` and `include/chewing_plus.h`: stable C ABI used by all three frontends (fcitx5, IBus, macOS IMK; see [ABI.md](ABI.md))
+- All three frontends drive `libchewing-plus-core` through the C ABI (`chewing_plus.h`) and render `chewing_plus_get_view()`.
+- All Plus features are disabled in password/sensitive fields (including adaptive usage recording).
+- Cross-platform design notes: [CROSS_PLATFORM.md](CROSS_PLATFORM.md).
 
 ### Engine limitations (why some features commit early)
 
@@ -201,8 +202,16 @@ transaction by `packaging/ime-switch/ime-switch` (see its README).
 
 ## Data
 
+- `data/plus-phrases.txt` / `data/plus-chars.txt`: built by `scripts/make-phrases.py` from `libchewing-data`'s `dict/chewing/tsi.csv` (LGPL-2.1-or-later), merged with McBopomofo `BPMFMappings.txt` + `phrase.occ` (MIT, `data/LICENSE.mcbopomofo`) and curated modern Taiwan terms in `data/plus-phrases-modern.txt` (LGPL-2.1-or-later).
 - `data/plus-emoji-shortcodes.txt`: generated from GitHub gemoji (MIT, `data/LICENSE.gemoji`)
 - `data/plus-english.txt`: generated from SCOWL/ESDB size 50 (MIT-like, `data/LICENSE.scowl`)
 
-Generators live in the fcitx5-mcbopomofo-plus repo (`scripts/make-emoji-shortcodes.py`,
-`scripts/make-english-words.py`).
+Generators for emoji/English live in the fcitx5-mcbopomofo-plus repo (`scripts/make-emoji-shortcodes.py`,
+`scripts/make-english-words.py`). To regenerate the merged phrase index:
+
+```bash
+python3 scripts/make-phrases.py path/to/tsi.csv \
+  --mcbopomofo path/to/BPMFMappings.txt \
+  --mcbopomofo-occ path/to/phrase.occ \
+  --extra data/plus-phrases-modern.txt > data/plus-phrases.txt
+```

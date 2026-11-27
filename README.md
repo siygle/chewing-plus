@@ -87,6 +87,7 @@ gsettings set org.freedesktop.ibus.panel custom-font 'Sans 13'
 ### 詞語建議
 - **自動完成：** 打「中華」會建議「中華民國、中華隊…」
 - **字首注音：** 每個字只打第一個注音，例如 `ㄍㄒㄈㄘ` → 「恭喜發財」、`ㄇㄇ` → 「媽媽」
+- **動態學習常用詞：** 會根據你實際選取（`⇧1…9`）與日常輸入的詞字頻率及近期性（Frecency）自動調高常用詞與邊打邊列字的排序，並自動匯入你在新酷音中建立的自訂詞；長時間未使用的詞權重會平滑衰減。可在設定中開關（預設開啟），在密碼等敏感欄位中絕不記錄。
 - 用 `Shift+1…9` 選取，不影響原本的按鍵；幾個字首開始建議可以調整（預設 2）
 
 ### Emoji 候選
@@ -193,9 +194,22 @@ Tencent HY Community License，不適用於歐盟、英國與南韓）。使用�
 
 翻譯失敗、模型還在下載或沒有外掛時，會改輸入原本的辨識結果並顯示原因。
 
-## 自訂詞庫（fcitx5）
+## 自訂詞庫與學習紀錄
 
-在 `~/.local/share/fcitx5-chewing/` 建立以下檔案：
+三個平台皆支援使用者自訂檔案，放在對應的使用者資料目錄中：
+
+- **Linux（fcitx5、IBus 共用）：** `~/.local/share/chewing-plus/`（fcitx5 舊路徑 `~/.local/share/fcitx5-chewing/` 的 emoji／english 檔案仍向後相容）
+- **macOS：** `~/Library/Application Support/ChewingPlus/`
+
+支援的檔案：
+
+**`plus-phrases-user.txt`**：自訂詞語建議（支援三種寫法：純詞、詞＋注音、詞＋頻率＋注音／字首注音，以 Tab 分隔），修改後不需重編輸入法即可自動重載
+
+```
+生成式人工智慧	ㄕㄥ ㄔㄥˊ ㄕˋ ㄖㄣˊ ㄍㄨㄥ ㄓˋ ㄏㄨㄟˋ
+提示詞工程	500	ㄊㄕㄘㄍㄔ
+公司專有名詞
+```
 
 **`plus-emoji-shortcodes.txt`**：自訂 emoji 短碼，每行一個，會優先於內建短碼
 
@@ -211,14 +225,16 @@ OpenVanilla
 k8s
 ```
 
-修改後，切換一次輸入法即可生效。
+**`plus-usage.tsv`**：由「學習常用字詞」自動維護的本機使用頻率紀錄（純文字 TSV），刪除該檔即可重置排序。
+
+修改自訂檔後，切換一次輸入法或重新聚焦輸入框即可生效。
 
 ## 授權
 
 LGPL-2.1-or-later（與上游 fcitx5-chewing 相同）。
 
 內建資料：
-- 注音詞庫：[libchewing-data](https://codeberg.org/chewing/libchewing-data)（LGPL-2.1-or-later）
+- 注音詞庫：[libchewing-data](https://codeberg.org/chewing/libchewing-data)（LGPL-2.1-or-later）、[McBopomofo](https://github.com/openvanilla/McBopomofo)（MIT，`data/LICENSE.mcbopomofo`）與 `data/plus-phrases-modern.txt`
 - Emoji 短碼：[gemoji](https://github.com/github/gemoji)（MIT）
 - 英文字典：[SCOWL](http://wordlist.aspell.net/)（MIT 類授權）
 - 語音服務 voxkit：MIT
