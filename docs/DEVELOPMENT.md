@@ -204,14 +204,16 @@ transaction by `packaging/ime-switch/ime-switch` (see its README).
 
 - `data/plus-phrases.txt` / `data/plus-chars.txt`: built by `scripts/make-phrases.py` from `libchewing-data`'s `dict/chewing/tsi.csv` (LGPL-2.1-or-later), merged with McBopomofo `BPMFMappings.txt` + `phrase.occ` (MIT, `data/LICENSE.mcbopomofo`) and curated modern Taiwan terms in `data/plus-phrases-modern.txt` (LGPL-2.1-or-later).
 - `data/plus-emoji-shortcodes.txt`: generated from GitHub gemoji (MIT, `data/LICENSE.gemoji`)
-- `data/plus-english.txt`: generated from SCOWL/ESDB size 50 (MIT-like, `data/LICENSE.scowl`)
+- `data/plus-english.txt`: built by `scripts/make-english-words.py` from SCOWL/ESDB size 60 US + hacker (MIT-like, `data/LICENSE.scowl`), merged with curated modern tech/AI/Taiwan terms in `data/plus-english-modern.txt` (LGPL-2.1-or-later).
 
-Generators for emoji/English live in the fcitx5-mcbopomofo-plus repo (`scripts/make-emoji-shortcodes.py`,
-`scripts/make-english-words.py`). To regenerate the merged phrase index:
+The emoji generator lives in the fcitx5-mcbopomofo-plus repo (`scripts/make-emoji-shortcodes.py`). To regenerate the merged phrase or English word lists:
 
 ```bash
 python3 scripts/make-phrases.py path/to/tsi.csv \
   --mcbopomofo path/to/BPMFMappings.txt \
   --mcbopomofo-occ path/to/phrase.occ \
   --extra data/plus-phrases-modern.txt > data/plus-phrases.txt
+
+python3 scripts/make-english-words.py path/to/esdb-size60.txt \
+  --extra data/plus-english-modern.txt > data/plus-english.txt
 ```

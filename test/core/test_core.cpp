@@ -132,9 +132,19 @@ void testShortcodes() {
 
 void testEnglish() {
     chewing_plus::EnglishLexicon lex;
-    check(lex.load(PLUS_ENGLISH_PATH) > 1000, "built-in English lexicon loads");
+    check(lex.load(PLUS_ENGLISH_PATH) > 80000,
+          "built-in English lexicon loads");
     check(lex.contains("github"), "lexicon contains github");
     check(lex.canonical("github") == "GitHub", "github -> GitHub");
+    check(lex.canonical("macos") == "macOS", "macos -> macOS");
+    check(lex.canonical("chatgpt") == "ChatGPT", "chatgpt -> ChatGPT");
+    check(lex.canonical("gitlab") == "GitLab", "gitlab -> GitLab");
+    check(lex.canonical("kubernetes") == "Kubernetes",
+          "kubernetes -> Kubernetes");
+    check(lex.canonical("hsinchu") == "Hsinchu", "hsinchu -> Hsinchu");
+    check(lex.canonical("tsmc") == "TSMC", "tsmc -> TSMC");
+    check(lex.canonical("json") == "JSON", "json -> JSON");
+    check(lex.contains("frontend"), "lexicon contains frontend");
     auto cands = lex.candidates("github");
     check(!cands.empty() && cands.front() == "GitHub",
           "github candidate is GitHub");
