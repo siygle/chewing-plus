@@ -1,12 +1,13 @@
 # Cross-platform chewing-plus
 
-Phase 1 pulls the Plus engine out of the fcitx5 addon so the same behavior can
-later sit behind fcitx5, IBus, and a native macOS InputMethodKit (IMK) app.
-This document is the target shape. It does not add an IBus engine or a Mac
-app, and it does not implement voice anywhere except the fcitx5 path that
-already exists.
+> **Status:** All three frontends (fcitx5, native IBus, and native macOS
+> InputMethodKit) are implemented and call the same C ABI
+> (`include/chewing_plus.h`) backed by `libchewing-plus-core`. All three also
+> integrate with the local `voxkit` daemon via `docs/VOXKIT_PROTOCOL.md` v1.
+> The design notes below document the architecture and historical voice-option
+> evaluation.
 
-## Target
+## Architecture
 
 ```
                     libchewing 0.14  (bundled; see docs/DEVELOPMENT.md)
@@ -15,7 +16,7 @@ already exists.
                     C++ Plus engine  +  C ABI (include/chewing_plus.h)
                     /            |            \
             fcitx5 addon      IBus engine     macOS IMK app
-            (exists)          (not yet)       (not yet)
+            (src/eim.cpp)     (src/ibus/)     (macos/ChewingPlus/)
 ```
 
 `libchewing-plus-core` is a CMake static library (shared if

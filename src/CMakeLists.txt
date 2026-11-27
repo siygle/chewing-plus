@@ -64,6 +64,7 @@ add_library(chewing-plus-core ${_core_type}
     plus/PlusEnglish.cpp
     plus/PlusFeatures.cpp
     plus/PlusPhrases.cpp
+    plus/PlusUserHistory.cpp
     plus/PlusData.cpp
     abi/chewing_plus.cpp
 )

@@ -20,10 +20,102 @@
 #include "ChewingPlus.h"
 #include "PlusData.h"
 #include "PlusPhrases.h"
+#include "PlusUserHistory.h"
 
 namespace {
 
 constexpr int kMaxChiSymbolLen = 18;
+
+// Two-lane 64-bit FNV-1a hash (128-bit digest) for zero-allocation view diff.
+struct ViewHash {
+    uint64_t lo = 14695981039346656037ULL;
+    uint64_t hi = 1099511628211ULL ^ 0x9e3779b97f4a7c15ULL;
+
+    void feedByte(unsigned char b) {
+        lo ^= b;
+        lo *= 1099511628211ULL;
+        hi ^= static_cast<uint64_t>(b) + 0x517cc1b727220a95ULL;
+        hi *= 0x100000001b3ULL;
+    }
+    void feedStr(std::string_view s) {
+        for (char c : s) {
+            feedByte(static_cast<unsigned char>(c));
+        }
+        feedByte(0x1f);
+    }
+    void feedU64(uint64_t v) {
+        for (int i = 0; i < 8; ++i) {
+            feedByte(static_cast<unsigned char>((v >> (i * 8)) & 0xff));
+        }
+        feedByte(0x1f);
+    }
+};
+
+bool IsHanCodePoint(uint32_t cp) {
+    return (cp >= 0x4E00 && cp <= 0x9FFF) || (cp >= 0x3400 && cp <= 0x4DBF) ||
+           (cp >= 0xF900 && cp <= 0xFAFF) || (cp >= 0x20000 && cp <= 0x2EBEF);
+}
+
+struct Utf8Char {
+    size_t offset = 0;
+    size_t len = 0;
+    uint32_t cp = 0;
+};
+
+Utf8Char NextUtf8(std::string_view s, size_t i) {
+    Utf8Char r{i, 1, 0};
+    auto b0 = static_cast<unsigned char>(s[i]);
+    if (b0 < 0x80) {
+        r.cp = b0;
+        return r;
+    }
+    if ((b0 & 0xE0) == 0xC0 && i + 1 < s.size()) {
+        r.len = 2;
+        r.cp = ((b0 & 0x1Fu) << 6) | (static_cast<unsigned char>(s[i + 1]) & 0x3Fu);
+        return r;
+    }
+    if ((b0 & 0xF0) == 0xE0 && i + 2 < s.size()) {
+        r.len = 3;
+        r.cp = ((b0 & 0x0Fu) << 12) |
+               ((static_cast<unsigned char>(s[i + 1]) & 0x3Fu) << 6) |
+               (static_cast<unsigned char>(s[i + 2]) & 0x3Fu);
+        return r;
+    }
+    if ((b0 & 0xF8) == 0xF0 && i + 3 < s.size()) {
+        r.len = 4;
+        r.cp = ((b0 & 0x07u) << 18) |
+               ((static_cast<unsigned char>(s[i + 1]) & 0x3Fu) << 12) |
+               ((static_cast<unsigned char>(s[i + 2]) & 0x3Fu) << 6) |
+               (static_cast<unsigned char>(s[i + 3]) & 0x3Fu);
+        return r;
+    }
+    return r;
+}
+
+std::string ExtractInitials(std::string_view bopomofo) {
+    std::string out;
+    size_t i = 0;
+    while (i < bopomofo.size()) {
+        while (i < bopomofo.size() && bopomofo[i] == ' ') {
+            ++i;
+        }
+        if (i >= bopomofo.size()) {
+            break;
+        }
+        size_t end = bopomofo.find(' ', i);
+        if (end == std::string_view::npos) {
+            end = bopomofo.size();
+        }
+        if (end - i >= 3) {
+            std::string first(bopomofo.substr(i, 3));
+            if (chewing_plus::AllBopomofo(first)) {
+                out += first;
+            }
+        }
+        i = end;
+    }
+    return out;
+}
 
 size_t CodePoints(const std::string &s) {
     return static_cast<size_t>(
@@ -112,7 +204,10 @@ struct Session {
     std::string englishBuiltin;
     std::string englishUser;
     std::string phrasesPath;
+    std::string userPhrasesPath;
+    std::string usagePath;
     bool suggestions = false;
+    bool adaptiveSuggestions = true;
     // Initials typed before suggesting phrases (ㄇㄇ -> 媽媽 at 2).
     size_t initialsMin = 2;
     // Likely characters for the syllable being typed (live_chars).
@@ -124,6 +219,11 @@ struct Session {
     bool suggChars = false;
     std::shared_ptr<const chewing_plus::PhraseIndex> phrases =
         std::make_shared<chewing_plus::PhraseIndex>();
+    std::shared_ptr<const chewing_plus::PhraseIndex> userPhrases =
+        std::make_shared<chewing_plus::PhraseIndex>();
+    std::shared_ptr<chewing_plus::UserHistory> usage =
+        std::make_shared<chewing_plus::UserHistory>();
+    bool suppressCommitLearn = false;
     // Current suggestions and what they replace: the last `replaceChars`
     // code points before the cursor in the buffer, or the whole reading.
     std::vector<std::string> sugg;
@@ -132,6 +232,12 @@ struct Session {
     chewing_plus_callbacks cb{};
     chewing_plus_preceding_text_fn precedingFn = nullptr;
     void *precedingUser = nullptr;
+
+    ~Session() {
+        if (usage) {
+            usage->saveIfDirty(chewing_plus::UserHistory::nowSeconds(), true);
+        }
+    }
 
     // Application text before the cursor, "" when unknown or sensitive.
     std::string applicationPrecedingText() {
@@ -163,15 +269,114 @@ struct Session {
     std::string settingOut;
     // Bumped by refresh() when anything a frontend draws changed.
     uint64_t revision = 1;
-    std::string lastDrawn;
+    uint64_t lastHashLo = 0;
+    uint64_t lastHashHi = 0;
+    bool hasHash = false;
 
     ChewingContext *raw() { return ctx.get(); }
+
+    void syncLibchewingUserPhrases() {
+        if (!usage || !raw()) {
+            return;
+        }
+        ChewingContext *c = raw();
+        if (chewing_userphrase_enumerate(c) != 0) {
+            return;
+        }
+        std::vector<std::pair<std::string, std::string>> imported;
+        unsigned int plen = 0;
+        unsigned int blen = 0;
+        while (chewing_userphrase_has_next(c, &plen, &blen) &&
+               imported.size() < 4000) {
+            std::string phrase(plen, '\0');
+            std::string bopomofo(blen, '\0');
+            if (chewing_userphrase_get(c, phrase.data(), plen, bopomofo.data(),
+                                       blen) != 0) {
+                break;
+            }
+            phrase.resize(std::strlen(phrase.c_str()));
+            bopomofo.resize(std::strlen(bopomofo.c_str()));
+            size_t charsCount = CodePoints(phrase);
+            if (charsCount < 2) {
+                continue;
+            }
+            std::string abbr = ExtractInitials(bopomofo);
+            if (CodePoints(abbr) != charsCount ||
+                !chewing_plus::AllBopomofo(abbr)) {
+                abbr.clear();
+            }
+            imported.emplace_back(std::move(phrase), std::move(abbr));
+        }
+        if (!imported.empty()) {
+            usage->importUserPhrases(imported);
+        }
+    }
+
+    void learnFromCommit(const std::string &text) {
+        if (sensitive || !adaptiveSuggestions || suppressCommitLearn ||
+            !usage || text.empty()) {
+            return;
+        }
+        const int64_t nowSec = chewing_plus::UserHistory::nowSeconds();
+        // Walk contiguous Han runs and apply forward maximum matching (2..6
+        // chars) against known phrases, plus single-character frequency.
+        std::vector<Utf8Char> run;
+        auto flushRun = [&]() {
+            const size_t n = run.size();
+            if (n == 0 || n > 64) {
+                run.clear();
+                return;
+            }
+            for (const auto &ch : run) {
+                usage->record(chewing_plus::UserHistory::Kind::Char,
+                              std::string_view(text).substr(ch.offset, ch.len),
+                              "", 1.0, nowSec);
+            }
+            size_t pos = 0;
+            while (pos + 1 < n) {
+                bool matched = false;
+                const size_t maxLen = std::min<size_t>(6, n - pos);
+                for (size_t len = maxLen; len >= 2; --len) {
+                    size_t start = run[pos].offset;
+                    size_t end =
+                        run[pos + len - 1].offset + run[pos + len - 1].len;
+                    std::string_view sub(text.data() + start, end - start);
+                    if (phrases->containsText(sub) ||
+                        userPhrases->containsText(sub) ||
+                        usage->hasPhrase(sub)) {
+                        usage->record(chewing_plus::UserHistory::Kind::Phrase,
+                                      sub, "", 1.0, nowSec);
+                        pos += len;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    ++pos;
+                }
+            }
+            run.clear();
+        };
+
+        for (size_t i = 0; i < text.size();) {
+            Utf8Char ch = NextUtf8(text, i);
+            i += ch.len;
+            if (IsHanCodePoint(ch.cp)) {
+                run.push_back(ch);
+            } else {
+                flushRun();
+            }
+        }
+        flushRun();
+        usage->saveIfDirty(nowSec, false);
+    }
 
     void commitText(const std::string &text) {
         if (text.empty()) {
             return;
         }
         std::string out = sensitive ? text : plus.postProcessCommit(text);
+        learnFromCommit(out);
         pendingCommit += out;
         if (cb.commit) {
             cb.commit(cb.user, out.c_str());
@@ -271,30 +476,37 @@ struct Session {
         }
     }
 
-    // One string that changes whenever anything visible changes.
+    // Zero-allocation digest that changes whenever anything visible changes.
     void bumpRevision() {
-        std::string key;
-        key.reserve(preedit.size() + aux.size() + 64);
-        auto add = [&key](const std::string &s) {
-            key += s;
-            key += '\x1f';
-        };
-        add(preedit);
-        add(std::to_string(cursor) + "," + std::to_string(hlStart) + "," +
-            std::to_string(hlLen) + "," + std::to_string(panelKind));
-        add(aux);
-        add(asciiMode ? "A" : "C");
+        ViewHash h;
+        h.feedStr(preedit);
+        h.feedU64(cursor);
+        h.feedU64(hlStart);
+        h.feedU64(hlLen);
+        h.feedU64(static_cast<uint64_t>(panelKind));
+        h.feedStr(aux);
+        h.feedByte(asciiMode ? 'A' : 'C');
+        h.feedU64(cands.size());
         for (const auto &c : cands) {
-            add(c.label + c.text);
+            h.feedStr(c.label);
+            h.feedStr(c.text);
         }
-        key += '\x1e';
+        h.feedU64(sugg.size());
         for (const auto &s : sugg) {
-            add(s);
+            h.feedStr(s);
         }
-        if (key != lastDrawn) {
-            lastDrawn = std::move(key);
+        if (!hasHash || h.lo != lastHashLo || h.hi != lastHashHi) {
+            lastHashLo = h.lo;
+            lastHashHi = h.hi;
+            hasHash = true;
             ++revision;
         }
+    }
+
+    const chewing_plus::UserHistory *activeHistory() const {
+        return (!sensitive && adaptiveSuggestions && usage && !usage->empty())
+                   ? usage.get()
+                   : nullptr;
     }
 
     // Longest phrase prefix ending at the cursor that has completions, or
@@ -311,8 +523,15 @@ struct Session {
         }
         std::string buffer = BufferOf(c);
         std::string zuin = ZuinOf(c);
-        if (!suggestions || phrases->size() == 0) {
-            fillLiveChars(zuin);
+        const auto *extra =
+            (userPhrases && userPhrases->size() > 0) ? userPhrases.get() : nullptr;
+        const auto *hist = activeHistory();
+        const int64_t nowSec =
+            hist ? chewing_plus::UserHistory::nowSeconds() : 0;
+        const bool hasAnyPhrases =
+            phrases->size() > 0 || extra != nullptr || hist != nullptr;
+        if (!suggestions || !hasAnyPhrases) {
+            fillLiveChars(zuin, hist, nowSec);
             return;
         }
         if (!zuin.empty()) {
@@ -322,10 +541,11 @@ struct Session {
             // only on layouts that queue them, e.g. Hsu). Use the raw keys
             // recorded for the English hint when the reading does not grow.
             std::string initials = plus.typedInitials(c);
-            sugg = phrases->expand(initials, 9, initialsMin);
+            sugg = phrases->expand(initials, 9, initialsMin, extra, hist,
+                                   nowSec);
             replaceReading = !sugg.empty();
             if (!replaceReading) {
-                fillLiveChars(zuin);
+                fillLiveChars(zuin, hist, nowSec);
                 return;
             }
             if (replaceReading && initials != zuin) {
@@ -351,7 +571,7 @@ struct Session {
             size_t from = ByteOffset(buffer, end - n);
             std::string tail =
                 buffer.substr(from, ByteOffset(buffer, end) - from);
-            auto found = phrases->complete(tail);
+            auto found = phrases->complete(tail, 9, 2, extra, hist, nowSec);
             if (!found.empty()) {
                 sugg = std::move(found);
                 replaceChars = n;
@@ -362,12 +582,13 @@ struct Session {
 
     // ㄋ -> 你 年 您: characters whose toneless reading starts with what is
     // typed so far. Tones in the reading are dropped before the lookup.
-    void fillLiveChars(const std::string &zuin) {
+    void fillLiveChars(const std::string &zuin,
+                       const chewing_plus::UserHistory *hist, int64_t nowSec) {
         if (!liveChars || zuin.empty() || chars->size() == 0) {
             return;
         }
         std::string reading;
-        for (size_t i = 0; i + 1 < zuin.size() || i < zuin.size();) {
+        for (size_t i = 0; i < zuin.size();) {
             auto b = static_cast<unsigned char>(zuin[i]);
             size_t n = b < 0x80 ? 1 : b < 0xE0 ? 2 : b < 0xF0 ? 3 : 4;
             std::string cp = zuin.substr(i, n);
@@ -376,7 +597,7 @@ struct Session {
             }
             i += n;
         }
-        sugg = chars->byReading(reading);
+        sugg = chars->byReading(reading, 9, nullptr, hist, nowSec);
         replaceReading = !sugg.empty();
         suggChars = replaceReading;
     }
@@ -386,6 +607,18 @@ struct Session {
             return;
         }
         std::string pick = sugg[index];
+        if (!sensitive && adaptiveSuggestions && usage) {
+            const int64_t nowSec = chewing_plus::UserHistory::nowSeconds();
+            usage->record(suggChars ? chewing_plus::UserHistory::Kind::Char
+                                    : chewing_plus::UserHistory::Kind::Phrase,
+                          pick, "", 2.0, nowSec);
+            usage->saveIfDirty(nowSec, false);
+        }
+        struct SuppressGuard {
+            bool &flag;
+            explicit SuppressGuard(bool &f) : flag(f) { flag = true; }
+            ~SuppressGuard() { flag = false; }
+        } guard(suppressCommitLearn);
         if (suggChars) {
             // A character for the syllable being typed: it replaces the
             // reading. libchewing's buffer cannot hold an arbitrary
@@ -489,6 +722,9 @@ struct Session {
         chewing_Reset(c);
         if (!text.empty()) {
             commitText(text);
+        }
+        if (usage) {
+            usage->saveIfDirty(chewing_plus::UserHistory::nowSeconds(), true);
         }
         refresh();
     }
@@ -641,6 +877,21 @@ struct Session {
                     refresh();
                     return 1;
                 }
+            } else if (cands.empty() && !sugg.empty() && shift && !ctrl &&
+                       !alt) {
+                // Shift+1..9 selects a phrase or live-character suggestion
+                // while no candidate list or Plus panel is open.
+                int digit = -1;
+                if (ev.keycode >= 10 && ev.keycode <= 18) {
+                    digit = ev.keycode - 10;
+                } else if (ev.keycode == 0 && ascii >= '1' && ascii <= '9') {
+                    digit = static_cast<int>(ascii - '1');
+                }
+                if (digit >= 0 && digit < static_cast<int>(sugg.size())) {
+                    selectSuggestion(c, digit);
+                    refresh();
+                    return 1;
+                }
             }
             char plusAscii = 0;
             if (!ctrl && ascii >= 0x20 && ascii < 0x7f) {
@@ -760,6 +1011,10 @@ struct Session {
             chewing_handle_Enter(c);
         } else if (ctrl && ascii >= '0' && ascii <= '9') {
             chewing_handle_CtrlNum(c, static_cast<int>(ascii));
+            if (ascii >= '2' && ascii <= '9' && !sensitive &&
+                adaptiveSuggestions) {
+                syncLibchewingUserPhrases();
+            }
         } else {
             dispatched = false;
         }
@@ -881,6 +1136,13 @@ void ApplySetting(chewing_plus_session *session, const std::string &key) {
                                              on("english_hint_commit"));
     } else if (key == "suggestions") {
         chewing_plus_set_suggestions(session, on("suggestions"), nullptr);
+    } else if (key == "adaptive_suggestions") {
+        auto *s = S(session);
+        s->adaptiveSuggestions = on("adaptive_suggestions") != 0;
+        if (s->adaptiveSuggestions) {
+            s->syncLibchewingUserPhrases();
+        }
+        s->refresh();
     } else if (key == "fuzzy") {
         chewing_config_set_int(S(session)->raw(), "chewing.conversion_engine",
                                on("fuzzy") ? FUZZY_CHEWING_CONVERSION_ENGINE
@@ -957,7 +1219,7 @@ chewing_plus_session *chewing_plus_new(const char *chewing_sys_path,
         chewing_plus_setting_info_at(i, &info);
         session->settings[info.key] = info.default_value;
     }
-    for (const char *key : {"fuzzy", "live_chars"}) {
+    for (const char *key : {"fuzzy", "live_chars", "adaptive_suggestions"}) {
         ApplySetting(reinterpret_cast<chewing_plus_session *>(session), key);
     }
     session->refresh();
@@ -1019,10 +1281,20 @@ void chewing_plus_set_suggestions(chewing_plus_session *session, int enabled,
         s->phrasesPath = path;
     }
     s->suggestions = enabled != 0;
-    if (!s->suggestions || s->phrasesPath.empty()) {
+    s->settings["suggestions"] = s->suggestions ? "1" : "0";
+    if (!s->suggestions) {
         s->phrases = std::make_shared<chewing_plus::PhraseIndex>();
-    } else if (reload || s->phrases->size() == 0) {
-        s->phrases = chewing_plus::DataCache::phrases(s->phrasesPath);
+        s->userPhrases = std::make_shared<chewing_plus::PhraseIndex>();
+    } else {
+        if (s->phrasesPath.empty()) {
+            s->phrases = std::make_shared<chewing_plus::PhraseIndex>();
+        } else if (reload || s->phrases->size() == 0) {
+            s->phrases = chewing_plus::DataCache::phrases(s->phrasesPath);
+        }
+        if (!s->userPhrasesPath.empty()) {
+            s->userPhrases =
+                chewing_plus::DataCache::userPhrases(s->userPhrasesPath);
+        }
     }
     s->refresh();
 }
@@ -1047,6 +1319,50 @@ void chewing_plus_set_phrases_path(chewing_plus_session *session,
     }
     auto *s = S(session);
     chewing_plus_set_suggestions(session, s->suggestions ? 1 : 0, path);
+}
+
+void chewing_plus_set_user_phrases_path(chewing_plus_session *session,
+                                        const char *path) {
+    if (!session || !path) {
+        return;
+    }
+    auto *s = S(session);
+    s->userPhrasesPath = path;
+    if (s->suggestions && !s->userPhrasesPath.empty()) {
+        s->userPhrases =
+            chewing_plus::DataCache::userPhrases(s->userPhrasesPath);
+    } else {
+        s->userPhrases = std::make_shared<chewing_plus::PhraseIndex>();
+    }
+    s->refresh();
+}
+
+void chewing_plus_set_usage_path(chewing_plus_session *session,
+                                 const char *path) {
+    if (!session || !path) {
+        return;
+    }
+    auto *s = S(session);
+    if (s->usage) {
+        s->usage->saveIfDirty(chewing_plus::UserHistory::nowSeconds(), true);
+    }
+    s->usagePath = path;
+    s->usage = chewing_plus::DataCache::userHistory(s->usagePath);
+    if (s->adaptiveSuggestions) {
+        s->syncLibchewingUserPhrases();
+    }
+    s->refresh();
+}
+
+void chewing_plus_clear_usage(chewing_plus_session *session) {
+    if (!session) {
+        return;
+    }
+    auto *s = S(session);
+    if (s->usage) {
+        s->usage->clear();
+    }
+    s->refresh();
 }
 
 int chewing_plus_suggestion_count(const chewing_plus_session *session) {
@@ -1077,6 +1393,7 @@ void chewing_plus_set_emoji(chewing_plus_session *session, int enabled) {
     }
     auto *s = S(session);
     s->opt.emoji = enabled != 0;
+    s->settings["emoji"] = s->opt.emoji ? "1" : "0";
     s->applyOptions();
 }
 
@@ -1086,6 +1403,7 @@ void chewing_plus_set_calculator(chewing_plus_session *session, int enabled) {
     }
     auto *s = S(session);
     s->opt.calculator = enabled != 0;
+    s->settings["calculator"] = s->opt.calculator ? "1" : "0";
     s->applyOptions();
 }
 
@@ -1097,6 +1415,8 @@ void chewing_plus_set_spacing(chewing_plus_session *session, int letters,
     auto *s = S(session);
     s->opt.spaceLetters = letters != 0;
     s->opt.spaceDigits = digits != 0;
+    s->settings["space_letters"] = s->opt.spaceLetters ? "1" : "0";
+    s->settings["space_digits"] = s->opt.spaceDigits ? "1" : "0";
     s->applyOptions();
 }
 
@@ -1108,11 +1428,14 @@ void chewing_plus_set_emoji_shortcode(chewing_plus_session *session,
     }
     auto *s = S(session);
     s->opt.emojiShortcode = enabled != 0;
+    s->settings["shortcode"] = s->opt.emojiShortcode ? "1" : "0";
     if (prefix) {
         s->opt.emojiPrefix = chewing_plus::EmojiPrefix::Parse(prefix);
+        s->settings["shortcode_prefix"] = prefix;
     }
     if (double_tap_ms > 0) {
         s->opt.emojiDoubleTapMs = double_tap_ms;
+        s->settings["shortcode_tap_ms"] = std::to_string(double_tap_ms);
     }
     s->applyOptions();
     s->reloadData();
@@ -1126,6 +1449,8 @@ void chewing_plus_set_english(chewing_plus_session *session, int enabled,
     auto *s = S(session);
     s->opt.english = enabled != 0;
     s->opt.englishHint = hint != 0;
+    s->settings["english"] = s->opt.english ? "1" : "0";
+    s->settings["english_hint"] = s->opt.englishHint ? "1" : "0";
     if (shortcut_label) {
         s->opt.englishShortcutLabel = shortcut_label;
     }
@@ -1140,6 +1465,7 @@ void chewing_plus_set_english_hint_commit(chewing_plus_session *session,
     }
     auto *s = S(session);
     s->opt.englishHintCommit = enabled != 0;
+    s->settings["english_hint_commit"] = s->opt.englishHintCommit ? "1" : "0";
     s->applyOptions();
 }
 
@@ -1156,6 +1482,7 @@ void chewing_plus_set_shift_toggle(chewing_plus_session *session, int enabled) {
     }
     auto *s = S(session);
     s->shiftToggle = enabled != 0;
+    s->settings["shift_toggle"] = s->shiftToggle ? "1" : "0";
     s->shiftPending = false;
     if (!s->shiftToggle) {
         s->setAscii(false);
@@ -1221,6 +1548,7 @@ void chewing_plus_set_keyboard_layout(chewing_plus_session *session,
     }
     auto *s = S(session);
     s->layout = kb_name;
+    s->settings["keyboard_layout"] = kb_name;
     chewing_set_KBType(s->raw(), chewing_KBStr2Num(kb_name));
 }
 
@@ -1231,6 +1559,7 @@ void chewing_plus_set_selection_keys(chewing_plus_session *session,
     }
     auto *s = S(session);
     s->selKeys.assign(ten_keys, 10);
+    s->settings["selection_keys"] = s->selKeys;
     int sel[10];
     for (int i = 0; i < 10; i++) {
         sel[i] = static_cast<unsigned char>(s->selKeys[i]);
@@ -1242,14 +1571,18 @@ void chewing_plus_set_page_size(chewing_plus_session *session, int page_size) {
     if (!session || page_size < 1 || page_size > 10) {
         return;
     }
-    chewing_set_candPerPage(S(session)->raw(), page_size);
+    auto *s = S(session);
+    s->settings["page_size"] = std::to_string(page_size);
+    chewing_set_candPerPage(s->raw(), page_size);
 }
 
 void chewing_plus_set_easy_symbol(chewing_plus_session *session, int enabled) {
     if (!session) {
         return;
     }
-    S(session)->easySymbol = enabled != 0;
+    auto *s = S(session);
+    s->easySymbol = enabled != 0;
+    s->settings["easy_symbol"] = s->easySymbol ? "1" : "0";
 }
 
 void chewing_plus_set_space_as_selection(chewing_plus_session *session,
@@ -1257,7 +1590,9 @@ void chewing_plus_set_space_as_selection(chewing_plus_session *session,
     if (!session) {
         return;
     }
-    chewing_set_spaceAsSelection(S(session)->raw(), enabled ? 1 : 0);
+    auto *s = S(session);
+    s->settings["space_as_selection"] = enabled ? "1" : "0";
+    chewing_set_spaceAsSelection(s->raw(), enabled ? 1 : 0);
 }
 
 void chewing_plus_set_phrase_options(chewing_plus_session *session,
@@ -1267,7 +1602,11 @@ void chewing_plus_set_phrase_options(chewing_plus_session *session,
     if (!session) {
         return;
     }
-    ChewingContext *c = S(session)->raw();
+    auto *s = S(session);
+    s->settings["add_phrase_forward"] = add_phrase_forward ? "1" : "0";
+    s->settings["choice_backward"] = choice_backward ? "1" : "0";
+    s->settings["auto_shift_cursor"] = auto_shift_cursor ? "1" : "0";
+    ChewingContext *c = s->raw();
     chewing_set_addPhraseDirection(c, add_phrase_forward ? 0 : 1);
     chewing_set_phraseChoiceRearward(c, choice_backward ? 1 : 0);
     chewing_set_autoShiftCur(c, auto_shift_cursor ? 1 : 0);

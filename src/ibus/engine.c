@@ -45,13 +45,29 @@ G_DEFINE_TYPE(ChewingPlusEngine, chewing_plus_engine, IBUS_TYPE_ENGINE)
 static void refresh(ChewingPlusEngine *self);
 static void refresh_talk_keys(ChewingPlusEngine *self);
 
-static int last_shift_toggle = 0;
+/* Shared Linux Plus user data path: $XDG_DATA_HOME/chewing-plus/<name>
+ * or $HOME/.local/share/chewing-plus/<name>. Returns "" on failure. */
+static const char *user_data_path(char *buf, size_t n, const char *name) {
+    const char *xdg = getenv("XDG_DATA_HOME");
+    const char *home = getenv("HOME");
+    int wrote = -1;
+    if (xdg && xdg[0]) {
+        wrote = snprintf(buf, n, "%s/chewing-plus/%s", xdg, name);
+    } else if (home && home[0]) {
+        wrote = snprintf(buf, n, "%s/.local/share/chewing-plus/%s", home, name);
+    }
+    if (wrote <= 0 || (size_t)wrote >= n) {
+        buf[0] = '\0';
+    }
+    return buf;
+}
 
 /* Apply every stored setting through the core's table. Absent keys keep the
  * core's defaults. */
 static void apply_features(chewing_plus_session *session) {
     chewing_plus_ibus_prefs prefs;
-    const char *shift;
+    char user_phrases[512];
+    char usage_file[512];
     size_t i;
 #ifndef CHEWING_PLUS_IBUS_PHRASES
 #define CHEWING_PLUS_IBUS_PHRASES ""
@@ -63,6 +79,12 @@ static void apply_features(chewing_plus_session *session) {
     const char *chars = getenv("CHEWING_PLUS_CHARS");
     chewing_plus_set_phrases_path(
         session, phrases && phrases[0] ? phrases : CHEWING_PLUS_IBUS_PHRASES);
+    chewing_plus_set_user_phrases_path(
+        session, user_data_path(user_phrases, sizeof(user_phrases),
+                                "plus-phrases-user.txt"));
+    chewing_plus_set_usage_path(
+        session,
+        user_data_path(usage_file, sizeof(usage_file), "plus-usage.tsv"));
     chewing_plus_set_chars_path(
         session, chars && chars[0] ? chars : CHEWING_PLUS_IBUS_CHARS);
     chewing_plus_ibus_prefs_load(&prefs);
@@ -70,8 +92,6 @@ static void apply_features(chewing_plus_session *session) {
         chewing_plus_set_setting(session, prefs.items[i].key,
                                  prefs.items[i].value);
     }
-    shift = chewing_plus_get_setting(session, "shift_toggle");
-    last_shift_toggle = shift && strcmp(shift, "1") == 0;
     /* English mode: Ctrl+Shift+Space (on by default in the core) and Right
      * Shift tapped twice, as before 6.0.0. */
     {
@@ -100,6 +120,8 @@ static void ensure_session(ChewingPlusEngine *self) {
     const char *user;
     const char *emoji;
     const char *english;
+    char emoji_user[512];
+    char english_user[512];
     if (self->session) {
         return;
     }
@@ -123,7 +145,12 @@ static void ensure_session(ChewingPlusEngine *self) {
     if (!english || !english[0]) {
         english = CHEWING_PLUS_IBUS_ENGLISH;
     }
-    chewing_plus_set_data_paths(self->session, emoji, "", english, "");
+    chewing_plus_set_data_paths(
+        self->session, emoji,
+        user_data_path(emoji_user, sizeof(emoji_user),
+                       "plus-emoji-shortcodes.txt"),
+        english,
+        user_data_path(english_user, sizeof(english_user), "plus-english.txt"));
     apply_features(self->session);
     refresh_talk_keys(self);
     {
@@ -527,24 +554,6 @@ static gboolean process_key(IBusEngine *engine, guint keyval, guint keycode,
         return FALSE;
     }
     {
-        /* Shift+1..9 (X11 keycodes 10..18) picks a phrase suggestion while
-         * no candidate list or Plus panel is open. */
-        chewing_plus_view view;
-        int digit = (int)keycode - 9;
-        if (!(state & CHEWING_IBUS_RELEASE) &&
-            (state & (CHEWING_IBUS_SHIFT | CHEWING_IBUS_CONTROL |
-                      CHEWING_IBUS_MOD1)) == CHEWING_IBUS_SHIFT &&
-            digit >= 1 && digit <= 9 &&
-            chewing_plus_get_view(self->session, &view) &&
-            view.candidate_count == 0 &&
-            view.panel == CHEWING_PLUS_PANEL_NONE &&
-            digit <= view.suggestion_count) {
-            chewing_plus_select_suggestion(self->session, digit - 1);
-            refresh(self);
-            return TRUE;
-        }
-    }
-    {
         int was_english = chewing_plus_ascii_mode(self->session);
         int consumed = chewing_plus_key(self->session, &decision.event);
         if (was_english != chewing_plus_ascii_mode(self->session)) {
@@ -559,11 +568,13 @@ static gboolean process_key(IBusEngine *engine, guint keyval, guint keycode,
 
 static void focus_in(IBusEngine *engine) {
     ChewingPlusEngine *self = (ChewingPlusEngine *)engine;
+    const char *shift = NULL;
     parent_class->focus_in(engine);
     ensure_session(self);
     if (self->session) {
         apply_features(self->session);
         refresh_talk_keys(self);
+        shift = chewing_plus_get_setting(self->session, "shift_toggle");
     }
     {
         /* Asks the client to send its surrounding text (spacing of English
@@ -574,7 +585,7 @@ static void focus_in(IBusEngine *engine) {
         ibus_engine_get_surrounding_text(engine, &surrounding, &cursor,
                                          &anchor);
     }
-    self->shift_toggle = last_shift_toggle;
+    self->shift_toggle = shift && strcmp(shift, "1") == 0;
     apply_sensitive(self);
     self->voice_failed = 0;
     if (!self->props) {

@@ -20,6 +20,7 @@
 #include "PlusEmoji.h"
 #include "PlusEnglish.h"
 #include "PlusPhrases.h"
+#include "PlusUserHistory.h"
 
 namespace chewing_plus {
 
@@ -31,8 +32,13 @@ std::shared_ptr<const EnglishLexicon> english(const std::string &builtIn,
 std::shared_ptr<const EmojiShortcodes> emoji(const std::string &builtIn,
                                              const std::string &user);
 std::shared_ptr<const PhraseIndex> phrases(const std::string &path);
+// User-supplied phrase overlay (plain text or compiled .bin).
+std::shared_ptr<const PhraseIndex> userPhrases(const std::string &path);
 // Character index keyed by whole toneless reading (data/plus-chars.txt).
 std::shared_ptr<const PhraseIndex> chars(const std::string &path);
+// Shared mutable usage history for a given path (one instance per path in the
+// process so multiple sessions never overwrite each other).
+std::shared_ptr<UserHistory> userHistory(const std::string &path);
 // Number of dictionaries currently alive, for tests.
 size_t liveCount();
 } // namespace DataCache

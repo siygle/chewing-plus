@@ -253,6 +253,10 @@ FCITX_CONFIGURATION(
         this, "PlusSuggestions",
         _("Plus: Phrase suggestions (completion and initials, Shift+1-9)"),
         false};
+    Option<bool> PlusAdaptiveSuggestions{
+        this, "PlusAdaptiveSuggestions",
+        _("Plus: Learn from typing habits to rank frequent phrases higher"),
+        true};
 
     // Not stored in chewing.conf: mirrors `systemctl --user is-enabled
     // voxkit` when the dialog opens and switches the unit when saved.
@@ -335,7 +339,6 @@ private:
 
     bool handleCandidateKeyEvent(const KeyEvent &keyEvent) const;
     bool englishShortcut(const KeyEvent &keyEvent, bool sensitive);
-    bool pickSuggestion(const KeyEvent &keyEvent, InputContext *ic);
     void updatePreedit(InputContext *ic);
 
     FCITX_ADDON_DEPENDENCY_LOADER(chttrans, instance_->addonManager());

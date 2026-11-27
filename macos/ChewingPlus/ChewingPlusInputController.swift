@@ -254,7 +254,6 @@ final class ChewingPlusInputController: IMKInputController {
             return true
         }
         if englishMode { return false }
-        if pickSuggestion(event, session: session) { return true }
         if selectDigit(event, session: session) { return true }
         var key = chewing_plus_key_event(
             key: 0, ascii: 0, mods: 0, keycode: Self.x11Keycode(event.keyCode), time_ms: -1)
@@ -321,16 +320,7 @@ final class ChewingPlusInputController: IMKInputController {
     /// Commit what is being typed and hand the session back.
     private func detachSession() {
         guard let session else { return }
-        var cursor = 0
-        var hlStart = 0
-        var hlLen = 0
-        if let raw = chewing_plus_preedit(session, &cursor, &hlStart, &hlLen),
-           !String(cString: raw).isEmpty {
-            var enter = chewing_plus_key_event(
-                key: UInt32(CHEWING_PLUS_KEY_RETURN), ascii: 0, mods: 0,
-                keycode: 36, time_ms: -1)
-            _ = chewing_plus_key(session, &enter)
-        }
+        chewing_plus_flush(session, Int32(CHEWING_PLUS_FLUSH_DEFAULT))
         lastClient?.setMarkedText("", selectionRange: NSRange(location: 0, length: 0),
                                   replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
         if panelShown {
@@ -358,6 +348,11 @@ final class ChewingPlusInputController: IMKInputController {
             .appendingPathComponent("plus-chars.bin").path {
             chewing_plus_set_chars_path(session, chars)
         }
+        let support = SessionPool.shared.appSupportDir
+        chewing_plus_set_user_phrases_path(
+            session, support.appendingPathComponent("plus-phrases-user.txt").path)
+        chewing_plus_set_usage_path(
+            session, support.appendingPathComponent("plus-usage.tsv").path)
         Settings.apply(to: session)
         chewing_plus_set_english(session, Settings.isOn("english") ? 1 : 0,
                                  Settings.isOn("english") ? 1 : 0,
@@ -427,25 +422,6 @@ final class ChewingPlusInputController: IMKInputController {
             chewing_plus_suggestion(session, Int32(i)).map { String(cString: $0) }
         }
     }
-
-    /// ⇧1…⇧9 picks a phrase suggestion while the list is showing. Plus panels
-    /// and the candidate window keep their own digit keys.
-    private func pickSuggestion(_ event: NSEvent, session: OpaquePointer) -> Bool {
-        guard event.type == .keyDown,
-              event.modifierFlags.intersection([.shift, .control, .option, .command]) == .shift,
-              chewing_plus_suggestion_count(session) > 0,
-              chewing_plus_candidate_count(session) == 0,
-              chewing_plus_panel(session) == Int32(CHEWING_PLUS_PANEL_NONE),
-              let digit = Self.digitRow[event.keyCode],
-              digit <= Int(chewing_plus_suggestion_count(session)) else { return false }
-        chewing_plus_select_suggestion(session, Int32(digit - 1))
-        publish(session)
-        return true
-    }
-
-    /// Mac keycodes of the digit row (by position, any layout).
-    private static let digitRow: [UInt16: Int] = [18: 1, 19: 2, 20: 3, 21: 4, 23: 5,
-                                                  22: 6, 26: 7, 28: 8, 25: 9]
 
     private static func revision(_ session: OpaquePointer) -> UInt64 {
         var view = chewing_plus_view()
@@ -555,17 +531,7 @@ final class ChewingPlusInputController: IMKInputController {
     private func toggleEnglishMode(_ session: OpaquePointer) {
         if !englishMode {
             // Keep what was typed: commit the buffer before passing keys through.
-            var cursor = 0
-            var hlStart = 0
-            var hlLen = 0
-            if let raw = chewing_plus_preedit(session, &cursor, &hlStart, &hlLen),
-               !String(cString: raw).isEmpty {
-                var enter = chewing_plus_key_event(
-                    key: UInt32(CHEWING_PLUS_KEY_RETURN), ascii: 0, mods: 0,
-                    keycode: 36, time_ms: -1)
-                _ = chewing_plus_key(session, &enter)
-            }
-            chewing_plus_reset(session)
+            chewing_plus_flush(session, Int32(CHEWING_PLUS_FLUSH_DEFAULT))
             publish(session)
         }
         englishMode.toggle()
@@ -620,10 +586,25 @@ final class ChewingPlusInputController: IMKInputController {
         let target = Settings.value("voice_translate_to").flatMap { $0.isEmpty ? nil : $0 } ?? "en"
         let mode: String? = translate ? "translate" : nil
         let targetArg: String? = translate ? target : nil
-        var line = [CChar](repeating: 0, count: 512)
+        var phraseCount = 0
+        let rawPhrases = chewing_plus_user_phrases(session, &phraseCount)
+        defer { chewing_plus_free_strings(rawPhrases) }
+        var vocab: [UnsafePointer<CChar>?] = []
+        if let rawPhrases, phraseCount > 0 {
+            vocab.reserveCapacity(phraseCount)
+            for i in 0..<phraseCount {
+                vocab.append(UnsafePointer(rawPhrases[i]))
+            }
+        }
+        var line = [CChar](repeating: 0, count: 2048)
         let wrote = line.withUnsafeMutableBufferPointer { buffer -> Int32 in
-            voxkit_proto_write_start_mode(buffer.baseAddress, buffer.count, voiceReq,
-                                          "zh", "s2twp", nil, nil, 0, mode, targetArg)
+            vocab.withUnsafeBufferPointer { vocabBuf in
+                voxkit_proto_write_start_mode(
+                    buffer.baseAddress, buffer.count, voiceReq,
+                    "zh", "s2twp", nil,
+                    vocabBuf.isEmpty ? nil : vocabBuf.baseAddress, vocabBuf.count,
+                    mode, targetArg)
+            }
         }
         if wrote > 0 {
             let sent = line.withUnsafeBufferPointer { buffer in
@@ -796,13 +777,19 @@ final class ChewingPlusInputController: IMKInputController {
             // that ignores modifiers would hand the core "/" (ㄥ).
             let plain = !event.modifierFlags.contains(.control)
                 && !event.modifierFlags.contains(.option)
-            guard event.type == .keyDown,
-                  let chars = plain ? event.characters : event.charactersIgnoringModifiers,
-                  let scalar = chars.unicodeScalars.first,
-                  scalar.value > 0x20, scalar.value < 0x7F else {
+            if event.type == .keyDown,
+               let chars = plain ? event.characters : event.charactersIgnoringModifiers,
+               let scalar = chars.unicodeScalars.first,
+               scalar.value > 0x20, scalar.value < 0x7F {
+                key.ascii = scalar.value
+            } else if event.type == .keyDown && key.keycode >= 10 && key.keycode <= 18
+                && (event.modifierFlags.contains(.shift) || event.modifierFlags.contains(.control)) {
+                // Digit-row selection (Shift+1..9 suggestions or Ctrl/Shift+1..9 panels)
+                // works by keycode even if the layout maps the shifted key to non-ASCII.
+                return true
+            } else {
                 return false
             }
-            key.ascii = scalar.value
         }
         return true
     }
@@ -890,7 +877,8 @@ enum Settings {
     private static let macDefaults: [String: String] = [
         "emoji": "1", "calculator": "1", "space_letters": "1", "space_digits": "1",
         "shortcode": "1", "english": "1", "english_hint_commit": "1",
-        "suggestions": "1", "shift_toggle": "1", "fuzzy": "1", "live_chars": "1",
+        "suggestions": "1", "adaptive_suggestions": "1",
+        "shift_toggle": "1", "fuzzy": "1", "live_chars": "1",
     ]
 
     private static let store = UserDefaults.standard
@@ -1106,7 +1094,13 @@ final class SessionPool {
     static let shared = SessionPool()
     private var idle: [OpaquePointer] = []
     private let keepIdle = 2
-    private var paths: (sys: String?, user: String?, emoji: String?, english: String?)?
+    private var paths: (sys: String?, user: String?, emoji: String?, emojiUser: String?,
+                        english: String?, englishUser: String?)?
+
+    var appSupportDir: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/ChewingPlus", isDirectory: true)
+    }
 
     func checkOut() -> OpaquePointer? {
         if let reused = idle.popLast() {
@@ -1119,8 +1113,13 @@ final class SessionPool {
         }
         guard let made else { return nil }
         p.emoji.withOptionalCString { emojiPtr in
-            p.english.withOptionalCString { englishPtr in
-                chewing_plus_set_data_paths(made, emojiPtr, "", englishPtr, "")
+            p.emojiUser.withOptionalCString { emojiUserPtr in
+                p.english.withOptionalCString { englishPtr in
+                    p.englishUser.withOptionalCString { englishUserPtr in
+                        chewing_plus_set_data_paths(
+                            made, emojiPtr, emojiUserPtr, englishPtr, englishUserPtr)
+                    }
+                }
             }
         }
         return made
@@ -1136,9 +1135,11 @@ final class SessionPool {
         }
     }
 
-    private func resolvedPaths() -> (sys: String?, user: String?, emoji: String?, english: String?) {
+    private func resolvedPaths() -> (sys: String?, user: String?, emoji: String?, emojiUser: String?,
+                                     english: String?, englishUser: String?) {
         if let paths { return paths }
         let res = Bundle.main.resourceURL
+        let support = appSupportDir
         let env = { (name: String) -> String? in
             guard let raw = getenv(name) else { return nil }
             let value = String(cString: raw)
@@ -1148,7 +1149,9 @@ final class SessionPool {
             sys: env("CHEWING_PATH") ?? res?.appendingPathComponent("libchewing", isDirectory: true).path,
             user: env("CHEWING_USER_PATH"),
             emoji: env("CHEWING_PLUS_EMOJI") ?? res?.appendingPathComponent("plus-emoji-shortcodes.txt").path,
-            english: env("CHEWING_PLUS_ENGLISH") ?? res?.appendingPathComponent("plus-english.txt").path)
+            emojiUser: support.appendingPathComponent("plus-emoji-shortcodes.txt").path,
+            english: env("CHEWING_PLUS_ENGLISH") ?? res?.appendingPathComponent("plus-english.txt").path,
+            englishUser: support.appendingPathComponent("plus-english.txt").path)
         paths = resolved
         return resolved
     }
