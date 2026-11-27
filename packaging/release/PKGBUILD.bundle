@@ -92,7 +92,8 @@ _install_common() {
   install -Dm644 "$_vk/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/voxkit-LICENSE"
   install -Dm644 "$_vk/daemon/NOTICE" "$pkgdir/usr/share/licenses/$pkgname/voxkit-NOTICE"
   install -Dm644 -t "$pkgdir/usr/share/licenses/$pkgname" \
-    "$_src/data/LICENSE.gemoji" "$_src/data/LICENSE.scowl"
+    "$_src/data/LICENSE.gemoji" "$_src/data/LICENSE.scowl" \
+    "$_src/data/LICENSE.mcbopomofo"
 }
 
 # Headers, static archives and CMake package files are build-time only.

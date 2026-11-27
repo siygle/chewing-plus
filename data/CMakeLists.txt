@@ -13,5 +13,5 @@ install(FILES "${CHEWING_PLUS_PHRASES_BIN}" RENAME chewing-plus-phrases.bin
         DESTINATION "${FCITX_INSTALL_PKGDATADIR}/data")
 install(FILES "${CHEWING_PLUS_CHARS_BIN}" RENAME chewing-plus-chars.bin
         DESTINATION "${FCITX_INSTALL_PKGDATADIR}/data")
-install(FILES LICENSE.gemoji LICENSE.scowl
+install(FILES LICENSE.gemoji LICENSE.scowl LICENSE.mcbopomofo
         DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/chewing-plus")
