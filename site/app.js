@@ -3,9 +3,9 @@
 
   const I18N = {
     "zh-tw": {
-      _title: "新酷音 Plus — 免打聲調、詞語建議、內嵌英文與本機語音的注音輸入法",
+      _title: "新酷音 Plus — 免打聲調、動態建議排序、內嵌英文與本機語音翻譯的注音輸入法",
       _desc:
-        "新酷音輸入法加強版：免打聲調、邊打邊列字、詞語與字首建議、內嵌英文模式、Emoji 短碼、計算機與本機語音輸入，支援 macOS、fcitx5 與 IBus。",
+        "新酷音輸入法加強版：免打聲調、邊打邊列字、動態建議排序、154K+ 中文詞庫與 91K+ 英文辨識字典、Emoji 短碼、計算機與本機語音輸入／翻譯，支援 macOS、fcitx5 與 IBus。",
       brand: "新酷音 Plus",
       "nav.demo": "互動體驗",
       "nav.features": "特色功能",
@@ -14,7 +14,7 @@
       "hero.badge": "v6.2.0 · 基於 libchewing 0.14",
       "hero.title": '為現代打字節奏打造的<span class="accent-text">新酷音 Plus</span>',
       "hero.subtitle":
-        "免打聲調、邊打邊列字、字首注音展開、免切輸入法打英文、Emoji 短碼、即時計算機與 100% 離線本機語音。一份核心，橫跨 fcitx5、IBus 與 macOS。",
+        "免打聲調、邊打邊列字、動態建議排序、154K+ 詞庫與 91K+ 英文智慧辨識、Emoji 短碼、即時計算機，以及 100% 離線本機語音輸入與翻譯。一份核心，橫跨 fcitx5、IBus 與 macOS。",
       "hero.ctaDownload": "下載安裝檔",
       "hero.ctaGithub": "檢視原始碼",
       "demo.tab.toneless": "免打聲調",
@@ -23,6 +23,7 @@
       "demo.tab.emoji": "Emoji 短碼",
       "demo.tab.calc": "計算機",
       "demo.tab.voice": "本機語音",
+      "demo.tab.translate": "語音翻譯",
       "demo.replay": "重播",
       "features.eyebrow": "PLUS 功能一覽",
       "features.title": "保留新酷音的準確，加上超順手的現代效率工具",
@@ -36,12 +37,19 @@
       "f.live.title": "邊打邊列字",
       "f.live.desc":
         "每敲一個注音符號，下方立刻列出最可能的常用字，用 <kbd>Shift</kbd>+<kbd>1…9</kbd> 直接選取，不必等整個音節打完。",
+      "f.suggestions.badge": "154,000+ 內建詞彙",
       "f.suggestions.title": "詞語建議與字首注音",
       "f.suggestions.desc":
-        "雙向加速長詞輸入：打前兩個字自動補全後文，或只敲每個字的第一個注音直接展開整句，用 <kbd>Shift</kbd>+<kbd>1…9</kbd> 選取，不干擾原本按鍵。觸發門檻可自訂（預設 2 個聲母）。",
+        "整合 libchewing、麥克注音（MIT）與現代台灣詞彙，提供超過 154,000 筆詞條。打前兩個字自動補全後文，或只敲每個字的第一個注音直接展開整句，用 <kbd>Shift</kbd>+<kbd>1…9</kbd> 選取，觸發門檻可自訂（預設 2 個聲母）。",
+      "f.adaptive.badge": "v6.2 新增",
+      "f.adaptive.title": "動態建議排序與自訂詞庫",
+      "f.adaptive.desc":
+        "依個人使用頻率與近期紀錄（Frecency）自動調整詞語建議、字首展開與邊打邊列字排序，自動匯入 <code>libchewing</code> 使用者詞庫，並支援 <code>plus-phrases-user.txt</code> 熱重載覆蓋。",
+      "f.adaptive.r1": "越常用的詞自動排前面",
+      "f.english.badge": "91,000+ 英文詞彙",
       "f.english.title": "內嵌英文模式與智慧提示",
       "f.english.desc":
-        "免切輸入法就能在中文句子裡插入英文並自動修正大小寫，前後中文留在組字區內持續可編輯。忘記切模式直接打英文時，下方自動提示轉換，按一下快速鍵直接填入。",
+        "內建超過 91,000 筆英文詞彙（SCOWL/ESDB 60 + 現代科技、AI、常見品牌與台灣地名／企業）。免切輸入法即可在中文裡插入英文並自動修正大小寫與補空白；忘記切模式直接打英文時，下方自動提示一鍵轉換。",
       "f.english.or": "或",
       "f.english.rshift": "右 Shift ×2",
       "f.english.hintNote": "直接把英文當注音打也會自動偵測",
@@ -55,30 +63,34 @@
       "f.spacing.desc":
         "中文與英文字母、數字相接時自動補上盤古空白，英文字母與數字可獨立開關，排版乾淨不費力。",
       "f.voice.badge": "選用啟用 · 100% 離線",
-      "f.voice.title": "本機語音輸入（voxkit）",
+      "f.voice.title": "本機語音輸入與翻譯（voxkit）",
       "f.voice.desc":
-        "按住快速鍵說話、放開即出字（Linux 預設右 Alt，macOS 預設右 Option）。由內附的 voxkit 服務在本機以 Qwen3-ASR-0.6B + Silero VAD + OpenCC <code>s2twp</code> 辨識並轉成台灣繁體，錄音絕不上傳，且會自動帶入你的新酷音個人詞庫提高專有名詞準確率。",
-      "f.voice.p1": "🔒 音訊不離開本機",
+        "按住聽寫鍵說話即出字（Linux 預設右 Alt，macOS 預設右 Option），按住翻譯鍵則透過本機 HY-MT1.5 模型直接翻成英文送出（Linux 預設右 Ctrl，macOS 預設右 Cmd，皆可自訂）。三平台皆以 Qwen3-ASR-0.6B + Silero VAD + OpenCC <code>s2twp</code> 離線辨識，並自動帶入你的新酷音個人詞庫。",
+      "f.voice.p1": "🔒 音訊與翻譯不離機",
       "f.voice.p2": "🇹🇼 OpenCC 台灣用語轉換",
-      "f.voice.p3": "📚 自動參考個人詞庫",
-      "f.voice.p4": "💤 預設不啟用，零閒置佔用",
+      "f.voice.p3": "📚 全平台參考個人詞庫",
+      "f.voice.p5": "🌐 本機 HY-MT1.5 語音翻譯",
+      "f.models.badge": "macOS + Linux 原生介面",
+      "f.models.title": "語音模型管理視窗",
+      "f.models.desc":
+        "macOS 採原生 SwiftUI、Linux 採 GTK4 / libadwaita，分成「語音辨識模型」與「翻譯模型」兩區，支援下載、續傳、取消、驗證、切換與刪除，服務未啟用時也能離線管理。",
       "f.privacy.title": "密碼欄位防護與中／英切換",
       "f.privacy.lshift": "左 Shift",
       "f.privacy.desc":
-        "偵測到密碼或敏感欄位時，自動停用所有 Plus 面板、自動空格與語音輸入。IBus 與 macOS 內建單按左 <kbd>Shift</kbd> 切換中／英並於狀態列顯示指示。",
+        "偵測到密碼或敏感欄位時，自動停用所有 Plus 面板、動態學習紀錄、自動空格與語音輸入。IBus 與 macOS 內建單按左 <kbd>Shift</kbd> 切換中／英並於狀態列顯示指示。",
       "arch.eyebrow": "架構設計",
       "arch.title": "一份核心，三個原生平台，零框架包袱",
       "arch.desc":
         "所有按鍵處理、設定表與記憶體映射詞庫都集中在 C++20 核心與穩定 C ABI，每個平台只負責繪製原生介面。",
       "arch.libchewing": "未修改上游引擎 · Bigram 語言模型 · v4 詞庫",
-      "arch.core": "C++20 核心 · 穩定 C ABI · 單一設定表 (settings.inc) · mmap 詞庫索引",
-      "arch.fcitx5": "原生 C++ Addon",
-      "arch.ibus": "純 C 引擎 + libadwaita 設定",
-      "arch.macos": "原生 Swift / InputMethodKit",
-      "arch.voxkit": "選用本機語音服務 · Qwen3-ASR-0.6B · Silero VAD · OpenCC s2twp",
+      "arch.core": "C++20 核心 · 穩定 C ABI · Frecency 動態排序 · mmap 154K+ 詞庫 & 91K+ 英文字典",
+      "arch.fcitx5": "原生 C++ Addon + GTK4 模型視窗",
+      "arch.ibus": "純 C 引擎 + libadwaita 設定與模型視窗",
+      "arch.macos": "原生 Swift / InputMethodKit + SwiftUI",
+      "arch.voxkit": "選用本機語音與翻譯服務 · Qwen3-ASR-0.6B · Silero VAD · HY-MT1.5 · OpenCC s2twp",
       "metric.mmap.title": "預編譯 mmap 詞庫載入",
       "metric.mmap.desc":
-        "詞語建議與單字表於建置期編譯成二進位索引，啟動零解析且跨程序共用記憶體分頁。",
+        "154,000+ 中文建議詞條與 18,000+ 單字表預先編譯成二進位索引，啟動零解析且跨程序共用記憶體分頁。",
       "metric.mem.title": "macOS 全功能執行記憶體",
       "metric.mem.desc":
         "純 AppKit + InputMethodKit 原生實作，無 Electron、無 Qt，多視窗共用同一份詞庫快取。",
@@ -91,12 +103,12 @@
         "所有安裝檔均附帶 libchewing 0.14、輸入法、預編譯詞庫與選用的 voxkit 語音服務。",
       "dl.macos.sub": "Apple Silicon · macOS 13+",
       "dl.macos.desc":
-        "安裝後自動註冊「新酷音 Plus」。所有 Plus 功能預設開啟，語音輸入可在安裝程式「自訂」畫面或輸入法選單中啟用。",
+        "安裝後自動註冊「新酷音 Plus」並附帶語音翻譯外掛與「語音模型」管理視窗。所有 Plus 功能預設開啟，語音輸入可在安裝程式「自訂」畫面或輸入法選單中啟用。",
       "dl.macos.gatekeeper":
         "套件未經 Apple 簽章：請對 .pkg 按右鍵 →「打開」以通過 Gatekeeper。",
       "dl.macos.btn": "下載 macOS 安裝檔",
       "dl.fcitx5.desc":
-        "取代系統的 libchewing（0.13）與 fcitx5-chewing。免打聲調與邊打邊列字預設開啟，其餘 Plus 選項可在 fcitx5 設定中啟用。",
+        "取代系統的 libchewing（0.13）與 fcitx5-chewing，內附 GTK4「語音模型」管理視窗。免打聲調與邊打邊列字預設開啟，另可加裝選用的 <code>chewing-plus-translate</code> 語音翻譯外掛。",
       "dl.ibus.desc":
         "含原生 IBus 引擎與「新酷音 Plus」設定程式（可管理 Plus 開關與語音模型）。安裝後執行 ibus restart 並加入輸入法即可。",
       "dl.copy": "複製",
@@ -104,17 +116,17 @@
       "dl.releases": "前往 GitHub Releases",
       "dl.defaults.title": "預設行為與自訂詞庫",
       "dl.defaults.body":
-        "免打聲調與邊打邊列字在三個平台皆預設開啟；語音輸入預設不啟用（載入模型約佔 260 MB RAM，首次使用前於設定中下載 ~850 MB 模型）。fcitx5 亦支援在 <code>~/.local/share/fcitx5-chewing/</code> 放置自訂的 <code>plus-emoji-shortcodes.txt</code> 與 <code>plus-english.txt</code>。",
+        "免打聲調、邊打邊列字與動態建議排序在三個平台皆預設開啟；語音輸入預設不啟用（載入辨識模型約佔 260 MB RAM，可在「語音模型」視窗下載）。個人自訂檔統一放於 Linux <code>~/.local/share/chewing-plus/</code>（相容舊路徑）或 macOS <code>~/Library/Application Support/ChewingPlus/</code>，支援 <code>plus-phrases-user.txt</code>、<code>plus-english.txt</code> 與 <code>plus-emoji-shortcodes.txt</code>。",
       "footer.releases": "版本下載",
       "footer.dev": "開發文件",
       "footer.issues": "問題回報",
       "footer.credits":
-        "基於 libchewing 0.14 與 fcitx5-chewing；內建資料來自 libchewing-data、gemoji（MIT）、SCOWL 與 fcitx5-voxkit（MIT）。",
+        "基於 libchewing 0.14 與 fcitx5-chewing；內建資料來自 libchewing-data、McBopomofo（MIT）、gemoji（MIT）、SCOWL/ESDB（MIT 類）與 fcitx5-voxkit（MIT）。",
     },
     en: {
       _title: "Chewing Plus — Modern Traditional Chinese Bopomofo Input Method",
       _desc:
-        "Enhanced Chewing (新酷音) Bopomofo input method: toneless typing, live character bar, phrase & initials suggestions, inline English mode, emoji shortcodes, calculator, and offline local voice dictation for macOS, fcitx5, and IBus.",
+        "Enhanced Chewing (新酷音) Bopomofo input method: toneless typing, live character bar, adaptive frecency ranking, 154K+ phrases, 91K+ inline English words, emoji shortcodes, calculator, and offline voice dictation & translation for macOS, fcitx5, and IBus.",
       brand: "Chewing Plus",
       "nav.demo": "Playground",
       "nav.features": "Features",
@@ -123,7 +135,7 @@
       "hero.badge": "v6.2.0 · Built on libchewing 0.14",
       "hero.title": 'Traditional Chinese typing, <span class="accent-text">reimagined</span>',
       "hero.subtitle":
-        "Toneless Bopomofo, live character picks, initial-only phrase expansion, inline English with smart casing, emoji shortcodes, instant calculator, and 100% offline voice dictation — one shared core across fcitx5, IBus, and macOS.",
+        "Toneless Bopomofo, live character picks, adaptive frecency ranking, 154K+ phrases & 91K+ smart English words, emoji shortcodes, instant calculator, and 100% offline voice dictation & translation — one shared core across fcitx5, IBus, and macOS.",
       "hero.ctaDownload": "Download Installer",
       "hero.ctaGithub": "View on GitHub",
       "demo.tab.toneless": "Toneless",
@@ -132,6 +144,7 @@
       "demo.tab.emoji": "Emoji",
       "demo.tab.calc": "Calculator",
       "demo.tab.voice": "Local Voice",
+      "demo.tab.translate": "Voice Translate",
       "demo.replay": "Replay",
       "features.eyebrow": "WHAT'S IN PLUS",
       "features.title": "Chewing's accuracy, supercharged with modern productivity tools",
@@ -145,12 +158,19 @@
       "f.live.title": "Live Character Bar",
       "f.live.desc":
         "As soon as you press the first Bopomofo symbol, likely characters appear below. Pick any with <kbd>Shift</kbd>+<kbd>1…9</kbd> without finishing the syllable.",
+      "f.suggestions.badge": "154,000+ Built-in Phrases",
       "f.suggestions.title": "Phrase Completion & Initials",
       "f.suggestions.desc":
-        "Type two characters to complete longer phrases, or type only the first Bopomofo of each syllable to expand full expressions. Select with <kbd>Shift</kbd>+<kbd>1…9</kbd>; minimum initials threshold is configurable (default 2).",
+        "Combines libchewing, McBopomofo (MIT), and curated modern Taiwan terms into 154,000+ phrases. Type two characters to complete or type only the first Bopomofo per syllable to expand with <kbd>Shift</kbd>+<kbd>1…9</kbd> (threshold configurable, default 2).",
+      "f.adaptive.badge": "New in v6.2",
+      "f.adaptive.title": "Adaptive Frecency & Custom Overlay",
+      "f.adaptive.desc":
+        "Re-ranks phrase completions, initials, and live characters by personal frequency & recency (Frecency). Automatically imports your <code>libchewing</code> user phrases and hot-reloads custom <code>plus-phrases-user.txt</code> overlays.",
+      "f.adaptive.r1": "Frequently used words float to the top",
+      "f.english.badge": "91,000+ English Words",
       "f.english.title": "Inline English Mode & Smart Hints",
       "f.english.desc":
-        "Insert auto-cased English directly into the Chewing composition buffer without switching input methods — surrounding Chinese stays editable. Forgot to switch? Keep typing and a live hint lets you convert with one shortcut.",
+        "Bundles 91,000+ English entries (SCOWL/ESDB size 60 + modern tech, AI, brand, and Taiwan terms). Insert auto-cased English directly into the buffer with automatic spacing; keep typing in Zhuyin and a live hint lets you convert with one shortcut.",
       "f.english.or": "or",
       "f.english.rshift": "Right Shift ×2",
       "f.english.hintNote": "Detects English words even if typed straight in Zhuyin",
@@ -164,30 +184,34 @@
       "f.spacing.desc":
         "Automatically inserts clean spaces where Chinese meets English letters or digits. Letters and digits can be toggled independently.",
       "f.voice.badge": "Opt-in · 100% Offline",
-      "f.voice.title": "On-Device Voice Dictation (voxkit)",
+      "f.voice.title": "On-Device Voice Dictation & Translation (voxkit)",
       "f.voice.desc":
-        "Hold push-to-talk to speak, release to insert at the cursor (Right Alt on Linux, Right Option on macOS). Powered locally by Qwen3-ASR-0.6B, Silero VAD, and OpenCC <code>s2twp</code> for Taiwan Traditional Chinese — audio never leaves your machine, and your own Chewing user phrases boost proper-noun accuracy.",
+        "Hold push-to-talk to dictate (Right Alt on Linux, Right Option on macOS), or hold the translate key to speak and insert an offline HY-MT1.5 translation (Right Ctrl on Linux, Right Cmd on macOS, customizable). Powered locally by Qwen3-ASR-0.6B, Silero VAD, and OpenCC <code>s2twp</code>, with your Chewing user phrases shared on all platforms.",
       "f.voice.p1": "🔒 Zero cloud upload",
       "f.voice.p2": "🇹🇼 Taiwan phrasing via OpenCC",
-      "f.voice.p3": "📚 Learns from your user phrases",
-      "f.voice.p4": "💤 Opt-in, 0 RAM when disabled",
+      "f.voice.p3": "📚 Learns from user phrases everywhere",
+      "f.voice.p5": "🌐 Local HY-MT1.5 translation",
+      "f.models.badge": "Native macOS + Linux UI",
+      "f.models.title": "Voice Model Manager",
+      "f.models.desc":
+        "Native SwiftUI on macOS and GTK4/libadwaita on Linux with separate Speech and Translation sections — download, resume, cancel, verify, switch, and delete models even while the daemon is stopped.",
       "f.privacy.title": "Password Field Safety & 中/英 Toggle",
       "f.privacy.lshift": "Left Shift",
       "f.privacy.desc":
-        "All Plus panels, auto-spacing, and dictation automatically shut off in password and sensitive fields. Tap Left <kbd>Shift</kbd> to switch 中/英 on IBus and macOS with a status indicator.",
+        "All Plus panels, adaptive usage recording, auto-spacing, and dictation strictly shut off in password and sensitive fields. Tap Left <kbd>Shift</kbd> to switch 中/英 on IBus and macOS with a status indicator.",
       "arch.eyebrow": "ARCHITECTURE",
       "arch.title": "One shared core, three native frontends, zero bloat",
       "arch.desc":
         "Key handling, unified settings, and memory-mapped dictionaries live inside a single C++20 core behind a stable C ABI. Each platform draws with its own native toolkit.",
       "arch.libchewing": "Unpatched upstream · Bigram LM · v4 user dictionary",
-      "arch.core": "C++20 core · Stable C ABI · Unified settings.inc · mmap binary indices",
-      "arch.fcitx5": "Native C++ Addon",
-      "arch.ibus": "Pure C engine + libadwaita prefs",
-      "arch.macos": "Native Swift / InputMethodKit",
-      "arch.voxkit": "Optional local voice daemon · Qwen3-ASR-0.6B · Silero VAD · OpenCC s2twp",
+      "arch.core": "C++20 core · Stable C ABI · Frecency ranking · mmap 154K+ phrases & 91K+ English",
+      "arch.fcitx5": "Native C++ Addon + GTK4 model window",
+      "arch.ibus": "Pure C engine + libadwaita prefs & models",
+      "arch.macos": "Native Swift / InputMethodKit + SwiftUI",
+      "arch.voxkit": "Optional local voice & MT daemon · Qwen3-ASR-0.6B · Silero VAD · HY-MT1.5 · OpenCC s2twp",
       "metric.mmap.title": "Memory-mapped dictionary load",
       "metric.mmap.desc":
-        "Phrase and live-character tables are pre-compiled at build time into binary indices — zero load-time parsing, shared across processes.",
+        "154,000+ phrase completions and 18,000+ live characters are pre-compiled into binary indices — zero load-time parsing, shared across processes.",
       "metric.mem.title": "Active memory on macOS",
       "metric.mem.desc":
         "Pure AppKit + InputMethodKit with no Qt or Electron. Dictionaries are cached and shared across every text field.",
@@ -200,12 +224,12 @@
         "Every package bundles libchewing 0.14, the input method, pre-compiled wordlists, and the optional voxkit voice daemon.",
       "dl.macos.sub": "Apple Silicon · macOS 13+",
       "dl.macos.desc":
-        "Automatically registers Chewing Plus on install. All Plus features start enabled; opt into voice during Installer customization or anytime from the input menu.",
+        "Automatically registers Chewing Plus with the local translation plugin and SwiftUI Voice Models window. All Plus features start enabled; opt into voice during Installer customization or anytime from the input menu.",
       "dl.macos.gatekeeper":
         "Unsigned package: right-click the .pkg → Open to install past Gatekeeper.",
       "dl.macos.btn": "Download macOS .pkg",
       "dl.fcitx5.desc":
-        "Replaces distro libchewing (0.13) and fcitx5-chewing in one transaction. Toneless typing and live characters start on; enable extra Plus options in fcitx5 settings.",
+        "Replaces distro libchewing (0.13) and fcitx5-chewing in one transaction and includes the GTK4 Voice Models window. Add the optional <code>chewing-plus-translate</code> package for offline voice translation.",
       "dl.ibus.desc":
         "Includes the native IBus engine and GTK4/libadwaita setup app for Plus toggles and voice models. Run ibus restart and add Chewing Plus in IBus preferences.",
       "dl.copy": "Copy",
@@ -213,12 +237,12 @@
       "dl.releases": "Open GitHub Releases",
       "dl.defaults.title": "Defaults & custom wordlists",
       "dl.defaults.body":
-        "Toneless typing and live characters are enabled by default on all platforms. Voice dictation is opt-in (loaded model uses ~260 MB RAM; download the ~850 MB model in settings before first use). On fcitx5, place custom <code>plus-emoji-shortcodes.txt</code> and <code>plus-english.txt</code> in <code>~/.local/share/fcitx5-chewing/</code> to override built-ins.",
+        "Toneless typing, live characters, and adaptive suggestion ranking are enabled by default on all platforms. Voice dictation is opt-in (~260 MB RAM loaded; download models from the Voice Models window). Place custom <code>plus-phrases-user.txt</code>, <code>plus-english.txt</code>, or <code>plus-emoji-shortcodes.txt</code> in <code>~/.local/share/chewing-plus/</code> (Linux) or <code>~/Library/Application Support/ChewingPlus/</code> (macOS).",
       "footer.releases": "Releases",
       "footer.dev": "Development Docs",
       "footer.issues": "Issues",
       "footer.credits":
-        "Built on libchewing 0.14 and fcitx5-chewing. Bundled data from libchewing-data, gemoji (MIT), SCOWL, and fcitx5-voxkit (MIT).",
+        "Built on libchewing 0.14 and fcitx5-chewing. Bundled data from libchewing-data, McBopomofo (MIT), gemoji (MIT), SCOWL/ESDB, and fcitx5-voxkit (MIT).",
     },
   };
 
@@ -246,8 +270,8 @@
       mode: "中",
       keys: ["ㄍ", "ㄒ", "ㄈ", "ㄘ", "⇧1"],
       caption: {
-        "zh-tw": "每個字只打第一個注音，Shift+1 直接展開並輸出整句成語（預設 2 個聲母即啟動，如 ㄇㄇ → 媽媽）。",
-        en: "Type only the first Bopomofo of each syllable and press Shift+1 to expand immediately (works from 2 initials, e.g. ㄇㄇ → 媽媽).",
+        "zh-tw": "每個字只打第一個注音，Shift+1 直接展開（內建 154,000+ 詞條並依個人使用習慣動態排序）。",
+        en: "Type only the first Bopomofo per syllable and press Shift+1 to expand (154,000+ phrases ranked adaptively by your usage).",
       },
       steps: [
         { k: 0, committed: "", preedit: "", hl: "ㄍ", aux: "", list: ["個", "國", "過", "高", "公"], prefix: "⇧", delay: 460 },
@@ -261,8 +285,8 @@
       mode: "中",
       keys: ["ㄋㄧˇ", "ㄏㄠˇ", "g", "i", "t", "h", "u", "b", "⌃⇧Space", "Enter"],
       caption: {
-        "zh-tw": "不用切換輸入法！直接打英文時下方會出現提示，按快速鍵直接轉成正確大小寫並自動加上中英空格。",
-        en: "No mode switching needed: typing English straight in Zhuyin triggers a smart hint — one shortcut converts, auto-cases, and adds CJK spacing.",
+        "zh-tw": "內建 91,000+ 英文詞彙！不用切換輸入法，直接打英文時下方自動提示，一鍵轉換大小寫並補空白。",
+        en: "91,000+ built-in English words: typing English straight in Zhuyin triggers a smart hint — one shortcut converts, auto-cases, and adds CJK spacing.",
       },
       steps: [
         { k: 0, committed: "", preedit: "你", hl: "", aux: "", list: [], delay: 420 },
@@ -350,6 +374,48 @@
           aux: "",
           list: [],
           delay: 2000,
+        },
+      ],
+    },
+    translate: {
+      mode: "中",
+      keys: ["按住右 Ctrl / ⌘", "說中文…", "放開"],
+      keysEn: ["Hold Right Ctrl / ⌘", "Speak Chinese…", "Release"],
+      caption: {
+        "zh-tw": "按住翻譯鍵直接說中文，透過本機 Qwen3-ASR + HY-MT1.5 離線翻譯成英文並送出至游標位置。",
+        en: "Hold the translate key and speak Chinese — local Qwen3-ASR + HY-MT1.5 translates completely offline and commits English at your cursor.",
+      },
+      steps: [
+        {
+          k: 0,
+          committed: "",
+          preedit: "",
+          hl: "",
+          aux: "🎙 語音翻譯聆聽中… (100% local)",
+          auxEn: "🎙 Listening for translation… (100% local)",
+          voice: true,
+          list: [],
+          delay: 950,
+        },
+        {
+          k: 1,
+          committed: "",
+          preedit: "",
+          hl: "",
+          aux: "HY-MT1.5 (llama.cpp) · 「請幫我把這個 PR 合併並發布新版」",
+          auxEn: "HY-MT1.5 (llama.cpp) · Translating locally…",
+          voice: true,
+          list: [],
+          delay: 1050,
+        },
+        {
+          k: 2,
+          committed: "Please merge this PR and publish a new release.",
+          preedit: "",
+          hl: "",
+          aux: "",
+          list: [],
+          delay: 2100,
         },
       ],
     },

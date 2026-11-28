@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>新酷音 Plus — Chewing Plus</title>
-  <meta name="description" content="新酷音輸入法加強版：免打聲調、邊打邊列字、詞語與字首建議、內嵌英文模式、Emoji 短碼、計算機與本機語音輸入，支援 macOS、fcitx5 與 IBus。">
+  <meta name="description" content="新酷音輸入法加強版：免打聲調、邊打邊列字、動態建議排序、154K+ 中文詞庫與 91K+ 英文辨識字典、Emoji 短碼、計算機與本機語音輸入／翻譯，支援 macOS、fcitx5 與 IBus。">
   <meta property="og:title" content="新酷音 Plus (Chewing Plus)">
-  <meta property="og:description" content="A modern Traditional Chinese Bopomofo input method built on libchewing 0.14 — toneless typing, live characters, initials expansion, inline English, emoji shortcodes, calculator, and offline voice dictation.">
+  <meta property="og:description" content="A modern Traditional Chinese Bopomofo input method built on libchewing 0.14 — toneless typing, live characters, adaptive frecency ranking, 154K+ phrases, 91K+ inline English words, emoji shortcodes, calculator, and offline voice dictation & translation.">
   <meta property="og:type" content="website">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -68,7 +68,7 @@
         </h1>
 
         <p class="hero-subtitle" data-i18n="hero.subtitle">
-          免打聲調、邊打邊列字、字首注音展開、免切輸入法打英文、Emoji 短碼、即時計算機與 100% 離線本機語音。一份核心，橫跨 fcitx5、IBus 與 macOS。
+          免打聲調、邊打邊列字、動態建議排序、154K+ 詞庫與 91K+ 英文智慧辨識、Emoji 短碼、即時計算機，以及 100% 離線本機語音輸入與翻譯。一份核心，橫跨 fcitx5、IBus 與 macOS。
         </p>
 
         <div class="hero-cta">
@@ -92,6 +92,7 @@
             <button type="button" class="demo-tab" role="tab" aria-selected="false" data-demo="emoji" data-i18n="demo.tab.emoji">Emoji 短碼</button>
             <button type="button" class="demo-tab" role="tab" aria-selected="false" data-demo="calc" data-i18n="demo.tab.calc">計算機</button>
             <button type="button" class="demo-tab" role="tab" aria-selected="false" data-demo="voice" data-i18n="demo.tab.voice">本機語音</button>
+            <button type="button" class="demo-tab" role="tab" aria-selected="false" data-demo="translate" data-i18n="demo.tab.translate">語音翻譯</button>
           </div>
 
           <div class="playground-stage">
@@ -175,15 +176,16 @@
 
           <!-- 3. Phrase Suggestions & Initials -->
           <article class="card card-wide">
+            <div class="card-badge" data-i18n="f.suggestions.badge">154,000+ 內建詞彙</div>
             <h3 data-i18n="f.suggestions.title">詞語建議與字首注音</h3>
             <p data-i18n="f.suggestions.desc">
-              雙向加速長詞輸入：打前兩個字自動補全後文，或只敲每個字的第一個注音直接展開整句，用 <kbd>Shift</kbd>+<kbd>1…9</kbd> 選取，不干擾原本按鍵。觸發門檻可自訂（預設 2 個聲母）。
+              整合 libchewing、麥克注音（MIT）與現代台灣詞彙，提供超過 154,000 筆詞條。打前兩個字自動補全後文，或只敲每個字的第一個注音直接展開整句，用 <kbd>Shift</kbd>+<kbd>1…9</kbd> 選取，觸發門檻可自訂（預設 2 個聲母）。
             </p>
             <div class="micro-grid">
               <div class="micro-demo">
-                <span class="mono-pill">中華</span>
+                <span class="mono-pill">生成</span>
                 <span class="arrow">→</span>
-                <span class="result-pill">中華民國 / 中華隊</span>
+                <span class="result-pill">生成式 / 生成式人工智慧</span>
               </div>
               <div class="micro-demo">
                 <span class="mono-pill">ㄍㄒㄈㄘ</span>
@@ -198,11 +200,25 @@
             </div>
           </article>
 
-          <!-- 4. Inline English Mode & Hints -->
+          <!-- 4. Adaptive Frecency Ranking & User Overlay -->
+          <article class="card">
+            <div class="card-badge" data-i18n="f.adaptive.badge">v6.2 新增</div>
+            <h3 data-i18n="f.adaptive.title">動態建議排序與自訂詞庫</h3>
+            <p data-i18n="f.adaptive.desc">
+              依個人使用頻率與近期紀錄（Frecency）自動調整詞語建議、字首展開與邊打邊列字排序，自動匯入 <code>libchewing</code> 使用者詞庫，並支援 <code>plus-phrases-user.txt</code> 熱重載覆蓋。
+            </p>
+            <div class="micro-stack">
+              <div class="micro-row"><span class="mono-tag">Frecency</span><span class="cand-preview" data-i18n="f.adaptive.r1">越常用的詞自動排前面</span></div>
+              <div class="micro-row"><span class="mono-tag">Overlay</span><span class="cand-preview"><code>plus-phrases-user.txt</code></span></div>
+            </div>
+          </article>
+
+          <!-- 5. Inline English Mode & Hints -->
           <article class="card card-wide">
+            <div class="card-badge" data-i18n="f.english.badge">91,000+ 英文詞彙</div>
             <h3 data-i18n="f.english.title">內嵌英文模式與智慧提示</h3>
             <p data-i18n="f.english.desc">
-              免切輸入法就能在中文句子裡插入英文並自動修正大小寫，前後中文留在組字區內持續可編輯。忘記切模式直接打英文時，下方自動提示轉換，按一下快速鍵直接填入。
+              內建超過 91,000 筆英文詞彙（SCOWL/ESDB 60 + 現代科技、AI、常見品牌與台灣地名／企業）。免切輸入法即可在中文裡插入英文並自動修正大小寫與補空白；忘記切模式直接打英文時，下方自動提示一鍵轉換。
             </p>
             <div class="micro-stack">
               <div class="micro-demo">
@@ -210,18 +226,18 @@
                 <span class="muted" data-i18n="f.english.or">或</span>
                 <kbd data-i18n="f.english.rshift">右 Shift ×2</kbd>
                 <span class="arrow">→</span>
-                <span class="mono-pill">[EN] github</span>
+                <span class="mono-pill">[EN] chatgpt</span>
                 <span class="arrow">→</span>
-                <span class="result-pill">GitHub</span>
+                <span class="result-pill">ChatGPT</span>
               </div>
               <div class="hint-preview">
-                <span class="hint-label">Ctrl+Shift+Space → GitHub</span>
+                <span class="hint-label">Ctrl+Shift+Space → GitHub · macOS · TSMC</span>
                 <span class="hint-sub" data-i18n="f.english.hintNote">直接把英文當注音打也會自動偵測</span>
               </div>
             </div>
           </article>
 
-          <!-- 5. Emoji Shortcodes & Candidates -->
+          <!-- 6. Emoji Shortcodes & Candidates -->
           <article class="card">
             <h3 data-i18n="f.emoji.title">Emoji 候選與 1,900+ 短碼</h3>
             <p data-i18n="f.emoji.desc">
@@ -234,7 +250,7 @@
             </div>
           </article>
 
-          <!-- 6. Inline Calculator -->
+          <!-- 7. Inline Calculator -->
           <article class="card">
             <h3 data-i18n="f.calc.title">即時計算機</h3>
             <p data-i18n="f.calc.desc">
@@ -247,7 +263,7 @@
             </div>
           </article>
 
-          <!-- 7. Auto Spacing -->
+          <!-- 8. Auto Spacing -->
           <article class="card">
             <h3 data-i18n="f.spacing.title">中英數自動空格</h3>
             <p data-i18n="f.spacing.desc">
@@ -260,31 +276,44 @@
             </div>
           </article>
 
-          <!-- 8. Offline Local Voice Dictation -->
-          <article class="card card-wide card-voice">
-            <div class="card-badge badge-subtle" data-i18n="f.voice.badge">選用啟用 · 100% 離線</div>
-            <h3 data-i18n="f.voice.title">本機語音輸入（voxkit）</h3>
-            <p data-i18n="f.voice.desc">
-              按住快速鍵說話、放開即出字（Linux 預設右 Alt，macOS 預設右 Option）。由內附的 voxkit 服務在本機以 Qwen3-ASR-0.6B + Silero VAD + OpenCC <code>s2twp</code> 辨識並轉成台灣繁體，錄音絕不上傳，且會自動帶入你的新酷音個人詞庫提高專有名詞準確率。
-            </p>
-            <div class="voice-points">
-              <span class="voice-pill" data-i18n="f.voice.p1">🔒 音訊不離開本機</span>
-              <span class="voice-pill" data-i18n="f.voice.p2">🇹🇼 OpenCC 台灣用語轉換</span>
-              <span class="voice-pill" data-i18n="f.voice.p3">📚 自動參考個人詞庫</span>
-              <span class="voice-pill" data-i18n="f.voice.p4">💤 預設不啟用，零閒置佔用</span>
-            </div>
-          </article>
-
           <!-- 9. Sensitive Field Safety + Shift Toggle -->
           <article class="card">
             <h3 data-i18n="f.privacy.title">密碼欄位防護與中／英切換</h3>
             <p data-i18n="f.privacy.desc">
-              偵測到密碼或敏感欄位時，自動停用所有 Plus 面板、自動空格與語音輸入。IBus 與 macOS 內建單按左 <kbd>Shift</kbd> 切換中／英並於狀態列顯示指示。
+              偵測到密碼或敏感欄位時，自動停用所有 Plus 面板、動態學習紀錄、自動空格與語音輸入。IBus 與 macOS 內建單按左 <kbd>Shift</kbd> 切換中／英並於狀態列顯示指示。
             </p>
             <div class="micro-demo">
               <kbd data-i18n="f.privacy.lshift">左 Shift</kbd>
               <span class="arrow">⇄</span>
               <span class="result-pill">中 / 英</span>
+            </div>
+          </article>
+
+          <!-- 10. Offline Local Voice Dictation & Translation -->
+          <article class="card card-wide card-voice">
+            <div class="card-badge badge-subtle" data-i18n="f.voice.badge">選用啟用 · 100% 離線</div>
+            <h3 data-i18n="f.voice.title">本機語音輸入與翻譯（voxkit）</h3>
+            <p data-i18n="f.voice.desc">
+              按住聽寫鍵說話即出字（Linux 預設右 Alt，macOS 預設右 Option），按住翻譯鍵則透過本機 HY-MT1.5 模型直接翻成英文送出（Linux 預設右 Ctrl，macOS 預設右 Cmd，皆可自訂）。三平台皆以 Qwen3-ASR-0.6B + Silero VAD + OpenCC <code>s2twp</code> 離線辨識，並自動帶入你的新酷音個人詞庫。
+            </p>
+            <div class="voice-points">
+              <span class="voice-pill" data-i18n="f.voice.p1">🔒 音訊與翻譯不離機</span>
+              <span class="voice-pill" data-i18n="f.voice.p2">🇹🇼 OpenCC 台灣用語轉換</span>
+              <span class="voice-pill" data-i18n="f.voice.p5">🌐 本機 HY-MT1.5 語音翻譯</span>
+              <span class="voice-pill" data-i18n="f.voice.p3">📚 全平台參考個人詞庫</span>
+            </div>
+          </article>
+
+          <!-- 11. Native Voice Model Manager -->
+          <article class="card">
+            <div class="card-badge badge-subtle" data-i18n="f.models.badge">macOS + Linux 原生介面</div>
+            <h3 data-i18n="f.models.title">語音模型管理視窗</h3>
+            <p data-i18n="f.models.desc">
+              macOS 採原生 SwiftUI、Linux 採 GTK4 / libadwaita，分成「語音辨識模型」與「翻譯模型」兩區，支援下載、續傳、取消、驗證、切換與刪除，服務未啟用時也能離線管理。
+            </p>
+            <div class="micro-stack">
+              <div class="micro-row"><span class="mono-tag">ASR</span><span class="cand-preview">Qwen3-ASR-0.6B · Silero VAD</span></div>
+              <div class="micro-row"><span class="mono-tag">MT</span><span class="cand-preview">HY-MT1.5 · llama.cpp</span></div>
             </div>
           </article>
         </div>
@@ -311,7 +340,7 @@
             <div class="arch-connector" aria-hidden="true">↓</div>
             <div class="arch-layer arch-core">
               <div class="arch-layer-title">libchewing-plus-core</div>
-              <div class="arch-layer-sub" data-i18n="arch.core">C++20 核心 · 穩定 C ABI · 單一設定表 (settings.inc) · mmap 詞庫索引</div>
+              <div class="arch-layer-sub" data-i18n="arch.core">C++20 核心 · 穩定 C ABI · Frecency 動態排序 · mmap 154K+ 詞庫 &amp; 91K+ 英文字典</div>
             </div>
             <div class="arch-branches" aria-hidden="true">
               <span></span><span></span><span></span>
@@ -319,21 +348,21 @@
             <div class="arch-frontends">
               <div class="arch-node">
                 <strong>fcitx5</strong>
-                <span data-i18n="arch.fcitx5">原生 C++ Addon</span>
+                <span data-i18n="arch.fcitx5">原生 C++ Addon + GTK4 模型視窗</span>
               </div>
               <div class="arch-node">
                 <strong>IBus</strong>
-                <span data-i18n="arch.ibus">純 C 引擎 + libadwaita 設定</span>
+                <span data-i18n="arch.ibus">純 C 引擎 + libadwaita 設定與模型視窗</span>
               </div>
               <div class="arch-node">
                 <strong>macOS</strong>
-                <span data-i18n="arch.macos">原生 Swift / InputMethodKit</span>
+                <span data-i18n="arch.macos">原生 Swift / InputMethodKit + SwiftUI</span>
               </div>
             </div>
             <div class="arch-connector" aria-hidden="true">↕</div>
             <div class="arch-layer arch-voxkit">
               <div class="arch-layer-title">voxkit Daemon <span class="arch-tag">Unix Socket v1</span></div>
-              <div class="arch-layer-sub" data-i18n="arch.voxkit">選用本機語音服務 · Qwen3-ASR-0.6B · Silero VAD · OpenCC s2twp</div>
+              <div class="arch-layer-sub" data-i18n="arch.voxkit">選用本機語音與翻譯服務 · Qwen3-ASR-0.6B · Silero VAD · HY-MT1.5 · OpenCC s2twp</div>
             </div>
           </div>
 
@@ -342,7 +371,7 @@
               <div class="metric-value">&lt; 1 ms</div>
               <div class="metric-label" data-i18n="metric.mmap.title">預編譯 mmap 詞庫載入</div>
               <p class="metric-desc" data-i18n="metric.mmap.desc">
-                詞語建議與單字表於建置期編譯成二進位索引，啟動零解析且跨程序共用記憶體分頁。
+                154,000+ 中文建議詞條與 18,000+ 單字表預先編譯成二進位索引，啟動零解析且跨程序共用記憶體分頁。
               </p>
             </div>
             <div class="metric-card">
@@ -386,7 +415,7 @@
               <span class="pkg-tag">.pkg</span>
             </div>
             <p class="install-note" data-i18n="dl.macos.desc">
-              安裝後自動註冊「新酷音 Plus」。所有 Plus 功能預設開啟，語音輸入可在安裝程式「自訂」畫面或輸入法選單中啟用。
+              安裝後自動註冊「新酷音 Plus」並附帶語音翻譯外掛與「語音模型」管理視窗。所有 Plus 功能預設開啟，語音輸入可在安裝程式「自訂」畫面或輸入法選單中啟用。
             </p>
             <div class="callout-mini" data-i18n="dl.macos.gatekeeper">
               套件未經 Apple 簽章：請對 .pkg 按右鍵 →「打開」以通過 Gatekeeper。
@@ -406,7 +435,7 @@
               <span class="pkg-tag">.pkg.tar.zst</span>
             </div>
             <p class="install-note" data-i18n="dl.fcitx5.desc">
-              取代系統的 libchewing（0.13）與 fcitx5-chewing。免打聲調與邊打邊列字預設開啟，其餘 Plus 選項可在 fcitx5 設定中啟用。
+              取代系統的 libchewing（0.13）與 fcitx5-chewing，內附 GTK4「語音模型」管理視窗。免打聲調與邊打邊列字預設開啟，另可加裝選用的 <code>chewing-plus-translate</code> 語音翻譯外掛。
             </p>
             <div class="code-box">
               <code>sudo pacman -U chewing-plus-fcitx5-*.pkg.tar.zst</code>
@@ -443,7 +472,7 @@
           <div>
             <strong data-i18n="dl.defaults.title">預設行為與自訂詞庫</strong>
             <p data-i18n="dl.defaults.body">
-              免打聲調與邊打邊列字在三個平台皆預設開啟；語音輸入預設不啟用（載入模型約佔 260 MB RAM，首次使用前於設定中下載 ~850 MB 模型）。fcitx5 亦支援在 <code>~/.local/share/fcitx5-chewing/</code> 放置自訂的 <code>plus-emoji-shortcodes.txt</code> 與 <code>plus-english.txt</code>。
+              免打聲調、邊打邊列字與動態建議排序在三個平台皆預設開啟；語音輸入預設不啟用（載入辨識模型約佔 260 MB RAM，可在「語音模型」視窗下載）。個人自訂檔統一放於 Linux <code>~/.local/share/chewing-plus/</code>（相容舊路徑）或 macOS <code>~/Library/Application Support/ChewingPlus/</code>，支援 <code>plus-phrases-user.txt</code>、<code>plus-english.txt</code> 與 <code>plus-emoji-shortcodes.txt</code>。
             </p>
           </div>
         </div>
@@ -465,7 +494,7 @@
         <a href="https://github.com/siygle/chewing-plus/issues" target="_blank" rel="noopener" data-i18n="footer.issues">問題回報</a>
       </div>
       <p class="footer-credits" data-i18n="footer.credits">
-        基於 libchewing 0.14 與 fcitx5-chewing；內建資料來自 libchewing-data、gemoji（MIT）、SCOWL 與 fcitx5-voxkit（MIT）。
+        基於 libchewing 0.14 與 fcitx5-chewing；內建資料來自 libchewing-data、McBopomofo（MIT）、gemoji（MIT）、SCOWL/ESDB（MIT 類）與 fcitx5-voxkit（MIT）。
       </p>
     </div>
   </footer>
