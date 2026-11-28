@@ -1,5 +1,13 @@
 新酷音 Plus：在新酷音上加入 emoji、計算機、英文模式與本機語音輸入。基於 [fcitx/fcitx5-chewing](https://github.com/fcitx/fcitx5-chewing) 與 libchewing 0.14。功能說明請看 [README](https://github.com/siygle/chewing-plus#readme)。
 
+## 6.2.0
+
+- **動態建議排序（Frecency）**：詞語補全、字首注音展開與邊打邊列字會依個人使用頻率與近期使用紀錄自動微調排序，同時自動匯入 `libchewing` 使用者詞庫。紀錄存於 `~/.local/share/chewing-plus/plus-usage.tsv`（macOS 為 `~/Library/Application Support/ChewingPlus/plus-usage.tsv`），密碼／敏感輸入欄位絕不記錄。
+- **使用者自訂詞庫覆蓋層**：支援 `plus-phrases-user.txt` 熱重載，不需重編索引即可即時擴充詞語建議與字首展開。
+- **中文詞庫大幅擴充**：整合麥克注音（MIT）與 175 條現代台灣常用詞，內建建議詞庫由 128,973 筆擴增至 **154,224 筆**。
+- **英文辨識字典升級擴充**：升級至 SCOWL/ESDB size 60（US + hacker）並併入策展的現代科技、AI、開發工具、常見品牌與台灣地名／企業詞彙，英文字典由 71,686 筆擴增至 **91,282 筆**。
+- **跨平台核心清理與修正**：macOS 語音開始時同步傳入使用者詞彙、切焦點與切換中英改用安全 flush（不再誤送 Return）；`Shift+1..9` 選詞邏輯統一收斂至共用核心；優化 Top-K 建議挑選與零配置版本雜湊；統一三平台個人資料目錄路徑。
+
 ## 6.1.2
 
 - **Linux 語音模型視窗**：GTK4 + libadwaita，對齊 macOS。畫面分成「語音辨識模型」與「翻譯模型」兩區，可下載、續傳、取消、刪除、檢查與切換；HY-MT 等受限模型須先勾選同意授權。語音服務沒開時改走離線 CLI。
